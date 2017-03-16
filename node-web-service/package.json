@@ -1,0 +1,14 @@
+{
+  "name": "chainpoint-node-web-service",
+  "version": "1.0.0",
+  "description": "Chainpoint front-end HTTP API server",
+  "author": "Glenn Rempe <glenn@tierion.com>",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.15.2"
+  }
+}
