@@ -65,6 +65,27 @@ function isEven (n) {
   return n === parseFloat(n) && !(n % 2)
 }
 
+// Utility function to add minutes to a Date object
+function addMinutes (date, minutes) {
+  return new Date(date.getTime() + (minutes * 60000))
+}
+
+// Utility function to convert Date to ISO8601
+// formatted string with JS Standard `ms` since
+// epoch removed.
+// e.g. '2017-03-19T23:24:32Z'
+function formatDateISO8601NoMs (date) {
+  return date.toISOString().slice(0, 19) + 'Z'
+}
+
+// Utility function to Generate a Key ID which is SHA256(pubKey)
+// as a hex string. This allows later lookup of that key and verification
+// that the key bytes returned hash to the same value as the
+// keyID used to retrieve it.
+function signingKeyID () {
+  return (Buffer.from(sha256(signingKeypair.publicKey))).toString('hex')
+}
+
 /**
  *
  * POST /hashes
@@ -123,7 +144,7 @@ function postHashesV1 (req, res, next) {
 
   // Run a map function over every hash to generate a UUIDv1
   // for each and a signature over the hash data.
-  let hashesWithMetadata = lowerCasedHashes.map(function (hash) {
+  let signedHashes = lowerCasedHashes.map(function (hash) {
     let hashObj = {}
     let sigObj = {}
 
@@ -152,16 +173,21 @@ function postHashesV1 (req, res, next) {
 
   // COMMON METADATA
 
-  let metaDataObj = {}
+  let signatureDataObj = {}
   // Type : Currently only 'ed25519' allowed
-  metaDataObj.signature_type = 'ed25519'
+  signatureDataObj.type = 'ed25519'
   // The SHA256 hash (fingerprint) of the public signing key.
-  metaDataObj.signature_key_id = (Buffer.from(sha256(signingKeypair.secretKey))).toString('hex')
+  signatureDataObj.key_id = signingKeyID()
+
+  let metaDataObj = {}
   // UTC Date in ISO 8601 format without milliseconds
   // e.g. '2017-03-19T23:24:32Z'
-  metaDataObj.timestamp = new Date().toISOString().slice(0, 19) + 'Z'
+  let timestamp = new Date()
+  metaDataObj.timestamp = formatDateISO8601NoMs(timestamp)
+  metaDataObj.processing_time_hint = formatDateISO8601NoMs(addMinutes(timestamp, 11))
+  metaDataObj.signature = signatureDataObj
 
-  let respObj = {meta: metaDataObj, hashes: hashesWithMetadata}
+  let respObj = {meta: metaDataObj, hashes: signedHashes}
 
   // FIXME : Publish to RabbitMQ
   //
