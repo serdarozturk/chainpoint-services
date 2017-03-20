@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  # level 0 chainpoint/node-aggregator-service
+  l0a:
+    image: chainpoint/node-aggregator-service
+    build:
+      context: ./node-aggregator-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
+  # level 1 chainpoint/node-aggregator-service
+  l1a:
+    image: chainpoint/node-aggregator-service
+    build:
+      context: ./node-aggregator-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
+  # level 2 chainpoint/node-aggregator-service
+  l2a:
+    image: chainpoint/node-aggregator-service
+    build:
+      context: ./node-aggregator-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
+  # HTTP API front-end chainpoint/node-web-service
+  web:
+    image: chainpoint/node-web-service
+    build:
+      context: ./node-web-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
+  rabbitmq:
+    image: "rabbitmq:alpine"
+
+  redis:
+    image: "redis:alpine"
+
+  # linkerd
+  l5d:
+    image: buoyantio/linkerd:0.9.0
+    ports:
+    - "4140:4140"
+    - "9990:9990"
+    # we must mount the config file and the disco directory
+    volumes:
+    - ./linkerd.yaml:/io.buoyant/linkerd.yaml:ro
+    - ./disco:/io.buoyant/disco
+    command: >
+      /io.buoyant/linkerd.yaml
