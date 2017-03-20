@@ -14,7 +14,6 @@
     "is-uuid": "^1.0.2",
     "lodash": "^4.17.4",
     "objecthash": "^1.0.2",
-    "redis": "^2.7.1",
     "restify": "^4.3.0",
     "tweetnacl": "^1.0.0-rc.1",
     "tweetnacl-util": "^0.15.0",

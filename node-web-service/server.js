@@ -31,14 +31,6 @@ nacl.util = require('tweetnacl-util')
 // FIXME : Must instantiate signing keypair from an external secret!
 const signingKeypair = nacl.sign.keyPair()
 
-// REDIS
-// see: http://redis.js.org
-const r = require('redis')
-const redis = r.createClient({host: 'redis'})
-
-redis.on('error', function (err) {
-  console.log('Error ' + err)
-})
 
 // AMQP / RabbitMQ
 // const q = 'tasks'
@@ -60,35 +52,146 @@ redis.on('error', function (err) {
 //   })
 // }).catch(console.warn)
 
-// Utility function to test if a numeric is Even or Odd
+/**
+ * Test if a number is Even or Odd
+ *
+ * @param {number} n - The number to test
+ * @returns {Boolean}
+ */
 function isEven (n) {
   return n === parseFloat(n) && !(n % 2)
 }
 
-// Utility function to add minutes to a Date object
+/**
+ * Add specified minutes to a Date object
+ *
+ * @param {Date} date - The starting date
+ * @param {number} minutes - The number of minutes to add to the date
+ * @returns {Date}
+ */
 function addMinutes (date, minutes) {
   return new Date(date.getTime() + (minutes * 60000))
 }
 
-// Utility function to convert Date to ISO8601
-// formatted string with JS Standard `ms` since
-// epoch removed.
-// e.g. '2017-03-19T23:24:32Z'
+/**
+ * Convert Date to ISO8601 string, stripping milliseconds
+ * '2017-03-19T23:24:32Z'
+ *
+ * @param {Date} date - The date to convert
+ * @returns {string} An ISO8601 formatted time string
+ */
 function formatDateISO8601NoMs (date) {
   return date.toISOString().slice(0, 19) + 'Z'
 }
 
-// Utility function to Generate a Key ID which is SHA256(pubKey)
-// as a hex string. This allows later lookup of that key and verification
-// that the key bytes returned hash to the same value as the
-// keyID used to retrieve it.
+/**
+ * Convert strings in an Array of hashes to lower case
+ *
+ * @param {string[]} hashes - An array of string hashes to convert to lower case
+ * @returns {string[]} An array of lowercase hash strings
+ */
+function lowerCaseHashes (hashes) {
+  return hashes.map(function (hash) {
+    return hash.toLowerCase()
+  })
+}
+
+/**
+ * Generate a Key ID which is SHA256(pubKey) as a hex string.
+ * This allows later lookup of that key and verification that
+ * the key bytes returned hash to the same value as the keyID
+ * used to retrieve it.
+ *
+ * @returns {string} A SHA256 hash hex string
+ */
 function signingKeyID () {
   return (Buffer.from(sha256(signingKeypair.publicKey))).toString('hex')
 }
 
 /**
+ * Hash the provided object deterministically using 'objectHash'
+ * library and sign it with ed25519 signature.
  *
- * POST /hashes
+ * @param {*} obj - An Object to hash and sign
+ * @returns {Object} An Object with 'data_hash' and 'signature' properties
+ */
+function hashAndSignObject (obj) {
+  let hashObjSHA256 = objectHash(obj)
+  let sigObj = {}
+  sigObj.data_hash = hashObjSHA256.toString('hex')
+  let hashObjSHA256Signature = nacl.sign(hashObjSHA256, signingKeypair.secretKey)
+  sigObj.signature = nacl.util.encodeBase64(hashObjSHA256Signature)
+  return sigObj
+}
+
+/**
+ * Accepts a hex string hash and wraps it in an Object with
+ * 'data' and 'signature' properties.
+ *
+ * The 'data' property contains the original hash and a UUID.
+ * The 'signature' property contains a hash over the 'data' object
+ * and a signature on that hash.
+ *
+ * @param {string} hash - A hex string hash value
+ * @returns {Object}
+ */
+function generateSignedHashObj (hash) {
+  let hashObj = {}
+  hashObj.id = uuidv1()
+  hashObj.hash = hash
+  return {data: hashObj, signature: hashAndSignObject(hashObj)}
+}
+
+/**
+ * Generate the values for the 'meta' property in a POST /hashes response.
+ *
+ * Returns an Object with metadata about a POST /hashes request
+ * including a 'timestamp', hints for estimated time to completion
+ * for various operations, and info about the signing key used.
+ *
+ * @returns {Object}
+ */
+function generatePostHashesResponseMetadata () {
+  let metaDataObj = {}
+  let timestamp = new Date()
+  metaDataObj.timestamp = formatDateISO8601NoMs(timestamp)
+
+  metaDataObj.processing_hints = {
+    cal: formatDateISO8601NoMs(addMinutes(timestamp, 1)),
+    eth: formatDateISO8601NoMs(addMinutes(timestamp, 11)),
+    btc: formatDateISO8601NoMs(addMinutes(timestamp, 61))
+  }
+
+  metaDataObj.signature = {
+    type: 'ed25519',
+    key_id: signingKeyID()
+  }
+
+  return metaDataObj
+}
+
+/**
+ * Converts an array of hash strings to a object suitable to
+ * return to HTTP clients.
+ *
+ * @param {string[]} hashes - An array of string hashes to process
+ * @returns {Object} An Object with 'meta' and 'hashes' properties
+ */
+function generatePostHashesResponse (hashes) {
+  let lcHashes = lowerCaseHashes(hashes)
+  let signedHashes = lcHashes.map(function (hash) {
+    return generateSignedHashObj(hash)
+  })
+
+  return {
+    meta: generatePostHashesResponseMetadata(),
+    hashes: signedHashes
+  }
+}
+
+/**
+ * POST /hashes handler
+ *
  * Expects a JSON body with the form:
  *   {"hashes": ["hash1", "hash2", "hashN"]}
  *
@@ -100,7 +203,6 @@ function signingKeyID () {
  * - minimum 40 chars long (e.g. 20 byte SHA1)
  * - maximum 128 chars long (e.g. 64 byte SHA512)
  * - an even length string
- *
  */
 function postHashesV1 (req, res, next) {
   // validate content-type sent was 'application/json'
@@ -137,57 +239,7 @@ function postHashesV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid hashes present'))
   }
 
-  // Normalize all hashes to lower case strings
-  let lowerCasedHashes = req.params.hashes.map(function (hash) {
-    return hash.toLowerCase()
-  })
-
-  // Run a map function over every hash to generate a UUIDv1
-  // for each and a signature over the hash data.
-  let signedHashes = lowerCasedHashes.map(function (hash) {
-    let hashObj = {}
-    let sigObj = {}
-
-    hashObj.id = uuidv1()
-    console.log('%s (string) created at %s', hashObj.id, uuidTime.v1(hashObj.id))
-
-    // The original (lower cased) hash submitted.
-    hashObj.hash = hash
-
-    // Compute the SHA256 hash over normalized `h`
-    let hashObjSHA256 = objectHash(hashObj)
-    sigObj.data_hash = hashObjSHA256.toString('hex')
-
-    // The ed25519 signature over the hash of the object we are signing
-    let hashObjSHA256Signature = nacl.sign(hashObjSHA256, signingKeypair.secretKey)
-
-    // The Base64 representation of the `ed25519` signature
-    sigObj.signature = nacl.util.encodeBase64(hashObjSHA256Signature)
-
-    // FIXME : Redis Test
-    redis.set('string key', 'string val', r.print)
-    redis.get('string key', r.print)
-
-    return {data: hashObj, signature: sigObj}
-  })
-
-  // COMMON METADATA
-
-  let signatureDataObj = {}
-  // Type : Currently only 'ed25519' allowed
-  signatureDataObj.type = 'ed25519'
-  // The SHA256 hash (fingerprint) of the public signing key.
-  signatureDataObj.key_id = signingKeyID()
-
-  let metaDataObj = {}
-  // UTC Date in ISO 8601 format without milliseconds
-  // e.g. '2017-03-19T23:24:32Z'
-  let timestamp = new Date()
-  metaDataObj.timestamp = formatDateISO8601NoMs(timestamp)
-  metaDataObj.processing_time_hint = formatDateISO8601NoMs(addMinutes(timestamp, 11))
-  metaDataObj.signature = signatureDataObj
-
-  let respObj = {meta: metaDataObj, hashes: signedHashes}
+  let responseObj = generatePostHashesResponse(req.params.hashes)
 
   // FIXME : Publish to RabbitMQ
   //
@@ -200,17 +252,16 @@ function postHashesV1 (req, res, next) {
   //   })
   // }).catch(console.warn)
 
-  res.send(respObj)
+  res.send(responseObj)
   return next()
 }
 
-//
-//
 /**
- * GET /proof/:id
- * Expects a query string Hash ID in the form of a Version 1 UUID
+ * GET /proofs/:id handler
  *
- * Returns a chainpoint proof for the given Hash ID
+ * Expects a query string Hash 'id' in the form of a Version 1 UUID
+ *
+ * Returns a chainpoint proof for the requested Hash ID
  */
 function getProofByIDV1 (req, res, next) {
   // isUUID.v1()
@@ -226,8 +277,10 @@ server.use(restify.bodyParser())
 
 // API RESOURCES
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
-server.get({ path: '/proof/:id', version: '1.0.0' }, getProofByIDV1)
+server.post({ path: '/proofs', version: '1.0.0' }, getProofByIDV1)
+server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofByIDV1)
 
+// SERVER
 server.listen(8080, function () {
   console.log('%s listening at %s', server.name, server.url)
 })
