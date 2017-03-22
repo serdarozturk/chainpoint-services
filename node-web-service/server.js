@@ -15,25 +15,6 @@ const isUUID = require('is-uuid')
 // see: https://github.com/indexzero/uuid-time
 var uuidTime = require('uuid-time')
 
-// Deterministic Object Hashing
-// see: https://github.com/emschwartz/objecthash-js
-// see: https://github.com/benlaurie/objecthash
-const objectHash = require('objecthash')
-
-// see: https://github.com/dchest/fast-sha256-js
-const sha256 = require('fast-sha256')
-
-// TweetNaCl.js
-// see: http://ed25519.cr.yp.to
-// see: https://github.com/dchest/tweetnacl-js#signatures
-const nacl = require('tweetnacl')
-nacl.util = require('tweetnacl-util')
-
-// Instantiate signing keypair from an external secret.
-// FIXME : Externalize this secret!
-const signingKeypairSeed = nacl.randomBytes(32)
-const signingKeypair = nacl.sign.keyPair.fromSeed(signingKeypairSeed)
-
 // AMQP / RabbitMQ
 // const q = 'tasks'
 // const open = require('amqplib').connect('amqp://127.0.0.1')
@@ -99,83 +80,15 @@ function lowerCaseHashes (hashes) {
 }
 
 /**
- * Generate a Key ID which is SHA256(pubKey) as a hex string.
- * This allows later lookup of that key and verification that
- * the key bytes returned hash to the same value as the keyID
- * used to retrieve it.
- *
- * @returns {string} A SHA256 hash hex string
- */
-function signingKeyID () {
-  return (Buffer.from(sha256(signingKeypair.publicKey))).toString('hex')
-}
-
-/**
- * Generate a Base64 encoded signature over a Byte Array
- *
- * @param {number[]} hashBytes - An array of bytes representing a hash to be signed.
- * @returns {string} A Base 64 encoded ed25519 signature
- */
-function signHashBytes (hashBytes) {
-  return nacl.util.encodeBase64(nacl.sign(hashBytes, signingKeypair.secretKey))
-}
-
-/**
- * Hash the provided object deterministically using 'objectHash'
- * library and sign it with ed25519 signature.
- *
- * @param {*} obj - An Object to hash and sign
- * @returns {Object} An Object with 'data_hash' and 'signature' properties
- */
-function hashAndSignObject (obj) {
-  let hashObjSHA256 = objectHash(obj)
-  let sigObj = {}
-  sigObj.type = 'ed25519',
-  sigObj.key_id = signingKeyID()
-  sigObj.data_hash = hashObjSHA256.toString('hex')
-  sigObj.signature = signHashBytes(hashObjSHA256)
-  return sigObj
-}
-
-/**
- * Accepts a hex string hash and wraps it in an Object with
- * 'data' and 'signature' properties.
- *
- * The 'data' property contains the original hash and a UUID.
- * The 'signature' property contains a hash over the 'data' object
- * and a signature on that hash.
- *
- * @param {string} hash - A hex string hash value
- * @param {Boolean} signHash - Should hashes be individually signed or not?
- * @returns {Object}
- */
-function generateHashObj (hash, signHash) {
-  let hashObj = {}
-  hashObj.id = uuidv1()
-  hashObj.hash = hash
-
-  let resp = {}
-  resp.data = hashObj
-
-  if (signHash === true) {
-    resp.signature = hashAndSignObject(hashObj)
-  }
-
-  return resp
-}
-
-/**
  * Generate the values for the 'meta' property in a POST /hashes response.
  *
  * Returns an Object with metadata about a POST /hashes request
- * including a 'timestamp', hints for estimated time to completion
- * for various operations, and info about the signing key used.
+ * including a 'timestamp', and hints for estimated time to completion
+ * for various operations.
  *
- * @param {Object[]} hashes - An array of hash objects to sign
- * @param {Boolean} signMeta - Should the meta contain a signature over all hashes or not?
  * @returns {Object}
  */
-function generatePostHashesResponseMetadata (hashes, signMeta) {
+function generatePostHashesResponseMetadata () {
   let metaDataObj = {}
   let timestamp = new Date()
   metaDataObj.timestamp = formatDateISO8601NoMs(timestamp)
@@ -186,10 +99,6 @@ function generatePostHashesResponseMetadata (hashes, signMeta) {
     btc: formatDateISO8601NoMs(addMinutes(timestamp, 61))
   }
 
-  if (signMeta === true) {
-    metaDataObj.signature = hashAndSignObject(hashes)
-  }
-
   return metaDataObj
 }
 
@@ -198,18 +107,19 @@ function generatePostHashesResponseMetadata (hashes, signMeta) {
  * return to HTTP clients.
  *
  * @param {string[]} hashes - An array of string hashes to process
- * @param {Boolean} signMeta - Should the meta contain a signature over all hashes and metadata or not?
- * @param {Boolean} signHash - Should hashes be individually signed or not?
  * @returns {Object} An Object with 'meta' and 'hashes' properties
  */
-function generatePostHashesResponse (hashes, signMeta, signHash) {
+function generatePostHashesResponse (hashes) {
   let lcHashes = lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map(function (hash) {
-    return generateHashObj(hash, signHash)
+    let hashObj = {}
+    hashObj.id = uuidv1()
+    hashObj.hash = hash
+    return hashObj
   })
 
   return {
-    meta: generatePostHashesResponseMetadata(hashObjects, signMeta),
+    meta: generatePostHashesResponseMetadata(hashObjects),
     hashes: hashObjects
   }
 }
@@ -264,7 +174,7 @@ function postHashesV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid hashes present'))
   }
 
-  let responseObj = generatePostHashesResponse(req.params.hashes, false, false)
+  let responseObj = generatePostHashesResponse(req.params.hashes)
 
   // FIXME : Publish to RabbitMQ
   //
