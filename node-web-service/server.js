@@ -295,8 +295,21 @@ function getProofByIDV1 (req, res, next) {
   return next()
 }
 
+/**
+ * GET / handler
+ *
+ * Root path handler with default message.
+ *
+ */
+function rootV1 (req, res, next) {
+  return next(new restify.ImATeapotError('This is an API endpoint. Please consult https://www.chainpoint.org'))
+}
+
 // RESTIFY
-var server = restify.createServer()
+var server = restify.createServer({
+  name: 'chainpoint'
+})
+
 server.use(restify.queryParser())
 server.use(restify.bodyParser())
 
@@ -304,6 +317,7 @@ server.use(restify.bodyParser())
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
 server.post({ path: '/proofs', version: '1.0.0' }, getProofByIDV1)
 server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofByIDV1)
+server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // SERVER
 server.listen(8080, function () {
