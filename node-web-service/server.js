@@ -28,9 +28,11 @@ const sha256 = require('fast-sha256')
 // see: https://github.com/dchest/tweetnacl-js#signatures
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
-// FIXME : Must instantiate signing keypair from an external secret!
-const signingKeypair = nacl.sign.keyPair()
 
+// Instantiate signing keypair from an external secret.
+// FIXME : Externalize this secret!
+const signingKeypairSeed = nacl.randomBytes(32)
+const signingKeypair = nacl.sign.keyPair.fromSeed(signingKeypairSeed)
 
 // AMQP / RabbitMQ
 // const q = 'tasks'
