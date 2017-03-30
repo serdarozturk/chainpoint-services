@@ -7,7 +7,7 @@
 # see: https://github.com/nodejs/LTS
 # see: https://hub.docker.com/_/node/
 # see: https://alpinelinux.org/
-FROM node:boron-alpine
+FROM node:7.8.0-alpine
 
 # /me
 MAINTAINER Glenn Rempe <glenn@tierion.com>
