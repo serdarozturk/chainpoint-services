@@ -1,27 +1,9 @@
 version: '3'
 
 services:
-  # level 0 chainpoint/node-aggregator-service
-  l0a:
+  aggregator:
     image: chainpoint/node-aggregator-service
-    build:
-      context: ./node-aggregator-service
-    depends_on:
-      - l5d
-      - rabbitmq
-
-  # level 1 chainpoint/node-aggregator-service
-  l1a:
-    image: chainpoint/node-aggregator-service
-    build:
-      context: ./node-aggregator-service
-    depends_on:
-      - l5d
-      - rabbitmq
-
-  # level 2 chainpoint/node-aggregator-service
-  l2a:
-    image: chainpoint/node-aggregator-service
+    container_name: aggregator
     build:
       context: ./node-aggregator-service
     depends_on:
@@ -31,21 +13,34 @@ services:
   # HTTP API front-end chainpoint/node-web-service
   web:
     image: chainpoint/node-web-service
+    container_name: web
     build:
       context: ./node-web-service
     depends_on:
       - l5d
       - rabbitmq
 
+  # RabbitMQ Admin Page : http://127.0.0.1:15672/
   rabbitmq:
-    image: "rabbitmq:alpine"
+    image: "rabbitmq:management-alpine"
+    hostname: rabbitmq
+    container_name: rabbitmq
+    ports:
+    - 5672:5672
+    - 15672:15672
+    environment:
+    - RABBITMQ_DEFAULT_USER=chainpoint
+    - RABBITMQ_DEFAULT_PASS=chainpoint
 
   redis:
     image: "redis:alpine"
+    container_name: redis
 
   # linkerd
+  # l5d Admin Page : http://127.0.0.1:9990/
   l5d:
     image: buoyantio/linkerd:0.9.0
+    container_name: l5d
     ports:
     - "4140:4140"
     - "9990:9990"
