@@ -15,10 +15,10 @@ const isUUID = require('is-uuid')
 // see: https://github.com/indexzero/uuid-time
 var uuidTime = require('uuid-time')
 
-// AMQP / RabbitMQ
-// const q = 'tasks'
-// const open = require('amqplib').connect('amqp://127.0.0.1')
-// const open = require('amqplib').connect('amqp://guest:guest@rabbitmq')
+// // AMQP / RabbitMQ
+// const q = 'hash_ingress'
+// // const open = require('amqplib').connect()
+// const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
 
 // AMQP Test Consumer
 // FIXME : REMOVE THIS!
@@ -186,6 +186,24 @@ function postHashesV1 (req, res, next) {
   //     return ch.sendToQueue(q, new Buffer('something to do'))
   //   })
   // }).catch(console.warn)
+
+  // AMQP / RabbitMQ
+  const q = 'hash_ingress'
+  // const open = require('amqplib').connect()
+  const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
+
+  open.then(function (c) {
+    c.createConfirmChannel().then(function (ch) {
+      ch.sendToQueue(q, new Buffer(JSON.stringify(responseObj)), {},
+                   function (err, ok) {
+                     if (err !== null) {
+                       console.warn('Message nacked!')
+                     } else {
+                       console.log('Message acked')
+                     }
+                   })
+    })
+  })
 
   res.send(responseObj)
   return next()
