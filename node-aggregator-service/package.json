@@ -9,6 +9,8 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "dotenv": "^4.0.0"
+    "amqplib": "^0.5.1",
+    "dotenv": "^4.0.0",
+    "lodash": "^4.17.4"
   }
 }

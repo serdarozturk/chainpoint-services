@@ -1,3 +1,4 @@
+require('dotenv').config()
 const _ = require('lodash')
 const restify = require('restify')
 
@@ -15,25 +16,8 @@ const isUUID = require('is-uuid')
 // see: https://github.com/indexzero/uuid-time
 var uuidTime = require('uuid-time')
 
-// // AMQP / RabbitMQ
-// const q = 'hash_ingress'
-// // const open = require('amqplib').connect()
-// const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
-
-// AMQP Test Consumer
-// FIXME : REMOVE THIS!
-// open.then(function (conn) {
-//   return conn.createChannel()
-// }).then(function (ch) {
-//   return ch.assertQueue(q).then(function (ok) {
-//     return ch.consume(q, function (msg) {
-//       if (msg !== null) {
-//         console.log(msg.content.toString())
-//         ch.ack(msg)
-//       }
-//     })
-//   })
-// }).catch(console.warn)
+// The name of the RabbitMQ hash to push hashes to process to
+const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
 
 /**
  * Test if a number is Even or Odd
@@ -176,25 +160,13 @@ function postHashesV1 (req, res, next) {
 
   let responseObj = generatePostHashesResponse(req.params.hashes)
 
-  // FIXME : Publish to RabbitMQ
-  //
-  // Publish the hash for workers to process via AMQP Publisher
-  // open.then(function (conn) {
-  //   return conn.createChannel()
-  // }).then(function (ch) {
-  //   return ch.assertQueue(q).then(function (ok) {
-  //     return ch.sendToQueue(q, new Buffer('something to do'))
-  //   })
-  // }).catch(console.warn)
-
   // AMQP / RabbitMQ
-  const q = 'hash_ingress'
-  // const open = require('amqplib').connect()
-  const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
+  const open = require('amqplib').connect()
+  // const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
 
   open.then(function (c) {
     c.createConfirmChannel().then(function (ch) {
-      ch.sendToQueue(q, new Buffer(JSON.stringify(responseObj)), {},
+      ch.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), {},
                    function (err, ok) {
                      if (err !== null) {
                        console.warn('Message nacked!')
