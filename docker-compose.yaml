@@ -39,7 +39,7 @@ services:
   # linkerd
   # l5d Admin Page : http://127.0.0.1:9990/
   l5d:
-    image: buoyantio/linkerd:0.9.0
+    image: buoyantio/linkerd:0.9.1
     container_name: l5d
     ports:
     - "4140:4140"
