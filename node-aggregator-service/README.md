@@ -118,9 +118,7 @@ In the event of any error occurring, the service will log that error to STDERR a
 | dotenv       | for managing and optionally overriding environment variables |
 | merkle-tools | for constructing merkle tree and calculating merkle paths |
 | grpc         | for the inclusion of gRPC client and server functionality |
-| async        | for managing callbacks when processing multiple asynchronous methods |
 | amqplib      | for communication between the service and RabbitMQ |
-| winston      | for handling all logging activity |
 
 
 
