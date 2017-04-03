@@ -4,9 +4,7 @@ const MerkleTools = require('merkle-tools')
 require('dotenv').config()
 
 // An array of all hashes needing to be processed.
-// Will be filled from the left as new hashes arrive
-// on the queue. Aggregation function will take hashes
-// off the right side (oldest) to process.
+// Will be filled as new hashes arrive on the queue.
 let HASHES = []
 
 // An array of all tree data ready to be finalized.
@@ -60,7 +58,7 @@ open.then(function (conn) {
         // to the API
         _.forEach(incomingHashBatch, function (hashObj) {
           console.log(hashObj)
-          HASHES.unshift(hashObj)
+          HASHES.push(hashObj)
         })
 
         ch.ack(msg) // TODO: Store this msg an ack it after finalize() instead?
@@ -72,14 +70,8 @@ open.then(function (conn) {
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = function () {
   console.log('merkling every %sms ...', AGGREGATION_INTERVAL)
-  let hashesForTree = []
 
-  _.times(HASHES_PER_MERKLE_TREE, function () {
-    let hash = HASHES.pop()
-    if (hash) {
-      hashesForTree.push(hash)
-    }
-  })
+  let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
 
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
@@ -100,7 +92,7 @@ let aggregate = function () {
     }
     treeData.proofs = proofs
 
-    TREES.unshift(treeData)
+    TREES.push(treeData)
   }
 
   console.log('HASHES length : %s', HASHES.length)
