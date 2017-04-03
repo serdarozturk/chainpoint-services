@@ -1,4 +1,5 @@
 const _ = require('lodash')
+const MerkleTools = require('merkle-tools')
 
 require('dotenv').config()
 
@@ -7,6 +8,13 @@ require('dotenv').config()
 // on the queue. Aggregation function will take hashes
 // off the right side (oldest) to process.
 let HASHES = []
+
+// An array of all tree data ready to be finalized.
+// Will be filled by the aggregation process as the
+// merkle trees are built. Each object in this array
+// contains the merkle root and the proof paths for
+// each leaf of the tree.
+let TREES = []
 
 // Using DotEnv : https://github.com/motdotla/dotenv
 // Expects AGGREGATION_INTERVAL environment variable
@@ -55,7 +63,7 @@ open.then(function (conn) {
           HASHES.unshift(hashObj)
         })
 
-        ch.ack(msg)
+        ch.ack(msg) // TODO: Store this msg an ack it after finalize() instead?
       }
     })
   })
@@ -73,9 +81,27 @@ let aggregate = function () {
     }
   })
 
-  // TODO : Add every hash in hashesForTree to new Merkle tree
-  // TODO : Collect and store the Merkle root in a process local Array where finalize() can find it
-  // TODO : Collect and store the proof for each hash in a process local Array where finalize() can find it
+  // create merkle tree only if there is at least one hash to process
+  if (hashesForTree.length > 0) {
+    let merkleTools = new MerkleTools()
+
+    // Add every hash in hashesForTree to new Merkle tree
+    merkleTools.addLeaves(hashesForTree.map(hashObj => hashObj.hash))
+    merkleTools.makeTree()
+
+    // Collect and store the Merkle root and proofs in a process local Array where finalize() can find it
+    let treeData = {}
+    treeData.merkleRoot = merkleTools.getMerkleRoot().toString('hex')
+
+    let treeSize = merkleTools.getLeafCount()
+    let proofs = []
+    for (let x = 0; x < treeSize; x++) {
+      proofs.push(merkleTools.getProof(x))
+    }
+    treeData.proofs = proofs
+
+    TREES.unshift(treeData)
+  }
 
   console.log('HASHES length : %s', HASHES.length)
   console.log('hashesForTree length : %s', hashesForTree.length)

@@ -37,7 +37,7 @@ Any values provided outside accepted bounds will result in service failure.
 The service will receive persistent hash object messages via a subscription to a durable queue (“*hash_queue*”) bound to a durable direct exchange (“*hash_exchange*”) within RabbitMQ. 
 
 The following is an example of a hash object message body: 
-```
+```json
 {
   "id": "34712680-14bb-11e7-9598-0800200c9a66",
   "hash": "39ec487d38b828c6f9ef5d1e8128c76c7455d0f5cbf7ce9b8ef550cf223dfbc3"
@@ -65,7 +65,7 @@ The resulting H1 values are stored within their hash objects to be used later wh
 Once the working array is complete, the data is saved in the state service which make this data available to other Chainpoint services.  
 
 The following is an example of the data sent to the state service: 
-```
+```json
 {
   "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
   "hash": "39ec487d38b828c6f9ef5d1e8128c76c7455d0f5cbf7ce9b8ef550cf223dfbc3",
@@ -92,7 +92,7 @@ Once the data is stored in the state service, the aggregation process is complet
 The service will publish persistent aggregation object messages to a durable direct exchange (“root_exchange”) within RabbitMQ. 
 
 The following is an example of an aggregation object message body: 
-```
+```json
 {
   "id": "c46aa06e-155f-11e7-93ae-92361f002671",
   "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
