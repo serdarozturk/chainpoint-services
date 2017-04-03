@@ -56,7 +56,7 @@ The following is an example of a hash object array message body:
 | id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
 | hash | A hex string representing the hash to be processed                     |
 
-As hash objects arrays are received, they are split into indiviual hash objets and temporarily stored in an array until they are processed. The AMQP message is added to the hash object in order to be able to reference it and send acknowledgment at some time in the future. Acknowledgments of the receipt of these messages are not sent until they have been completely and successfully processed. Should the service fail, RabbitMQ will requeue the unacknowledged message once its connection to the service is lost.
+As hash object arrays are received, they are split into individual hash objects and temporarily stored in an array until they are processed. The AMQP message is added to the hash object in order to be able to reference it and send acknowledgment at some time in the future. Acknowledgments of the receipt of these messages are not sent until they have been completely and successfully processed. Should the service fail, RabbitMQ will requeue the unacknowledged message once its connection to the service is lost.
 
 ## Aggregation Process
 This process is executed at the interval defined by the interval configuration parameter. Hashes are purged from the temporary array into a working array, clearing the temporary array and thus enabling storage of the subsequent batch of hash objects into the temporary array. 
