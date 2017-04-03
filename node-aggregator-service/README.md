@@ -28,27 +28,35 @@ The following is a list of configuration parameters:
 
 | Name           | Type         | Description  | Default | Min | Max |
 | :------------- |:-------------|:-------------|:----|:----|:--------|
-| interval       | integer      | how often the aggregation process should run, in milliseconds | 1,000 | 250 | 10,000 | 
-| max_hashes     | integer      | maximum number of hashes the aggregation process will consume per aggregation interval | 1,000 | 100 | 25,000 | 
+| AGGREGATION_INTERVAL       | integer      | how often the aggregation process should run, in milliseconds | 1,000 | 250 | 10,000 | 
+| HASHES\_PER\_MERKLE_TREE     | integer      | maximum number of hashes the aggregation process will consume per aggregation interval | 1,000 | 100 | 25,000 | 
+| FINALIZE_INTERVAL       | integer      | how often the finalize process should run, in milliseconds | 250 | 250 | 10,000 | 
+| HASH\_INGRESS\_QUEUE\_NAME       | string      | name of the hash ingress queue | 'hash_ingress' |  |  | 
 
 Any values provided outside accepted bounds will result in service failure.
 
 ## Data In
-The service will receive persistent hash object messages via a subscription to a durable queue (“*hash_queue*”) bound to a durable direct exchange (“*hash_exchange*”) within RabbitMQ. 
+The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable direct exchange within RabbitMQ.  
 
-The following is an example of a hash object message body: 
+The following is an example of a hash object array message body: 
 ```json
-{
-  "id": "34712680-14bb-11e7-9598-0800200c9a66",
-  "hash": "39ec487d38b828c6f9ef5d1e8128c76c7455d0f5cbf7ce9b8ef550cf223dfbc3"
-}
+[
+  {
+    "id": "34712680-14bb-11e7-9598-0800200c9a66",
+    "hash": "39ec487d38b828c6f9ef5d1e8128c76c7455d0f5cbf7ce9b8ef550cf223dfbc3"
+  },
+  {
+    "id": "6d627180-1883-11e7-a8f9-edb8c212ef23",
+    "hash": "ed10960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4"
+  }
+]
 ```
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
 | id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
 | hash | A hex string representing the hash to be processed                     |
 
-As hash objects are received, they are temporarily stored in an array until they are processed. The AMQP message is added to the hash object in order to be able to reference it and send acknowledgment at some time in the future. Acknowledgments of the receipt of these messages are not sent until they have been completely and successfully processed. Should the service fail, RabbitMQ will requeue the unacknowledged message once its connection to the service is lost.
+As hash objects arrays are received, they are split into indiviual hash objets and temporarily stored in an array until they are processed. The AMQP message is added to the hash object in order to be able to reference it and send acknowledgment at some time in the future. Acknowledgments of the receipt of these messages are not sent until they have been completely and successfully processed. Should the service fail, RabbitMQ will requeue the unacknowledged message once its connection to the service is lost.
 
 ## Aggregation Process
 This process is executed at the interval defined by the interval configuration parameter. Hashes are purged from the temporary array into a working array, clearing the temporary array and thus enabling storage of the subsequent batch of hash objects into the temporary array. 

@@ -34,6 +34,8 @@ const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 // The name of the RabbitMQ hash for incoming hashes to process
 const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
 
+// TODO: Validate env variables and exit if values are out of bounds
+
 // FIXME : This RabbitMQ client code is not playing nicely yet with
 // RMQ running in Docker compose. This service starts way before RMQ
 // has finished initializing and throws connection errors. For the
