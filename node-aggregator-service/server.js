@@ -100,7 +100,7 @@ let aggregate = function () {
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
     // clear the merkleTools instance to prepare for a new tree
-    merkleTools.reset()
+    merkleTools.resetTree()
 
     // Add every hash in hashesForTree to new Merkle tree
     merkleTools.addLeaves(hashesForTree.map(hashObj => hashObj.hash))
