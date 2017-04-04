@@ -1,5 +1,6 @@
 const _ = require('lodash')
 const MerkleTools = require('merkle-tools')
+const amqp = require('amqplib')
 
 require('dotenv').config()
 
@@ -36,38 +37,59 @@ const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ing
 
 // TODO: Validate env variables and exit if values are out of bounds
 
-// FIXME : This RabbitMQ client code is not playing nicely yet with
-// RMQ running in Docker compose. This service starts way before RMQ
-// has finished initializing and throws connection errors. For the
-// moment I have configured it to talk to a locally installed (e.g. brew)
-// RMQ service instead of `rabbitmq` docker/l5d host name. Need to figure
-// out a gracefull fallback for this lib with auto-retry connect.
+// The merkle tools object for building trees and generating proof paths
+const merkleTools = new MerkleTools()
 
-// AMQP / RabbitMQ
-const open = require('amqplib').connect()
-// const open = require('amqplib').connect('amqp://chainpoint:chainpoint@rabbitmq')
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+var amqpChannel = null
 
-// Continuously load the HASHES from RMQ with hash objects to process
-open.then(function (conn) {
-  return conn.createChannel()
-}).then(function (ch) {
-  return ch.assertQueue(HASH_INGRESS_QUEUE_NAME).then(function (ok) {
-    return ch.consume(HASH_INGRESS_QUEUE_NAME, function (msg) {
-      if (msg !== null) {
-        let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
-
-        // process each hash in a batch of hashes as submitted
-        // to the API
-        _.forEach(incomingHashBatch, function (hashObj) {
-          console.log(hashObj)
-          HASHES.push(hashObj)
-        })
-
-        ch.ack(msg) // TODO: Store this msg an ack it after finalize() instead?
-      }
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+function amqpOpenConnection (connectionString) {
+  amqp.connect(connectionString).then(function (conn) {
+    conn.on('close', () => {
+      // if the channel closes for any reason, attempt to reconnect
+      console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
+    conn.createConfirmChannel().then(function (chan) {
+      // the connection and channel have been established
+      // set 'amqpChannel' so that publishers have access to the channel
+      amqpChannel = chan
+
+      // Continuously load the HASHES from RMQ with hash objects to process
+      return amqpChannel.assertQueue(HASH_INGRESS_QUEUE_NAME).then(function (ok) {
+        return amqpChannel.consume(HASH_INGRESS_QUEUE_NAME, function (msg) {
+          if (msg !== null) {
+            let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
+
+            // process each hash in a batch of hashes as submitted
+            // to the API
+            _.forEach(incomingHashBatch, function (hashObj) {
+              console.log(hashObj)
+              HASHES.push(hashObj)
+            })
+
+            amqpChannel.ack(msg) // TODO: Store this msg an ack it after finalize() instead?
+          }
+        })
+      })
+    })
+  }).catch(() => {
+    // catch errors when attempting to establish connection
+    console.error('Cannot establish connection. Attempting in 5 seconds...')
+    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
   })
-}).catch(console.warn)
+}
+
+// AMQP initialization
+var rmqURI = 'amqp://chainpoint:chainpoint@rabbitmq'
+amqpOpenConnection(rmqURI)
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = function () {
@@ -77,7 +99,8 @@ let aggregate = function () {
 
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
-    let merkleTools = new MerkleTools()
+    // clear the merkleTools instance to prepare for a new tree
+    merkleTools.reset()
 
     // Add every hash in hashesForTree to new Merkle tree
     merkleTools.addLeaves(hashesForTree.map(hashObj => hashObj.hash))
