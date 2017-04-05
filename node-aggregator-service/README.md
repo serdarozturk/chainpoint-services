@@ -32,7 +32,7 @@ The following is a list of configuration parameters:
 | HASHES\_PER\_MERKLE_TREE     | integer      | maximum number of hashes the aggregation process will consume per aggregation interval | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer      | how often the finalize process should run, in milliseconds | 250 | 250 | 10,000 | 
 | HASH\_INGRESS\_QUEUE\_NAME       | string      | name of the hash ingress queue | 'hash_ingress' |  |  | 
-| CALENDAR\_QUEUE\_NAME       | string      | name of the queue for sending data to a Calendar service | 'calendar_ingress' |  |  | 
+| CALENDAR\_INGRESS\_QUEUE\_NAME       | string      | name of the queue for sending data to a Calendar service | 'calendar_ingress' |  |  | 
 
 Any values provided outside accepted bounds will result in service failure.
 

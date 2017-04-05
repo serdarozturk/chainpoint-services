@@ -55,7 +55,7 @@ const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
 
 // The name of the RabbitMQ queue for sending data to a Calendar service
-const CALENDAR_QUEUE_NAME = process.env.CALENDAR_QUEUE_NAME || 'calendar_ingress'
+const CALENDAR_INGRESS_QUEUE_NAME = process.env.CALENDAR_QUEUE_NAME || 'calendar_ingress'
 
 // TODO: Validate env variables and exit if values are out of bounds
 
@@ -189,12 +189,12 @@ let finalize = function () {
     // TODO : Persist proof data to State service via gRPC call
     // TODO : Send merkle roots to Calendar via RMQ message
     let calMessage = {} // TODO: populate this object
-    amqpChannel.sendToQueue(CALENDAR_QUEUE_NAME, new Buffer(JSON.stringify(calMessage)), { persistent: true },
+    amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(calMessage)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error(CALENDAR_QUEUE_NAME, 'message publish nacked')
+        console.error(CALENDAR_INGRESS_QUEUE_NAME, 'message publish nacked')
       } else {
-        console.log(CALENDAR_QUEUE_NAME, 'message publish acked')
+        console.log(CALENDAR_INGRESS_QUEUE_NAME, 'message publish acked')
         // Hashes have been sucessfully finalized, update workingCounts in MESSAGES for each messageId
         for (var messageId in treeDataObj.messageTotals) {
           if (treeDataObj.messageTotals.hasOwnProperty(messageId)) {
