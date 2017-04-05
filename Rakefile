@@ -14,8 +14,13 @@ namespace :build do
     system 'cd node-aggregator-service && yarn && docker build -t chainpoint/node-aggregator-service:latest --no-cache=true .'
   end
 
+  desc 'Build node-proof-service image from Dockerfile'
+  task :node_proof_service do
+    system 'cd node-proof-service && yarn && docker build -t chainpoint/node-proof-service:latest --no-cache=true .'
+  end
+
   desc 'Build all images from Dockerfiles'
-  task all: [:node_base, :node_web_service, :node_aggregator_service]
+  task all: [:node_base, :node_web_service, :node_aggregator_service, :node_proof_service]
 end
 
 namespace :prune do

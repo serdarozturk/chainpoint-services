@@ -2,6 +2,7 @@ version: '3'
 
 services:
   aggregator:
+    restart: always
     image: chainpoint/node-aggregator-service
     container_name: aggregator
     build:
@@ -10,8 +11,19 @@ services:
       - l5d
       - rabbitmq
 
+  proof:
+    restart: always
+    image: chainpoint/node-proof-service
+    container_name: proof
+    build:
+      context: ./node-proof-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
   # HTTP API front-end chainpoint/node-web-service
   web:
+    restart: always
     image: chainpoint/node-web-service
     container_name: web
     build:
@@ -22,6 +34,7 @@ services:
 
   # RabbitMQ Admin Page : http://127.0.0.1:15672/
   rabbitmq:
+    restart: always
     image: "rabbitmq:management-alpine"
     hostname: rabbitmq
     container_name: rabbitmq
@@ -33,12 +46,14 @@ services:
     - RABBITMQ_DEFAULT_PASS=chainpoint
 
   redis:
+    restart: always
     image: "redis:alpine"
     container_name: redis
 
   # linkerd
   # l5d Admin Page : http://127.0.0.1:9990/
   l5d:
+    restart: always
     image: buoyantio/linkerd:0.9.1
     container_name: l5d
     ports:
