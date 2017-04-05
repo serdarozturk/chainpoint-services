@@ -7,16 +7,6 @@ const amqp = require('amqplib')
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
-// Test if a UUID is a valid v1 UUID
-// see: https://github.com/afram/is-uuid
-// isUUID.v1('857b3f0a-a777-11e5-bf7f-feff819cdc9f'); // true
-const isUUID = require('is-uuid')
-
-// Parse Time value out of v1 UUID's and return
-// time in ms (NOT seconds) from UNIX Epoch
-// see: https://github.com/indexzero/uuid-time
-var uuidTime = require('uuid-time')
-
 // The name of the RabbitMQ hash to push hashes to process to
 const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
 
@@ -36,11 +26,13 @@ function amqpOpenConnection (connectionString) {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+      amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
+      console.error('Connection established')
       amqpChannel = chan
     })
   }).catch(() => {
@@ -195,12 +187,13 @@ function postHashesV1 (req, res, next) {
 
   // validate amqp channel has been established
   if (!amqpChannel) {
-    return next(new restify.BadGatewayError('RabbitMQ connection not established'))
+    return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), {},
+  amqpChannel.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.warn('Message nacked!')
+        console.error('Message nacked')
+        return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
         console.log('Message acked')
       }

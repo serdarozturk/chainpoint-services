@@ -11,10 +11,8 @@
   "dependencies": {
     "amqplib": "^0.5.1",
     "dotenv": "^4.0.0",
-    "is-uuid": "^1.0.2",
     "lodash": "^4.17.4",
     "restify": "^4.3.0",
-    "uuid": "^3.0.1",
-    "uuid-time": "^1.0.0"
+    "uuid": "^3.0.1"
   }
 }
