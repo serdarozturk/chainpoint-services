@@ -192,10 +192,10 @@ function postHashesV1 (req, res, next) {
   amqpChannel.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error('Message nacked')
+        console.error(HASH_INGRESS_QUEUE_NAME, 'message publish nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log('Message acked')
+        console.log(HASH_INGRESS_QUEUE_NAME, 'message publish acked')
       }
     })
 
