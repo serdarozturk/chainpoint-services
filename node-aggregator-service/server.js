@@ -38,10 +38,10 @@ const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
 const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 
 // The name of the RabbitMQ queue for incoming hashes to process
-const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
+const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
 
 // The name of the RabbitMQ queue for sending data to a Calendar service
-const CALENDAR_QUEUE_NAME = process.env.CALENDAR_QUEUE_NAME || 'calendar_data'
+const CALENDAR_INGRESS_QUEUE = process.env.CALENDAR_INGRESS_QUEUE || 'calendar_ingress'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -76,8 +76,8 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue(HASH_INGRESS_QUEUE_NAME).then(function (ok) {
-        return amqpChannel.consume(HASH_INGRESS_QUEUE_NAME, function (msg) {
+      return amqpChannel.assertQueue(AGGREGATOR_INGRESS_QUEUE).then(function (ok) {
+        return amqpChannel.consume(AGGREGATOR_INGRESS_QUEUE, function (msg) {
           if (msg !== null) {
             let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
@@ -159,8 +159,8 @@ let finalize = function () {
 
     // TODO : Persist proof data to State service via gRPC call
     // TODO : Send merkle roots to Calendar via RMQ message
-    let calMessage = {} // TODO: populate this object
-    amqpChannel.sendToQueue(CALENDAR_QUEUE_NAME, new Buffer(JSON.stringify(calMessage)), { persistent: true },
+    let calMessage = {foo: 'bar'} // TODO: populate this object
+    amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE, Buffer.from(JSON.stringify(calMessage)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
         console.error('Finalize message nacked!')

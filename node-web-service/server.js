@@ -7,8 +7,8 @@ const amqp = require('amqplib')
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
-// The name of the RabbitMQ hash to push hashes to process to
-const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
+// The name of the RabbitMQ hash to push hashes for aggregation
+const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -192,7 +192,7 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(AGGREGATOR_INGRESS_QUEUE, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
         console.error('Message nacked')
