@@ -1,6 +1,16 @@
 version: '3'
 
 services:
+  calendar:
+    restart: always
+    image: chainpoint/node-calendar-service
+    container_name: calendar
+    build:
+      context: ./node-calendar-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
   aggregator:
     restart: always
     image: chainpoint/node-aggregator-service
