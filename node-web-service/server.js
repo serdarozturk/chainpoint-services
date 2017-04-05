@@ -10,6 +10,9 @@ const uuidv1 = require('uuid/v1')
 // The name of the RabbitMQ hash to push hashes to process to
 const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
 
+// Connection string w/ credentials for RabbitMQ
+const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 // API methods should return 502 when this value is null
@@ -242,8 +245,7 @@ server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofByIDV1)
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // AMQP initialization
-var rmqURI = 'amqp://chainpoint:chainpoint@rabbitmq'
-amqpOpenConnection(rmqURI)
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // SERVER
 server.listen(8080, function () {

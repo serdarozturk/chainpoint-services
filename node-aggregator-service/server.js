@@ -43,6 +43,9 @@ const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ing
 // The name of the RabbitMQ queue for sending data to a Calendar service
 const CALENDAR_QUEUE_NAME = process.env.CALENDAR_QUEUE_NAME || 'calendar_data'
 
+// Connection string w/ credentials for RabbitMQ
+const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
 // TODO: Validate env variables and exit if values are out of bounds
 
 // The merkle tools object for building trees and generating proof paths
@@ -96,8 +99,7 @@ function amqpOpenConnection (connectionString) {
 }
 
 // AMQP initialization
-var rmqURI = 'amqp://chainpoint:chainpoint@rabbitmq'
-amqpOpenConnection(rmqURI)
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = function () {
