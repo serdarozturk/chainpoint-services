@@ -60,7 +60,18 @@ const CALENDAR_INGRESS_QUEUE = process.env.CALENDAR_INGRESS_QUEUE || 'calendar_i
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-// TODO: Validate env variables and exit if values are out of bounds
+// Validate env variables and exit if values are out of bounds
+const AGGREGATION_INTERVAL_MIN = 250
+const AGGREGATION_INTERVAL_MAX = 10000
+const FINALIZATION_INTERVAL_MIN = 250
+const FINALIZATION_INTERVAL_MAX = 10000
+const HASHES_PER_MERKLE_TREE_MIN = 100
+const HASHES_PER_MERKLE_TREE_MAX = 25000
+var envErrors = []
+if (AGGREGATION_INTERVAL < AGGREGATION_INTERVAL_MIN || AGGREGATION_INTERVAL > AGGREGATION_INTERVAL_MAX) envErrors.push('Bad AGGREGATION_INTERVAL')
+if (FINALIZATION_INTERVAL < FINALIZATION_INTERVAL_MIN || FINALIZATION_INTERVAL > FINALIZATION_INTERVAL_MAX) envErrors.push('Bad FINALIZATION_INTERVAL')
+if (HASHES_PER_MERKLE_TREE < HASHES_PER_MERKLE_TREE_MIN || HASHES_PER_MERKLE_TREE > HASHES_PER_MERKLE_TREE_MAX) envErrors.push('Bad HASHES_PER_MERKLE_TREE')
+if (envErrors.length > 0) throw new Error(envErrors)
 
 /**
  * Opens an AMPQ connection and channel

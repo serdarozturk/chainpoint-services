@@ -24,19 +24,29 @@ docker exec -it <container id> /bin/ash
 ## Configuration
 Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
 
-The following is a list of configuration parameters:
+The following are the descriptions of the configuration parameters:
 
-| Name           | Type         | Description  | Default | Min | Max |
+| Name           | Description  
 | :------------- |:-------------|:-------------|:----|:----|:--------|
-| AGGREGATION_INTERVAL       | integer      | how often the aggregation process should run, in milliseconds | 1,000 | 250 | 10,000 | 
-| HASHES\_PER\_MERKLE_TREE     | integer      | maximum number of hashes the aggregation process will consume per aggregation interval | 1,000 | 100 | 25,000 | 
-| FINALIZE_INTERVAL       | integer      | how often the finalize process should run, in milliseconds | 250 | 250 | 10,000 | 
-| AGGREGATOR\_INGRESS\_QUEUE       | string      | name of the aggregator ingress queue | 'aggregator_ingress' |  |  | 
-| CALENDAR\_INGRESS\_QUEUE       | string      | name of the calendar ingress queue | 'calendar_ingress' |  |  | 
-| RABBITMQ\_CONNECT\_URI       | string      | RabbitMQ connection URI | 'amqp://chainpoint:chainpoint@rabbitmq' |  |  | 
+| AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds 
+| HASHES\_PER\_MERKLE_TREE     | maximum number of hashes the aggregation process will consume per aggregation interval 
+| FINALIZE_INTERVAL       | how often the finalize process should run, in milliseconds 
+| AGGREGATOR\_INGRESS\_QUEUE       | name of the aggregator ingress queue 
+| CALENDAR\_INGRESS\_QUEUE       | name of the calendar ingress queue 
+| RABBITMQ\_CONNECT\_URI       | RabbitMQ connection URI
 
+The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
-Any values provided outside accepted bounds will result in service failure.
+| Name           | Type         | Default | Min | Max |
+| :------------- |:-------------|:-------------|:----|:----|:--------|
+| AGGREGATION_INTERVAL       | integer       | 1,000 | 250 | 10,000 | 
+| HASHES\_PER\_MERKLE_TREE     | integer       | 1,000 | 100 | 25,000 | 
+| FINALIZE_INTERVAL       | integer       | 250 | 250 | 10,000 | 
+| AGGREGATOR\_INGRESS\_QUEUE       | string      | 'aggregator_ingress' |  |  | 
+| CALENDAR\_INGRESS\_QUEUE       | string      | 'calendar_ingress' |  |  | 
+| RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' |  |  |
+
+Any values provided outside accepted ranges will result in service failure.
 
 
 ## Data In
