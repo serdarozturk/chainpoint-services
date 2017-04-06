@@ -9,8 +9,8 @@ require('dotenv').config()
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
-// An array of message objects contianing an id, a hash count, and the message itself
-// This is nessecary to track all the aggregator_ingress messages received and the number
+// An array of message objects containing an id, a hash count, and the message itself
+// This is necessary to track all the aggregator_ingress messages received and the number
 // of hashes in each message. This information is used by the
 // finalize method to know when all hashes from a message are processed
 // and the message is ready to be acked.
@@ -149,7 +149,7 @@ let aggregate = function () {
     merkleTools.addLeaves(leaves)
     merkleTools.makeTree()
 
-    // Collect and store the aggrfegation id, Merkle root, and proofs in an array where finalize() can find it
+    // Collect and store the aggregation id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
     treeData.id = uuidv1()
     treeData.root = merkleTools.getMerkleRoot().toString('hex')
