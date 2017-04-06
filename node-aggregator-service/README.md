@@ -26,8 +26,8 @@ Configuration parameters will be stored in environment variables. Environment va
 
 The following are the descriptions of the configuration parameters:
 
-| Name           | Description  
-| :------------- |:-------------|:-------------|:----|:----|:--------|
+| Name           | Description  |
+| :------------- |:-------------|
 | AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds 
 | HASHES\_PER\_MERKLE_TREE     | maximum number of hashes the aggregation process will consume per aggregation interval 
 | FINALIZE_INTERVAL       | how often the finalize process should run, in milliseconds 
@@ -38,7 +38,7 @@ The following are the descriptions of the configuration parameters:
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
 | Name           | Type         | Default | Min | Max |
-| :------------- |:-------------|:-------------|:----|:----|:--------|
+| :------------- |:-------------|:-------------|:----|:--------|
 | AGGREGATION_INTERVAL       | integer       | 1,000 | 250 | 10,000 | 
 | HASHES\_PER\_MERKLE_TREE     | integer       | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer       | 250 | 250 | 10,000 | 
