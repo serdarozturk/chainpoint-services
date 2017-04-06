@@ -194,33 +194,34 @@ let finalize = function () {
     console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
     // TODO : Persist proof data to State service via gRPC call
-    // TODO : Send merkle roots to Calendar via RMQ message
-    let calMessage = {foo: 'bar'} // TODO: populate this object
+
+    // Send merkle roots to Calendar via RMQ message
+    let calMessage = { id: treeDataObj.id, hash: treeDataObj.root }
     amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE, Buffer.from(JSON.stringify(calMessage)), { persistent: true },
-    function (err, ok) {
-      if (err !== null) {
-        console.error(CALENDAR_INGRESS_QUEUE, 'message publish nacked')
-      } else {
-        console.log(CALENDAR_INGRESS_QUEUE, 'message publish acked')
-        // Hashes have been sucessfully finalized, update workingCounts in MESSAGES for each messageId
-        for (var messageId in treeDataObj.messageTotals) {
-          if (treeDataObj.messageTotals.hasOwnProperty(messageId)) {
-            // Reduce the global workingCount for the message by the number in the current tree.
-            // If the workingCount reaches 0, the entire set of hashes from the message has been finalized,
-            // so ack the message and remove the message object from MESSAGES.
-            let msgIndex = MESSAGES.findIndex((msg) => {
-              return msg.id === messageId
-            })
-            MESSAGES[msgIndex].workingCount -= treeDataObj.messageTotals[messageId]
-            if (MESSAGES[msgIndex].workingCount === 0) {
-              let messageToAckArray = MESSAGES.splice(msgIndex, 1)
-              amqpChannel.ack(messageToAckArray[0].msg)
-              console.log(AGGREGATOR_INGRESS_QUEUE, 'message consume acked')
+      function (err, ok) {
+        if (err !== null) {
+          console.error(CALENDAR_INGRESS_QUEUE, 'message publish nacked')
+        } else {
+          console.log(CALENDAR_INGRESS_QUEUE, 'message publish acked')
+          // Hashes have been sucessfully finalized, update workingCounts in MESSAGES for each messageId
+          for (var messageId in treeDataObj.messageTotals) {
+            if (treeDataObj.messageTotals.hasOwnProperty(messageId)) {
+              // Reduce the global workingCount for the message by the number in the current tree.
+              // If the workingCount reaches 0, the entire set of hashes from the message has been finalized,
+              // so ack the message and remove the message object from MESSAGES.
+              let msgIndex = MESSAGES.findIndex((msg) => {
+                return msg.id === messageId
+              })
+              MESSAGES[msgIndex].workingCount -= treeDataObj.messageTotals[messageId]
+              if (MESSAGES[msgIndex].workingCount === 0) {
+                let messageToAckArray = MESSAGES.splice(msgIndex, 1)
+                amqpChannel.ack(messageToAckArray[0].msg)
+                console.log(AGGREGATOR_INGRESS_QUEUE, 'message consume acked')
+              }
             }
           }
         }
-      }
-    })
+      })
   })
 }
 
