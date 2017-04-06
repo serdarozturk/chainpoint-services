@@ -7,8 +7,11 @@ const amqp = require('amqplib')
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
-// The name of the RabbitMQ hash to push hashes to process to
-const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
+// The name of the RabbitMQ hash to push hashes for aggregation
+const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
+
+// Connection string w/ credentials for RabbitMQ
+const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -189,13 +192,13 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(HASH_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(AGGREGATOR_INGRESS_QUEUE, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error(HASH_INGRESS_QUEUE_NAME, 'message publish nacked')
+        console.error(AGGREGATOR_INGRESS_QUEUE, 'message publish nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(HASH_INGRESS_QUEUE_NAME, 'message publish acked')
+        console.log(AGGREGATOR_INGRESS_QUEUE, 'message publish acked')
       }
     })
 
@@ -242,8 +245,7 @@ server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofByIDV1)
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // AMQP initialization
-var rmqURI = 'amqp://chainpoint:chainpoint@rabbitmq'
-amqpOpenConnection(rmqURI)
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // SERVER
 server.listen(8080, function () {

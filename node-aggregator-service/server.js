@@ -10,7 +10,7 @@ require('dotenv').config()
 const uuidv1 = require('uuid/v1')
 
 // An array of message objects contianing an id, a hash count, and the message itself
-// This is nessecary to track all the hash_ingress messages received and the number
+// This is nessecary to track all the aggregator_ingress messages received and the number
 // of hashes in each message. This information is used by the
 // finalize method to know when all hashes from a message are processed
 // and the message is ready to be acked.
@@ -52,10 +52,13 @@ const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
 const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 
 // The name of the RabbitMQ queue for incoming hashes to process
-const HASH_INGRESS_QUEUE_NAME = process.env.HASH_INGRESS_QUEUE_NAME || 'hash_ingress'
+const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
 
 // The name of the RabbitMQ queue for sending data to a Calendar service
-const CALENDAR_INGRESS_QUEUE_NAME = process.env.CALENDAR_QUEUE_NAME || 'calendar_ingress'
+const CALENDAR_INGRESS_QUEUE = process.env.CALENDAR_INGRESS_QUEUE || 'calendar_ingress'
+
+// Connection string w/ credentials for RabbitMQ
+const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // TODO: Validate env variables and exit if values are out of bounds
 
@@ -83,8 +86,8 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue(HASH_INGRESS_QUEUE_NAME).then(function (ok) {
-        return amqpChannel.consume(HASH_INGRESS_QUEUE_NAME, function (msg) {
+      return amqpChannel.assertQueue(AGGREGATOR_INGRESS_QUEUE).then(function (ok) {
+        return amqpChannel.consume(AGGREGATOR_INGRESS_QUEUE, function (msg) {
           if (msg !== null) {
             let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
@@ -120,8 +123,7 @@ function amqpOpenConnection (connectionString) {
 }
 
 // AMQP initialization
-var rmqURI = 'amqp://chainpoint:chainpoint@rabbitmq'
-amqpOpenConnection(rmqURI)
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = function () {
@@ -188,13 +190,13 @@ let finalize = function () {
 
     // TODO : Persist proof data to State service via gRPC call
     // TODO : Send merkle roots to Calendar via RMQ message
-    let calMessage = {} // TODO: populate this object
-    amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE_NAME, new Buffer(JSON.stringify(calMessage)), { persistent: true },
+    let calMessage = {foo: 'bar'} // TODO: populate this object
+    amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE, Buffer.from(JSON.stringify(calMessage)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error(CALENDAR_INGRESS_QUEUE_NAME, 'message publish nacked')
+        console.error(CALENDAR_INGRESS_QUEUE, 'message publish nacked')
       } else {
-        console.log(CALENDAR_INGRESS_QUEUE_NAME, 'message publish acked')
+        console.log(CALENDAR_INGRESS_QUEUE, 'message publish acked')
         // Hashes have been sucessfully finalized, update workingCounts in MESSAGES for each messageId
         for (var messageId in treeDataObj.messageTotals) {
           if (treeDataObj.messageTotals.hasOwnProperty(messageId)) {
@@ -208,7 +210,7 @@ let finalize = function () {
             if (MESSAGES[msgIndex].workingCount === 0) {
               let messageToAckArray = MESSAGES.splice(msgIndex, 1)
               amqpChannel.ack(messageToAckArray[0].msg)
-              console.log(HASH_INGRESS_QUEUE_NAME, 'message consume acked')
+              console.log(AGGREGATOR_INGRESS_QUEUE, 'message consume acked')
             }
           }
         }

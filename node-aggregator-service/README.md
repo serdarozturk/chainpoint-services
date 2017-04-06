@@ -31,14 +31,16 @@ The following is a list of configuration parameters:
 | AGGREGATION_INTERVAL       | integer      | how often the aggregation process should run, in milliseconds | 1,000 | 250 | 10,000 | 
 | HASHES\_PER\_MERKLE_TREE     | integer      | maximum number of hashes the aggregation process will consume per aggregation interval | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer      | how often the finalize process should run, in milliseconds | 250 | 250 | 10,000 | 
-| HASH\_INGRESS\_QUEUE\_NAME       | string      | name of the hash ingress queue | 'hash_ingress' |  |  | 
-| CALENDAR\_INGRESS\_QUEUE\_NAME       | string      | name of the queue for sending data to a Calendar service | 'calendar_ingress' |  |  | 
+| AGGREGATOR\_INGRESS\_QUEUE       | string      | name of the aggregator ingress queue | 'aggregator_ingress' |  |  | 
+| CALENDAR\_INGRESS\_QUEUE       | string      | name of the calendar ingress queue | 'calendar_ingress' |  |  | 
+| RABBITMQ\_CONNECT\_URI       | string      | RabbitMQ connection URI | 'amqp://chainpoint:chainpoint@rabbitmq' |  |  | 
+
 
 Any values provided outside accepted bounds will result in service failure.
 
 
 ## Data In
-The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable direct exchange within RabbitMQ. The name of the queue is defined by the HASH\_INGRESS\_QUEUE\_NAME configuration parameter.
+The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable direct exchange within RabbitMQ. The name of the queue is defined by the AGGREGATOR\_INGRESS\_QUEUE configuration parameter.
 
 The following is an example of a hash object array message body: 
 ```json
@@ -97,7 +99,7 @@ Once all these fields are populated for this object, it is added to the TREES ar
 
 
 ## Data Out [finalize]
-This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will use a gRPC call to send state inforamation to a proof state service, and publish persistent aggregation object messages to a durable direct exchange within RabbitMQ. The name of the queue is defined by the CALENDAR\_INGRESS\_QUEUE\_NAME configuration parameter.
+This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will use a gRPC call to send state inforamation to a proof state service, and publish persistent aggregation object messages to a durable direct exchange within RabbitMQ. The name of the queue is defined by the CALENDAR\_INGRESS\_QUEUE configuration parameter.
 
 The finalize method will loop through and process every treeData object ready for finalization in the TREES array. The first step in finalizing is to send the data to a proof state service which make this data available to other Chainpoint services.  
 
