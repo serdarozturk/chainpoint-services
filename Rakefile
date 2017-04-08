@@ -14,9 +14,9 @@ namespace :build do
     system 'cd node-aggregator-service && yarn && docker build -t chainpoint/node-aggregator-service:latest --no-cache=true .'
   end
 
-  desc 'Build node-proof-service image from Dockerfile'
-  task :node_proof_service do
-    system 'cd node-proof-service && yarn && docker build -t chainpoint/node-proof-service:latest --no-cache=true .'
+  desc 'Build node-proof-state-service image from Dockerfile'
+  task :node_proof_state_service do
+    system 'cd node-proof-state-service && yarn && docker build -t chainpoint/node-proof-state-service:latest --no-cache=true .'
   end
 
   desc 'Build node-calendar-service image from Dockerfile'
@@ -28,7 +28,7 @@ namespace :build do
   task all: [:node_base,
              :node_web_service,
              :node_aggregator_service,
-             :node_proof_service,
+             :node_proof_state_service,
              :node_calendar_service
             ]
 end

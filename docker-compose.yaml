@@ -21,12 +21,12 @@ services:
       - l5d
       - rabbitmq
 
-  proof:
+  proof-state:
     restart: always
-    image: chainpoint/node-proof-service
-    container_name: proof
+    image: chainpoint/node-proof-state-service
+    container_name: proof-state
     build:
-      context: ./node-proof-service
+      context: ./node-proof-state-service
     depends_on:
       - l5d
       - rabbitmq
