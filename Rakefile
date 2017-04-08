@@ -24,12 +24,18 @@ namespace :build do
     system 'cd node-calendar-service && yarn && docker build -t chainpoint/node-calendar-service:latest --no-cache=true .'
   end
 
+  desc 'Build node-splitter-service image from Dockerfile'
+  task :node_splitter_service do
+    system 'cd node-splitter-service && yarn && docker build -t chainpoint/node-splitter-service:latest --no-cache=true .'
+  end
+
   desc 'Build all images from Dockerfiles'
   task all: [:node_base,
              :node_web_service,
              :node_aggregator_service,
              :node_proof_state_service,
-             :node_calendar_service
+             :node_calendar_service,
+             :node_splitter_service
             ]
 end
 

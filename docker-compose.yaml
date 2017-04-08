@@ -31,6 +31,16 @@ services:
       - l5d
       - rabbitmq
 
+  splitter:
+    restart: always
+    image: chainpoint/node-splitter-service
+    container_name: splitter
+    build:
+      context: ./node-splitter-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
   # HTTP API front-end chainpoint/node-web-service
   web:
     restart: always
