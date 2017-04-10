@@ -47,7 +47,6 @@ function amqpOpenConnection (connectionString) {
           if (msg !== null) {
             let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
-            // assuming openFiles is an array of file names
             async.each(incomingHashBatch, function (hashObj, callback) {
               console.log(hashObj)
               amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
