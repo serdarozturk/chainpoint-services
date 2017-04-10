@@ -1,4 +1,5 @@
 const amqp = require('amqplib')
+const async = require('async')
 
 require('dotenv').config()
 
@@ -46,23 +47,26 @@ function amqpOpenConnection (connectionString) {
           if (msg !== null) {
             let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
-            // process each hash from the batch of hashes as submitted to the API
-            var hashPromises = incomingHashBatch.map(function (hashObj) {
+            // assuming openFiles is an array of file names
+            async.each(incomingHashBatch, function (hashObj, callback) {
               console.log(hashObj)
-              return amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
-              function (err, ok) {
-                if (err !== null) {
-                  console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
-                } else {
-                  console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
-                }
-              })
-            })
-
-            Promise.all(hashPromises)
-            .then(() => {
-              amqpChannel.ack(msg)
-              console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+              amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+                function (err, ok) {
+                  if (err !== null) {
+                    console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+                    return callback(err)
+                  } else {
+                    console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+                    return callback(null)
+                  }
+                })
+            }, function (err) {
+              if (err) {
+                // An error as occurred publishing a message, nack consumption of entire batch
+                console.err(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+              } else {
+                console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+              }
             })
           }
         })
