@@ -3,12 +3,17 @@ const _ = require('lodash')
 const restify = require('restify')
 const amqp = require('amqplib')
 
+require('dotenv').config()
+
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
-// The name of the RabbitMQ hash to push hashes for aggregation
-const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
+// The RabbitMQ exchange name
+const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+
+// The RabbitMQ topic key for outgoing message to the splitter service
+const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.splitter'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -36,6 +41,7 @@ function amqpOpenConnection (connectionString) {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.error('Connection established')
+      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
       amqpChannel = chan
     })
   }).catch(() => {
@@ -192,13 +198,13 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(AGGREGATOR_INGRESS_QUEUE, new Buffer(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error(AGGREGATOR_INGRESS_QUEUE, 'message publish nacked')
+        console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(AGGREGATOR_INGRESS_QUEUE, 'message publish acked')
+        console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
       }
     })
 
