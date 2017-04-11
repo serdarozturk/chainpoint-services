@@ -51,18 +51,18 @@ The following is an example of a hash object array message body:
 ```json
 [
   {
-    "id": "34712680-14bb-11e7-9598-0800200c9a66",
+    "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
     "hash": "39ec487d38b828c6f9ef5d1e8128c76c7455d0f5cbf7ce9b8ef550cf223dfbc3"
   },
   {
-    "id": "6d627180-1883-11e7-a8f9-edb8c212ef23",
+    "hash_id": "6d627180-1883-11e7-a8f9-edb8c212ef23",
     "hash": "ed10960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4"
   }
 ]
 ```
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
-| id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
+| hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
 | hash | A hex string representing the hash to be processed                     |
 
 Once a message is consumed, the hash object array is split into individual hash objects. Each individual hash object is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the proof state service. When all hash objects have been published, the original message is acked.
