@@ -21,107 +21,113 @@ docker ps
 docker exec -it <container id> /bin/ash
 ```
 
+## Configuration
+Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
 
-## temp copy
-Once the data is stored in the proof state service, an aggregation object message is published to RabbitMQ for the Calendar service to receive. 
+The following are the descriptions of the configuration parameters:
 
-The following is an example of an aggregation object message body: 
+| Name           | Description  |
+| :------------- |:-------------|
+| RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
+| RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from other services
+| RMQ\_WORK\_OUT\_AGGREGATOR\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the aggregator service 
+| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the calendar service 
+| RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
+| RMQ\_WORK\_OUT\_ETH\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the eth anchor service 
+| RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generation service for eth anchor generation
+| RMQ\_WORK\_OUT\_BTC\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the btc anchor service 
+| RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generation service for btc anchor generation
+| RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI 
+
+The following are the types, defaults, and acceptable ranges of the configuration parameters: 
+
+| Name           | Type         | Default | 
+| :------------- |:-------------|:-------------|
+| RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
+| RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
+| RMQ\_WORK\_OUT\_AGGREGATOR\_ROUTING\_KEY       | string       | 'work.aggregator' |  
+| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string       | 'work.cal' |  
+| RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY       | string       | 'work.generator.cal' |  
+| RMQ\_WORK\_OUT\_ETH\_ROUTING\_KEY       | string       | 'work.eth' |  
+| RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY       | string       | 'work.generator.eth' |  
+| RMQ\_WORK\_OUT\_BTC\_ROUTING\_KEY       | string       | 'work.btc' |  
+| RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY       | string       | 'work.generator.btc' |  
+| RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
+
+
+## Data In
+The proof state service serves as both a proof state storage mechanism as well as a communication hub for most Chainpoint services. As proofs are constructed for each hash, state data is received and stored from the splitter service, aggregator(s), calendar, and all other anchor services. When the data is stored, a new message is published, bound for the next service in line, in order to continue the proof building processes. As anchors objects are completed and added to the proof, a message is also sent to the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data.
+
+TODO: Decide how data is stored and document it here.
+
+The following is an example of state data from the splitter service: 
 ```json
 {
-  "id": "c46aa06e-155f-11e7-93ae-92361f002671", // for this agg event, id == treeObject.id == aggregation_id from the previous step
-  "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2" // for this agg event, hash == treeObject.root
+  "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
+  "state": {
+    "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
+  } 
 }
 ```
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
-| id   | The UUIDv1 unique identifier for an aggregation event with embedded timestamp |
-| hash | A hex string representing the merkle root of the tree for this aggregation group |\
-*/
+| hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
+| state | An object containing state information to be stored |
 
-## Proof State Schema
-
+The following is an example of state data from the aggregation service: 
 ```json
 {
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  "hash": "dee46745c1435784a4aab8b1398a9489860c6ac4a81ab12f6fe0387e7e00d3fd",
-  "aggregation_events": {
-    "level0": {
-      "id": "c46aa06e-155f-11e7-93ae-92361f002671",
-      "ops": [
+  "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
+  "state": {
+    "ops": [
         { "l": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
         { "op": "sha-256" },
         { "r": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" },
         { "op": "sha-256" }
       ]
-    },
-    "complete": true
   },
-  "cal": {
-    "id": "582f65a8-1b9d-11e7-93ae-92361f002671",
+  "value": "ecbdb5e9691b2e77bd45706e3945becf3330819f59541a478fef0124d1072408"
+}
+```
+| Name | Description                                                            |
+| :--- |:-----------------------------------------------------------------------|
+| hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
+| state | An object containing state information to be stored |
+| value | The last calculated value, typically a merkle root, to be passed on to the next service |
+
+
+## Proof State Schema
+
+The following is an example of a proof state object: 
+
+```json
+{
+  "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
+  "type": "agg_0",
+  "state": {
     "ops": [
-      { "l": "71696d030e1984bac3891f5872e9c88161ea54b14847e0f91d0f819a7515b54b" },
-      { "op": "sha-256" },
-      { "r": "279062e8124601f88ff4f7bbe87ee1ca44442644348a6712ada3231ac048135c" },
-      { "op": "sha-256" }
-    ],
-    "anchor_id": "11654",
-    "anchor_uris": [
-      "http://a.cal.chainpoint.org/46374/root",
-      "http://b.cal.chainpoint.org/46374/root"
-    ],
-    "complete": true
-  },
-  "eth": {
-    "id": "49daf3be-1b9d-11e7-93ae-92361f002671",
-    "ops": [
-      { "l": "6bb1c74695ca40b851fefcf719b470a81c7ec1c1137c8496d46a8d5612f2d339" },
-      { "op": "sha-256" },
-      { "r": "267c18f4f0e27257bfd18cf9f1be25d50dd6db4cf2045d11a5947e96bb35835a" },
-      { "op": "sha-256" }
-    ],
-    "anchor_id": "d3e7ec84c3dbe86f7d9a8ea68ae4ded6c0b012be519f433a07f15bd612fb47a9",
-    "complete": true
-  },
-  "btc": {
-    "id": "404e4fc6-1b9d-11e7-93ae-92361f002671",
-    "tx_ops": [
-      { "l": "98b56a4694f427b6170d387a848e8c8e41c0eb4e059754285fe5d4dbf590cfec" },
-      { "op": "sha-256" },
-      { "r": "a6fe46ba29671e59c98782884c797f99875a9af4d7173c257f6f41588d4b2265" },
-      { "op": "sha-256" }
-    ],
-    "header_ops": [
-      { "l": "1c5bee8b7b63d962ce5a3feedef050336a773e2e28e97c31248aff0f06540989" },
-      { "op": "sha-256-x2" },
-      { "r": "ecbdb5e9691b2e77bd45706e3945becf3330819f59541a478fef0124d1072408" },
-      { "op": "sha-256-x2" },
-      { "r": "8354f6578f47230553b1fab8adba1785cf42afdfff47808fc376251c3a653f1d" },
-      { "op": "sha-256-x2" }
-    ],
-    "anchor_id": "48987",
-    "complete": true
+        { "l": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
+        { "op": "sha-256" },
+        { "r": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" },
+        { "op": "sha-256" }
+      ]
   }
 }
 ```
-
-The proof state schema is similar to the Chainpoint schema, but is optimized for idempotent write operations. 
+| Name | Description                                                            |
+| :--- |:-----------------------------------------------------------------------|
+| hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
+| type   | The type of state data, the origin of the state data |
+| state | An object containing state information  |
 
 The following indexes are added to assist in common write scenarios:
 
 | Field | Property | Description |
 |:--------|:-----------|:--------------|
-| hash\_id | Primary Key | The UUIDv1 for this hash and corresponding proof |
-| aggregation\_events.level0.id | Index | The UUIDv1 for this aggregation event |
-| cal.id | Index | The UUIDv1 for this calendar aggregation and anchoring event |
-| btc.id | Index | The UUIDv1 for this multi-step btc block header anchoring event |
+| state\_id | Primary Key | The UUIDv1 for this state object |
+| hash\_id | Index | The UUIDv1 for this hash |
 
-These common write scenarios include:
-* Create new record by inserting hash, hash\_id, and aggregation\_events.level0
-* Insert cal object for all records with a given aggregation\_events.level0 value
-* Insert eth object for all records with a given cal.id
-* Insert btc object for all records with a given cal.id
-* Insert btc.header_ops object for all records with a given btc.id
+TODO: The above will likely change... dependant upon our storage implementation
 
-Note: The .level0 distinction exists in aggregation\_events to allow for multiple aggregation levels. In the example above, only 1 level of aggregation is shown. To show _x_ levels of aggregation, you would start by adding the first level, level(x-1), and continue down to level0.
 
 
