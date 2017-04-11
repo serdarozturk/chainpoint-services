@@ -129,7 +129,7 @@ function generatePostHashesResponse (hashes) {
   let lcHashes = lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map(function (hash) {
     let hashObj = {}
-    hashObj.id = uuidv1()
+    hashObj.hash_id = uuidv1()
     hashObj.hash = hash
     return hashObj
   })
