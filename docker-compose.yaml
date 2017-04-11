@@ -31,6 +31,16 @@ services:
       - l5d
       - rabbitmq
 
+  proof-gen:
+    restart: always
+    image: chainpoint/node-proof-gen-service
+    container_name: proof-gen
+    build:
+      context: ./node-proof-gen-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
   splitter:
     restart: always
     image: chainpoint/node-splitter-service

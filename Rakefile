@@ -19,6 +19,11 @@ namespace :build do
     system 'cd node-proof-state-service && yarn && docker build -t chainpoint/node-proof-state-service:latest --no-cache=true .'
   end
 
+  desc 'Build node-proof-gen-service image from Dockerfile'
+  task :node_proof_gen_service do
+    system 'cd node-proof-gen-service && yarn && docker build -t chainpoint/node-proof-gen-service:latest --no-cache=true .'
+  end
+
   desc 'Build node-calendar-service image from Dockerfile'
   task :node_calendar_service do
     system 'cd node-calendar-service && yarn && docker build -t chainpoint/node-calendar-service:latest --no-cache=true .'
@@ -34,6 +39,7 @@ namespace :build do
              :node_web_service,
              :node_aggregator_service,
              :node_proof_state_service,
+             :node_proof_gen_service,
              :node_calendar_service,
              :node_splitter_service
             ]
