@@ -49,7 +49,11 @@ function amqpOpenConnection (connectionString) {
 
             async.each(incomingHashBatch, function (hashObj, callback) {
               console.log(hashObj)
-              amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+              let stateObj = {}
+              stateObj.hash_id = hashObj.hash_id
+              stateObj.state = {}
+              stateObj.state.hash = hashObj.hash
+              amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
                 function (err, ok) {
                   if (err !== null) {
                     console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
@@ -61,9 +65,11 @@ function amqpOpenConnection (connectionString) {
                 })
             }, function (err) {
               if (err) {
-                // An error as occurred publishing a message, nack consumption of entire batch
-                console.err(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+                // An error as occurred publishing a message, nack consumption of message
+                amqpChannel.nack(msg)
+                console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
               } else {
+                amqpChannel.ack(msg)
                 console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
               }
             })
