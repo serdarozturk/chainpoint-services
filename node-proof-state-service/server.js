@@ -10,11 +10,26 @@ const uuidv1 = require('uuid/v1')
 // the name of the RabbitMQ topic exchange to use
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
-// the topic exchange routing key for message consumption originating from other services
+// the topic exchange routing key for message consumption originating from all other services
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.*.state'
 
+// the topic exchange routing key for message consumption originating from splitter service
+const RMQ_WORK_IN_SPLITTER_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.splitter.state'
+
+// the topic exchange routing key for message consumption originating from aggregator service
+const RMQ_WORK_IN_AGG_0_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_0_ROUTING_KEY || 'work.agg_0.state'
+
+// the topic exchange routing key for message consumption originating from calendar service
+const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.cal.state'
+
+// the topic exchange routing key for message consumption originating from ethereum anchor service
+const RMQ_WORK_IN_ETH_ROUTING_KEY = process.env.RMQ_WORK_IN_ETH_ROUTING_KEY || 'work.eth.state'
+
+// the topic exchange routing key for message consumption originating from btc anchor service
+const RMQ_WORK_IN_BTC_ROUTING_KEY = process.env.RMQ_WORK_IN_BTC_ROUTING_KEY || 'work.btc.state'
+
 // the topic exchange routing key for message publishing bound for the aggregator service
-const RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY = process.env.RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY || 'work.agg_0'
+const RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY = process.env.RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY || 'work.agg_0'
 
 // the topic exchange routing key for message publishing bound for the calendar service
 const RMQ_WORK_OUT_CAL_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_ROUTING_KEY || 'work.cal'
@@ -61,15 +76,15 @@ function processSplitterWork (msg) {
   let hashObj = {}
   hashObj.hash_id = messageObj.hash_id
   hashObj.hash = messageObj.state.hash
-  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
-        console.error(RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY, 'publish message nacked')
+        console.error(RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, 'publish message nacked')
          // An error as occurred publishing a message, nack consumption of original message
         console.error(msg.fields.routingKey, 'consume message nacked')
         amqpChannel.nack(msg)
       } else {
-        console.log(RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY, 'publish message acked')
+        console.log(RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, 'publish message acked')
          // New message has been published, ack consumption of original message
         console.log(msg.fields.routingKey, 'consume message acked')
         amqpChannel.ack(msg)
@@ -185,19 +200,19 @@ function amqpOpenConnection (connectionString) {
           if (msg !== null) {
             // determine the source of the message and handle appropriately
             switch (msg.fields.routingKey) {
-              case 'work.splitter.state':
+              case RMQ_WORK_IN_SPLITTER_ROUTING_KEY:
                 processSplitterWork(msg)
                 break
-              case 'work.agg_0.state':
+              case RMQ_WORK_IN_AGG_0_ROUTING_KEY:
                 processAggregatorWork(msg)
                 break
-              case 'work.cal.state':
+              case RMQ_WORK_IN_CAL_ROUTING_KEY:
                 processCalWork(msg)
                 break
-              case 'work.eth.state':
+              case RMQ_WORK_IN_ETH_ROUTING_KEY:
                 processEthWork(msg)
                 break
-              case 'work.btc.state':
+              case RMQ_WORK_IN_BTC_ROUTING_KEY:
                 processBtcWork(msg)
                 break
               default:
