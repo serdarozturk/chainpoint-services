@@ -3,7 +3,7 @@ require('dotenv').config()
 
 // just a temp function
 let finalize = function () {
-  console.log('Generating...')
+  //console.log('Generating...')
 }
 
 setInterval(() => finalize(), 1000)

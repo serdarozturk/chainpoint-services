@@ -43,9 +43,8 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 
-
-## Splitting Process
-The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable direct exchange within RabbitMQ. The routing key to bind to is defined by the RMQ\_WORK\_IN\_ROUTING\_KEY configuration parameter.
+## Data In
+The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable topic exchange within RabbitMQ. The routing key is defined by the RMQ\_WORK\_IN\_ROUTING\_KEY configuration parameter.
 
 The following is an example of a hash object array message body: 
 ```json
@@ -65,7 +64,28 @@ The following is an example of a hash object array message body:
 | hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
 | hash | A hex string representing the hash to be processed                     |
 
-Once a message is consumed, the hash object array is split into individual hash objects. Each individual hash object is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the proof state service. When all hash objects have been published, the original message is acked.
+
+## Splitting Process
+Once a message is consumed, the hash object array is split into individual hash objects. 
+
+## Data Out
+For each hash object, a proof state object message is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the proof state service.
+
+The following is an example of a proof state object message sent to the proof state service: 
+```json
+{
+  "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
+  "state": {
+    "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
+  } 
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp, used to reference the state of a particular hash |
+| state  | The state data being stored, in this case, the starting hash value |
+
+When all hash objects in the array have been processed, the original message is acked.
 
 ## Service Failure
 In the event of any error occurring, the service will log that error to STDERR and kill itself with a process.exit(). RabbitMQ will be configured so that upon service exit, unacknowledged messages will be requeued to ensure than unfinished work lost due to failure will be processed again in full.
@@ -76,3 +96,4 @@ In the event of any error occurring, the service will log that error to STDERR a
 | :---         |:-----------------------------------------------------------------------|
 | dotenv       | for managing and optionally overriding environment variables |
 | amqplib      | for communication between the service and RabbitMQ |
+| async      | for handling flow control for some asynchronous operations |

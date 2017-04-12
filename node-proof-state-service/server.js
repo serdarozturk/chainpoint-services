@@ -14,7 +14,7 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.*.state'
 
 // the topic exchange routing key for message publishing bound for the aggregator service
-const RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY = process.env.RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY || 'work.aggregator'
+const RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY = process.env.RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY || 'work.agg_0'
 
 // the topic exchange routing key for message publishing bound for the calendar service
 const RMQ_WORK_OUT_CAL_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_ROUTING_KEY || 'work.cal'
@@ -66,12 +66,12 @@ function processSplitterWork (msg) {
       if (err !== null) {
         console.error(RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY, 'publish message nacked')
          // An error as occurred publishing a message, nack consumption of original message
-        console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+        console.error(msg.fields.routingKey, 'consume message nacked')
         amqpChannel.nack(msg)
       } else {
         console.log(RMQ_WORK_OUT_AGGREGATOR_ROUTING_KEY, 'publish message acked')
          // New message has been published, ack consumption of original message
-        console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+        console.log(msg.fields.routingKey, 'consume message acked')
         amqpChannel.ack(msg)
       }
     })

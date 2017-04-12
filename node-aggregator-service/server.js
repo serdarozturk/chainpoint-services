@@ -2,19 +2,9 @@ const _ = require('lodash')
 const MerkleTools = require('merkle-tools')
 const amqp = require('amqplib')
 const crypto = require('crypto')
+const async = require('async')
 
 require('dotenv').config()
-
-// Generate a v1 UUID (time-based)
-// see: https://github.com/broofa/node-uuid
-const uuidv1 = require('uuid/v1')
-
-// An array of message objects containing an id, a hash count, and the message itself
-// This is necessary to track all the aggregator_ingress messages received and the number
-// of hashes in each message. This information is used by the
-// finalize method to know when all hashes from a message are processed
-// and the message is ready to be acked.
-let MESSAGES = []
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -23,8 +13,8 @@ let HASHES = []
 // An array of all tree data ready to be finalized.
 // Will be filled by the aggregation process as the
 // merkle trees are built. Each object in this array
-// contains the merkle root and the proof paths for
-// each leaf of the tree.
+// contains the merkle root and the hash_id and proof
+// paths for each leaf of the tree.
 let TREES = []
 
 // The merkle tools object for building trees and generating proof paths
@@ -51,11 +41,14 @@ const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
 // during each AGGREGATION_INTERVAL.
 const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 
-// The name of the RabbitMQ queue for incoming hashes to process
-const AGGREGATOR_INGRESS_QUEUE = process.env.AGGREGATOR_INGRESS_QUEUE || 'aggregator_ingress'
+// The name of the RabbitMQ topic exchange to use
+const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
-// The name of the RabbitMQ queue for sending data to a Calendar service
-const CALENDAR_INGRESS_QUEUE = process.env.CALENDAR_INGRESS_QUEUE || 'calendar_ingress'
+// The topic exchange routing key for message consumption originating from proof state service
+const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.agg_0'
+
+// The topic exchange routing key for message publishing bound for the proof state service
+const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.agg_0.state'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -81,41 +74,27 @@ function amqpOpenConnection (connectionString) {
       // channel is lost, reset to null
       amqpChannel = null
       // un-acked messaged will be requeued, so clear all work in progress
-      MESSAGES = HASHES = TREES = []
+      HASHES = TREES = []
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
+      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue(AGGREGATOR_INGRESS_QUEUE).then(function (ok) {
-        return amqpChannel.consume(AGGREGATOR_INGRESS_QUEUE, function (msg) {
+      return amqpChannel.assertQueue('', { durable: true }).then(function (q) {
+        amqpChannel.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
+        return amqpChannel.consume(q.queue, function (msg) {
           if (msg !== null) {
-            let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
+            let hashObj = JSON.parse(msg.content.toString())
+            console.log(hashObj)
 
-            // record message and size for later reference
-            // workingCount represents the number of hashes in the message
-            // that have not been finalized. Whne the count reaches 0, the
-            // message may be acked.
-            let messageId = uuidv1()
-            MESSAGES.push({
-              id: messageId,
-              workingCount: incomingHashBatch.length,
-              msg: msg
-            })
-
-            // process each hash in a batch of hashes as submitted
-            // to the API
-            _.forEach(incomingHashBatch, function (hashObj) {
-              console.log(hashObj)
-
-              // add association between the hashObject and the messsage it came from
-              hashObj.messageId = messageId
-              HASHES.push(hashObj)
-            })
+            // add msg to the hash object so that we can ack it during the finalize process for this hash
+            hashObj.msg = msg
+            HASHES.push(hashObj)
           }
         })
       })
@@ -134,7 +113,6 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 let aggregate = function () {
   // if the amqp channel is null (closed), processing should not continue, defer to next aggregate call
   if (amqpChannel === null) return
-  console.log('merkling every %sms ...', AGGREGATION_INTERVAL)
 
   let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
 
@@ -145,9 +123,9 @@ let aggregate = function () {
 
     // concatonate and hash the hash ids and hash values into new array
     let leaves = hashesForTree.map(hashObj => {
-      let idBuffer = Buffer.from(hashObj.id, 'utf8')
+      let hashIdBuffer = Buffer.from(hashObj.hash_id, 'utf8')
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
-      return crypto.createHash('sha256').update(Buffer.concat([idBuffer, hashBuffer])).digest('hex')
+      return crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest('hex')
     })
 
     // Add every hash in hashesForTree to new Merkle tree
@@ -156,72 +134,67 @@ let aggregate = function () {
 
     // Collect and store the aggregation id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
-    treeData.id = uuidv1()
     treeData.root = merkleTools.getMerkleRoot().toString('hex')
 
     let treeSize = merkleTools.getLeafCount()
-    let proofs = []
+    let proofData = []
     for (let x = 0; x < treeSize; x++) {
-      // push the proof onto the array, inserting the UUID concat/hash step at the beginning
-      proofs.push(merkleTools.getProof(x).unshift({ left: hashesForTree[x].id }))
+      // push the hash_id and corresponding proof onto the array, inserting the UUID concat/hash step at the beginning
+      let proofDataItem = {}
+      proofDataItem.hash_id = hashesForTree[x].hash_id
+      proofDataItem.hash_msg = hashesForTree[x].msg
+      proofDataItem.proof = merkleTools.getProof(x).unshift({ left: hashesForTree[x].hash_id })
+      proofData.push(proofDataItem)
     }
-    treeData.proofs = proofs
-
-    // add the message ids and the corresponding hash counts per message id being processed in this tree
-    var messageTotals = hashesForTree.reduce((msgTotals, hashObj) => {
-      msgTotals[hashObj.messageId] = msgTotals[hashObj.messageId] >= 1 ? msgTotals[hashObj.messageId] + 1 : 1
-      return msgTotals
-    }, {})
-    treeData.messageTotals = messageTotals
+    treeData.proofData = proofData
 
     TREES.push(treeData)
+    console.log('hashesForTree length : %s', hashesForTree.length)
   }
-
-  console.log('hashesForTree length : %s', hashesForTree.length)
 }
 
-// Finalize already aggregated hash proofs by writing
-// them to persistent store and sending ACK back to RMQ
-// to report a BATCH of hashes has been processed.
+// Finalize already aggregated hash proofs by queuing message bound for proof state service
+// and acking the original hash object message for all messages in all trees ready for finalization
 let finalize = function () {
   // if the amqp channel is null (closed), processing should not continue, defer to next finalize call
   if (amqpChannel === null) return
-  console.log('Finalizing...')
 
   // process each set of tree data
   let treesToFinalize = TREES.splice(0)
   _.forEach(treesToFinalize, function (treeDataObj) {
     console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
-    // TODO : Persist proof data to State service via gRPC call
+    // for each hash , queue up message containing updated proof state bound for proof state service
+    async.each(treeDataObj.proofData, function (proofDataItem, callback) {
+      let stateObj = {}
+      stateObj.hash_id = proofDataItem.hash_id
+      stateObj.state = {}
+      stateObj.state.ops = proofDataItem.proof
+      stateObj.value = treeDataObj.root
 
-    // Send merkle roots to Calendar via RMQ message
-    let calMessage = { id: treeDataObj.id, hash: treeDataObj.root }
-    amqpChannel.sendToQueue(CALENDAR_INGRESS_QUEUE, Buffer.from(JSON.stringify(calMessage)), { persistent: true },
-      function (err, ok) {
-        if (err !== null) {
-          console.error(CALENDAR_INGRESS_QUEUE, 'message publish nacked')
-        } else {
-          console.log(CALENDAR_INGRESS_QUEUE, 'message publish acked')
-          // Hashes have been sucessfully finalized, update workingCounts in MESSAGES for each messageId
-          for (var messageId in treeDataObj.messageTotals) {
-            if (treeDataObj.messageTotals.hasOwnProperty(messageId)) {
-              // Reduce the global workingCount for the message by the number in the current tree.
-              // If the workingCount reaches 0, the entire set of hashes from the message has been finalized,
-              // so ack the message and remove the message object from MESSAGES.
-              let msgIndex = MESSAGES.findIndex((msg) => {
-                return msg.id === messageId
-              })
-              MESSAGES[msgIndex].workingCount -= treeDataObj.messageTotals[messageId]
-              if (MESSAGES[msgIndex].workingCount === 0) {
-                let messageToAckArray = MESSAGES.splice(msgIndex, 1)
-                amqpChannel.ack(messageToAckArray[0].msg)
-                console.log(AGGREGATOR_INGRESS_QUEUE, 'message consume acked')
-              }
-            }
+      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+        function (err, ok) {
+          if (err !== null) {
+            // An error as occurred publishing a message, nack consumption of message
+            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+            amqpChannel.nack(proofDataItem.hash_msg)
+            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+            return callback(null)
+          } else {
+            // New message has been published, ack consumption of original message
+            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+            amqpChannel.ack(proofDataItem.hash_msg)
+            console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+            return callback(null)
           }
-        }
-      })
+        })
+    }, function (err) {
+      if (err) {
+        console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
+      } else {
+        console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+      }
+    })
   })
 }
 

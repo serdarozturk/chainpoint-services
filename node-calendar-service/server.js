@@ -72,8 +72,8 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 // TODO store Merkle root of calendar in DB and chain to previous calendar entries
 // TODO store proofs for roots with their associated hashes in proof service to build calendar attestation proof
 let generateCalendar = function () {
-  console.log('Calendaring...')
-  console.log('AGGREGATION_ROOTS : %s', JSON.stringify(AGGREGATION_ROOTS))
+  // console.log('Calendaring...')
+  // console.log('AGGREGATION_ROOTS : %s', JSON.stringify(AGGREGATION_ROOTS))
 }
 
 setInterval(() => generateCalendar(), CALENDAR_INTERVAL)

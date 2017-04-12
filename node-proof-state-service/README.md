@@ -45,7 +45,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
-| RMQ\_WORK\_OUT\_AGGREGATOR\_ROUTING\_KEY       | string       | 'work.aggregator' |  
+| RMQ\_WORK\_OUT\_AGGREGATOR\_ROUTING\_KEY       | string       | 'work.agg_0' |  
 | RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string       | 'work.cal' |  
 | RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY       | string       | 'work.generator.cal' |  
 | RMQ\_WORK\_OUT\_ETH\_ROUTING\_KEY       | string       | 'work.eth' |  
@@ -93,7 +93,7 @@ The following is an example of state data from the aggregation service:
 | :--- |:-----------------------------------------------------------------------|
 | hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
 | state | An object containing state information to be stored |
-| value | The last calculated value, typically a merkle root, to be passed on to the next service |
+| value | The last calculated value from the ops array, typically a merkle root, to be passed on to the next service |
 
 
 ## Proof State Schema
