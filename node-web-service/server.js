@@ -157,7 +157,7 @@ function generatePostHashesResponse (hashes) {
  */
 function postHashesV1 (req, res, next) {
   // validate content-type sent was 'application/json'
-  if (!req.contentType() === 'application/json') {
+  if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
 
@@ -257,3 +257,5 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 server.listen(8080, function () {
   console.log('%s listening at %s', server.name, server.url)
 })
+
+module.exports = server
