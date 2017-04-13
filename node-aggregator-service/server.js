@@ -85,17 +85,10 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue('', { durable: true }).then(function (q) {
-        amqpChannel.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return amqpChannel.consume(q.queue, function (msg) {
-          if (msg !== null) {
-            let hashObj = JSON.parse(msg.content.toString())
-            console.log(hashObj)
-
-            // add msg to the hash object so that we can ack it during the finalize process for this hash
-            hashObj.msg = msg
-            HASHES.push(hashObj)
-          }
+      return chan.assertQueue('', { durable: true }).then(function (q) {
+        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
+        return chan.consume(q.queue, function (msg) {
+          consumeHashMessage(msg)
         })
       })
     })
@@ -106,14 +99,22 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
+function consumeHashMessage (msg) {
+  if (msg !== null) {
+    let hashObj = JSON.parse(msg.content.toString())
+    console.log(hashObj)
+
+    // add msg to the hash object so that we can ack it during the finalize process for this hash
+    hashObj.msg = msg
+    HASHES.push(hashObj)
+  }
+}
+
 // AMQP initialization
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = function () {
-  // if the amqp channel is null (closed), processing should not continue, defer to next aggregate call
-  if (amqpChannel === null) return
-
   let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
 
   // create merkle tree only if there is at least one hash to process
@@ -143,7 +144,9 @@ let aggregate = function () {
       let proofDataItem = {}
       proofDataItem.hash_id = hashesForTree[x].hash_id
       proofDataItem.hash_msg = hashesForTree[x].msg
-      proofDataItem.proof = merkleTools.getProof(x).unshift({ left: hashesForTree[x].hash_id })
+      var proof = merkleTools.getProof(x)
+      proof.unshift({ left: hashesForTree[x].hash_id })
+      proofDataItem.proof = proof
       proofData.push(proofDataItem)
     }
     treeData.proofData = proofData
@@ -201,3 +204,17 @@ let finalize = function () {
 setInterval(() => finalize(), FINALIZATION_INTERVAL)
 
 setInterval(() => aggregate(), AGGREGATION_INTERVAL)
+
+// export these functions for unit tests
+module.exports = {
+  getHASHES: function () { return HASHES },
+  setHASHES: function (hashes) { HASHES = hashes },
+  getTREES: function () { return TREES },
+  setTREES: function (trees) { TREES = trees },
+  getAMQPChannel: function () { return amqpChannel },
+  setAMQPChannel: function (chan) { amqpChannel = chan },
+  amqpOpenConnection: amqpOpenConnection,
+  consumeHashMessage: consumeHashMessage,
+  aggregate: aggregate,
+  finalize: finalize
+}

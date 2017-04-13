@@ -17,7 +17,6 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
-// API methods should return 502 when this value is null
 var amqpChannel = null
 // getter and setter methods added for testing purposes
 function getAMQPChannel () { return amqpChannel }
@@ -59,7 +58,10 @@ function amqpOpenConnection (connectionString) {
 }
 
 function consumeHashMessage (msg) {
-  let chan = getAMQPChannel()
+  // if the amqp channel is null (closed), processing should not continue, defer to next consumeHashMessage call
+  var chan = getAMQPChannel()
+  if (chan === null) return
+
   if (msg !== null) {
     let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
