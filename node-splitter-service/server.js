@@ -15,10 +15,6 @@ const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.s
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-// The channel used for all amqp communication
-// This value is set once the connection has been established
-var amqpChannel = null
-
 /**
  * Opens an AMPQ connection and channel
  * Retry logic is included to handle losses of connection
@@ -30,50 +26,18 @@ function amqpOpenConnection (connectionString) {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
       // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue('', { durable: true }).then(function (q) {
-        amqpChannel.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return amqpChannel.consume(q.queue, function (msg) {
-          if (msg !== null) {
-            let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
-
-            async.each(incomingHashBatch, function (hashObj, callback) {
-              console.log(hashObj)
-              let stateObj = {}
-              stateObj.hash_id = hashObj.hash_id
-              stateObj.state = {}
-              stateObj.state.hash = hashObj.hash
-              amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
-                function (err, ok) {
-                  if (err !== null) {
-                    console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
-                    return callback(err)
-                  } else {
-                    console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
-                    return callback(null)
-                  }
-                })
-            }, function (err) {
-              if (err) {
-                // An error as occurred publishing a message, nack consumption of message
-                amqpChannel.nack(msg)
-                console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
-              } else {
-                amqpChannel.ack(msg)
-                console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
-              }
-            })
-          }
+      return chan.assertQueue('', { durable: true }).then(function (q) {
+        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
+        return chan.consume(q.queue, function (msg) {
+          consumeHashMessage(chan, msg)
         })
       })
     })
@@ -84,5 +48,44 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
+function consumeHashMessage (chan, msg) {
+  if (msg !== null) {
+    let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
+
+    async.each(incomingHashBatch, function (hashObj, callback) {
+      console.log(hashObj)
+      let stateObj = {}
+      stateObj.hash_id = hashObj.hash_id
+      stateObj.state = {}
+      stateObj.state.hash = hashObj.hash
+      chan.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+        function (err, ok) {
+          if (err !== null) {
+            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+            return callback(err)
+          } else {
+            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+            return callback(null)
+          }
+        })
+    }, function (err) {
+      if (err) {
+        // An error as occurred publishing a message, nack consumption of message
+        chan.nack(msg)
+        console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+      } else {
+        chan.ack(msg)
+        console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+      }
+    })
+  }
+}
+
 // Start reading from queue and splitting hashes
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
+
+// export these functions for testing purposes
+module.exports = {
+  amqpOpenConnection: amqpOpenConnection,
+  consumeHashMessage: consumeHashMessage
+}
