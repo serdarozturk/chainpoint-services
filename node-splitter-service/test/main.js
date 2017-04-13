@@ -7,26 +7,27 @@ var server = require('../server')
 
 describe('Consume Hash Messages', function () {
   it('should do nothing with null message', function (done) {
-    let chan = {
+    server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
-    }
+    })
     let msg = null
-    server.consumeHashMessage(chan, msg)
+    server.consumeHashMessage(msg)
+    let chan = server.getAMQPChannel()
     expect(chan).to.have.property('results')
     expect(chan.results.length).to.equal(0)
     done()
   })
 
   it('should generate one state object with a one hash message', function (done) {
-    let chan = {
+    server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
-    }
+    })
     let msg = {}
     msg.content = new Buffer(JSON.stringify({
       hashes: [
@@ -36,7 +37,8 @@ describe('Consume Hash Messages', function () {
         }
       ]
     }))
-    server.consumeHashMessage(chan, msg)
+    server.consumeHashMessage(msg)
+    let chan = server.getAMQPChannel()
     expect(chan).to.have.property('results')
     expect(chan.results.length).to.equal(1)
     expect(chan.results[0]).to.have.property('hash_id')
@@ -48,12 +50,12 @@ describe('Consume Hash Messages', function () {
   })
 
   it('should generate three state objects with a three hash messages', function (done) {
-    let chan = {
+    server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
-    }
+    })
     let msg = {}
     msg.content = new Buffer(JSON.stringify({
       hashes: [
@@ -71,7 +73,8 @@ describe('Consume Hash Messages', function () {
         }
       ]
     }))
-    server.consumeHashMessage(chan, msg)
+    server.consumeHashMessage(msg)
+    let chan = server.getAMQPChannel()
     expect(chan).to.have.property('results')
     expect(chan.results.length).to.equal(3)
     expect(chan.results[0]).to.have.property('hash_id')

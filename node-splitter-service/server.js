@@ -15,6 +15,14 @@ const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.s
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+// API methods should return 502 when this value is null
+var amqpChannel = null
+// getter and setter methods added for testing purposes
+function getAMQPChannel () { return amqpChannel }
+function setAMQPChannel (chan) { amqpChannel = chan }
+
 /**
  * Opens an AMPQ connection and channel
  * Retry logic is included to handle losses of connection
@@ -26,18 +34,20 @@ function amqpOpenConnection (connectionString) {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+      setAMQPChannel(null)
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
       // the connection and channel have been established
       console.log('Connection established')
+      setAMQPChannel(chan)
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
 
       // Continuously load the HASHES from RMQ with hash objects to process
       return chan.assertQueue('', { durable: true }).then(function (q) {
         chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
         return chan.consume(q.queue, function (msg) {
-          consumeHashMessage(chan, msg)
+          consumeHashMessage(msg)
         })
       })
     })
@@ -48,7 +58,8 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
-function consumeHashMessage (chan, msg) {
+function consumeHashMessage (msg) {
+  let chan = getAMQPChannel()
   if (msg !== null) {
     let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
@@ -87,5 +98,7 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 // export these functions for testing purposes
 module.exports = {
   amqpOpenConnection: amqpOpenConnection,
-  consumeHashMessage: consumeHashMessage
+  consumeHashMessage: consumeHashMessage,
+  getAMQPChannel: getAMQPChannel,
+  setAMQPChannel: setAMQPChannel
 }
