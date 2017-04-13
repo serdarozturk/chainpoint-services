@@ -2,6 +2,7 @@ require('dotenv').config()
 const _ = require('lodash')
 const restify = require('restify')
 const amqp = require('amqplib')
+const cors = require('cors')
 
 require('dotenv').config()
 
@@ -241,6 +242,7 @@ var server = restify.createServer({
   name: 'chainpoint'
 })
 
+server.use(cors())
 server.use(restify.queryParser())
 server.use(restify.bodyParser())
 
