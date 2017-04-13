@@ -167,6 +167,37 @@ describe('Hashes Controller', function () {
           done()
         })
     })
+
+    it('should return proper result with on valid call', function (done) {
+      app.setAMQPChannel({
+        publish: function () { }
+      })
+      request(server)
+        .post('/hashes')
+        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end(function (err, res) {
+          expect(err).to.equal(null)
+          expect(res).to.have.property('body')
+          expect(res.body).to.have.property('meta')
+          expect(res.body.meta).to.have.property('timestamp')
+          expect(res.body.meta).to.have.property('processing_hints')
+          expect(res.body.meta.processing_hints).to.have.property('cal')
+            .and.to.be.a('string')
+          expect(res.body.meta.processing_hints).to.have.property('eth')
+            .and.to.be.a('string')
+          expect(res.body.meta.processing_hints).to.have.property('btc')
+            .and.to.be.a('string')
+          expect(res.body).to.have.property('hashes')
+            .and.to.be.a('array')
+          expect(res.body.hashes.length).to.equal(1)
+          expect(res.body.hashes[0]).to.have.property('hash_id')
+          expect(res.body.hashes[0]).to.have.property('hash')
+            .and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+          done()
+        })
+    })
   })
 })
 
@@ -192,7 +223,6 @@ describe('Functions', function () {
       done()
     })
   })
-
 
   describe('calling generatePostHashesResponse with three hashes', function () {
     it('should return proper repsonse object', function (done) {

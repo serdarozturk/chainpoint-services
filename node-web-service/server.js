@@ -23,6 +23,9 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 // This value is set once the connection has been established
 // API methods should return 502 when this value is null
 var amqpChannel = null
+// getter and setter methods added for testing purposes
+function getAMQPChannel () { return amqpChannel }
+function setAMQPChannel (chan) { amqpChannel = chan }
 
 /**
  * Opens an AMPQ connection and channel
@@ -35,7 +38,7 @@ function amqpOpenConnection (connectionString) {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      amqpChannel = null
+      setAMQPChannel(null)
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
@@ -43,7 +46,7 @@ function amqpOpenConnection (connectionString) {
       // set 'amqpChannel' so that publishers have access to the channel
       console.error('Connection established')
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
+      setAMQPChannel(chan)
     })
   }).catch(() => {
     // catch errors when attempting to establish connection
@@ -196,10 +199,11 @@ function postHashesV1 (req, res, next) {
   // AMQP / RabbitMQ
 
   // validate amqp channel has been established
-  if (!amqpChannel) {
+  let chan = getAMQPChannel()
+  if (!chan) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(responseObj)), { persistent: true },
+  chan.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(responseObj)), { persistent: true },
     function (err, ok) {
       if (err !== null) {
         console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
@@ -263,5 +267,6 @@ server.listen(8080, function () {
 // export these functions for testing purposes
 module.exports = {
   server: server,
-  generatePostHashesResponse: generatePostHashesResponse
+  generatePostHashesResponse: generatePostHashesResponse,
+  setAMQPChannel: setAMQPChannel
 }
