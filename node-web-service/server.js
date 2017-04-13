@@ -260,4 +260,8 @@ server.listen(8080, function () {
   console.log('%s listening at %s', server.name, server.url)
 })
 
-module.exports = server
+// export these functions for testing purposes
+module.exports = {
+  server: server,
+  generatePostHashesResponse: generatePostHashesResponse
+}
