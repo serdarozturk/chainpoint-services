@@ -51,6 +51,16 @@ services:
       - l5d
       - rabbitmq
 
+  btc-tx:
+    restart: always
+    image: chainpoint/node-btc-tx-service
+    container_name: btc-tx
+    build:
+      context: ./node-btc-tx-service
+    depends_on:
+      - l5d
+      - rabbitmq
+
   # HTTP API front-end chainpoint/node-web-service
   web:
     restart: always
