@@ -78,13 +78,15 @@ The following is an example of state data published from the splitter service:
   "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
   "state": {
     "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
-  } 
+  },
+  "value": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
 }
 ```
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
 | hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
 | state | An object containing state information to be stored |
+| value | The last calculated value from the ops array, in this case, the initial hash |
 
 #### Aggregator Service
 
@@ -171,7 +173,6 @@ The following is an example of a proof state object:
 
 ```json
 {
-  "state_id": "78dce74c-1fbe-11e7-93ae-92361f002671",
   "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
   "type": "agg_0",
   "state": {
@@ -186,26 +187,13 @@ The following is an example of a proof state object:
 ```
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
-| state_id   | The UUIDv1 unique identifier for this proof state record with embedded timestamp |
 | hash_id   | The UUIDv1 unique identifier for the hash with embedded timestamp |
 | type   | The type/origin of the state data |
 | state | An object containing state information to be stored |
 
-The following indexes are added to assist in common write scenarios:
-
-| Field | Property | Description |
-|:--------|:-----------|:--------------|
-| state\_id | Primary Key | The UUIDv1 for this proof state object |
-| hash\_id | Index | The UUIDv1 for this hash |
-
-TODO: The above will likely change... dependant upon our storage implementation
 
 ## Data Out 
-Once the proof state data is persisted into storage, a new message is created and queued, bound for the next service in line for the overall proccess. 
-
-#### Splitter Service
-
-If the proof state data being stored originated from the splitter service, a new hash object message will be queued for the aggregator service to consume using the routing key as defined by the RMQ\_WORK\_OUT\_AGG\_0\_ROUTING\_KEY configuration parameter. 
+Once the proof state data is persisted into storage, a new hash object message is created and queued, bound for the next service in line for the overall proccess. 
 
 The following is an example of a hash object message body: 
 ```json
@@ -217,73 +205,30 @@ The following is an example of a hash object message body:
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
 | hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-| hash | A hex string representing the hash to be processed |
+| hash | A hex string representing the hash value last calculated by the ops array |
+
+#### Splitter Service
+
+If the proof state data being stored originated from the splitter service, a new hash object message will be queued for the aggregator service to consume using the routing key as defined by the RMQ\_WORK\_OUT\_AGG\_0\_ROUTING\_KEY configuration parameter. 
 
 #### Aggregator Service
 
-If the proof state data being stored originated from the aggregator service, a new aggregation object message will be queued for the calendar service to consume using the routing key as defined by the RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY configuration parameter. 
-
-The following is an example of an aggregation message body: 
-```json
-{
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  "root": "da31a4f8b87a901707e054105a1dac415e63af5c6dd1221f0249dc44662fa9d6"
-}
-```
-| Name | Description                                                            |
-| :--- |:-----------------------------------------------------------------------|
-| hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-| root | A hex string representing the merkle root calculated during the aggregation process |
+If the proof state data being stored originated from the aggregator service, a new hash object message will be queued for the calendar service to consume using the routing key as defined by the RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY configuration parameter. 
 
 #### Calendar Service
 
-If the proof state data being stored originated from the calendar service, new calendar anchor object messages will be queued for the proof generator service, ethereum anchor service, and btc anchor service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY, RMQ\_WORK\_OUT\_ETH\_ROUTING\_KEY, and RMQ\_WORK\_OUT\_BTC\_ROUTING\_KEY configuration parameters. 
-
-The following is an example of a calendar anchor object message body: 
-```json
-{
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  //TODO: Complete this
-}
-```
-| Name | Description                                                            |
-| :--- |:-----------------------------------------------------------------------|
-| hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-TODO: Complete this
+If the proof state data being stored originated from the calendar service, new hash object messages will be queued for the proof generator service, ethereum anchor service, and btc anchor service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY, RMQ\_WORK\_OUT\_ETH\_ROUTING\_KEY, and RMQ\_WORK\_OUT\_BTC\_ROUTING\_KEY configuration parameters. 
 
 #### Ethereum Anchor Service
 
-If the proof state data being stored originated from the ethereum anchor service, a new ethereum anchor object message will be queued for the proof generator service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY configuration parameters. 
-
-The following is an example of an ethereum anchor object message body: 
-```json
-{
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  //TODO: Complete this
-}
-```
-| Name | Description                                                            |
-| :--- |:-----------------------------------------------------------------------|
-| hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-TODO: Complete this
+If the proof state data being stored originated from the ethereum anchor service, a new hash object message will be queued for the proof generator service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY configuration parameters. 
 
 #### BTC Anchor Service
 
-If the proof state data being stored originated from the btc anchor service, a new btc anchor object message will be queued for the proof generator service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY configuration parameters. 
+If the proof state data being stored originated from the btc anchor service, a new hash object message will be queued for the proof generator service to consume using the routing keys as defined by the RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY configuration parameters. 
 
-The following is an example of a btc anchor object message body: 
-```json
-{
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  //TODO: Complete this
-}
-```
-| Name | Description                                                            |
-| :--- |:-----------------------------------------------------------------------|
-| hash_id   | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-TODO: Complete this
 
-Finally, once message publishing is acked, the original proof state data object message is acked as consumed.
+Finally, for all services, once message publishing is acked, the original proof state data object message is acked as consumed.
 
 
 

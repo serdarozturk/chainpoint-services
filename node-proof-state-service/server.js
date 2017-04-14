@@ -1,11 +1,9 @@
-const _ = require('lodash')
 const amqp = require('amqplib')
+const async = require('async')
+
+const storageClient = require('./storage-adapters/redis.js')
 
 require('dotenv').config()
-
-// Generate a v1 UUID (time-based)
-// see: https://github.com/broofa/node-uuid
-const uuidv1 = require('uuid/v1')
 
 // the name of the RabbitMQ topic exchange to use
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
@@ -56,120 +54,98 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 var amqpChannel = null
 
 /**
- * Consumes a message from the Splitter service
- * Stores state information and publishes message bound for aggregation service
- *
- * @param {amqp message object} msg - The AMQP message received from the queue
- */
-function processSplitterWork (msg) {
+* Writes the state data to persitent storage and pulbishes a message
+* for consumption by the next service(s)
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+* @param {string} stateType - The state type identifier
+* @param {array} outRoutingKeys - The routing key(s) to which messages are published
+*/
+function doStorageAndMessageWork (msg, stateType, outRoutingKeys) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
-  stateObj.state_id = uuidv1()
   stateObj.hash_id = messageObj.hash_id
-  stateObj.type = 'splitter'
+  stateObj.type = stateType
   stateObj.state = messageObj.state
   console.log(stateObj)
 
-  // TODO: Store this state information in DB/Redis/??
+  // Store this state information
+  storageClient.writeStateObject(stateObj, function (err, success) {
+    if (err) {
+      console.error('error writing state object', err)
+      amqpChannel.nack(msg)
+      console.error(msg.fields.routingKey, 'consume message nacked')
+    } else {
+      let dataOutObj = {}
+      dataOutObj.hash_id = messageObj.hash_id
+      dataOutObj.hash = messageObj.value
 
-  // Publish the hash for consumption by the aggregator service
-  let hashObj = {}
-  hashObj.hash_id = messageObj.hash_id
-  hashObj.hash = messageObj.state.hash
-  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
-    function (err, ok) {
-      if (err !== null) {
-        console.error(RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, 'publish message nacked')
-         // An error as occurred publishing a message, nack consumption of original message
-        console.error(msg.fields.routingKey, 'consume message nacked')
-        amqpChannel.nack(msg)
-      } else {
-        console.log(RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY, 'publish message acked')
-         // New message has been published, ack consumption of original message
-        console.log(msg.fields.routingKey, 'consume message acked')
-        amqpChannel.ack(msg)
-      }
-    })
+      // Publish an object for consumption by the next service(s) for each provided routing key
+      async.each(outRoutingKeys, function (routingKey, callback) {
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, routingKey, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+          function (err, ok) {
+            if (err) {
+              console.error(routingKey, 'publish message nacked')
+              return callback(err)
+            } else {
+              console.log(routingKey, 'publish message acked')
+              return callback(null)
+            }
+          })
+      }, function (err) {
+        if (err) {
+          // An error as occurred publishing a message, nack consumption of original message
+          amqpChannel.nack(msg)
+          console.error(msg.fields.routingKey, 'consume message nacked')
+        } else {
+          // New message has been published, ack consumption of original message
+          amqpChannel.ack(msg)
+          console.log(msg.fields.routingKey, 'consume message acked')
+        }
+      })
+    }
+  })
 }
 
 /**
- * Consumes a message from the Aggregator service
- * Stores state information and publishes message bound for Calendar service
- *
- * @param {amqp message object} msg - The AMQP message received from the queue
- */
-function processAggregatorWork (msg) {
-  let messageObj = JSON.parse(msg.content.toString())
-  let stateObj = {}
-  stateObj.state_id = uuidv1()
-  stateObj.hash_id = messageObj.hash_id
-  stateObj.type = 'agg_0'
-  stateObj.state = messageObj.state
-  console.log(stateObj)
-
-  // TODO: Store this state information in DB/Redis/??
-
-  // TODO: Handle remaining messaging tasks
-}
-
-/**
- * Consumes a message from the Calendar service
- * Stores state information and publishes message bound for Generator, Eth Anchor and Btc service
- *
- * @param {amqp message object} msg - The AMQP message received from the queue
- */
-function processCalWork (msg) {
-  let messageObj = JSON.parse(msg.content.toString())
-  let stateObj = {}
-  stateObj.state_id = uuidv1()
-  stateObj.hash_id = messageObj.hash_id
-  stateObj.type = 'cal'
-  stateObj.state = messageObj.state
-  console.log(stateObj)
-
-  // TODO: Store this state information in DB/Redis/??
-
-  // TODO: Handle remaining messaging tasks
-}
-
-/**
- * Consumes a message from the Eth Anchor service
- * Stores state information and publishes message bound for Generator
- *
- * @param {amqp message object} msg - The AMQP message received from the queue
- */
-function processEthWork (msg) {
-  let messageObj = JSON.parse(msg.content.toString())
-  let stateObj = {}
-  stateObj.state_id = uuidv1()
-  stateObj.hash_id = messageObj.hash_id
-  stateObj.type = 'eth'
-  stateObj.state = messageObj.state
-  console.log(stateObj)
-
-  // TODO: Store this state information in DB/Redis/??
-
-  // TODO: Handle remaining messaging tasks
-}
-
-/**
- * Consumes a message from the Calendar service
- * Stores state information and publishes message bound for Generator
- *
- * @param {amqp message object} msg - The AMQP message received from the queue
- */
-function processBtcWork (msg) {
-  let messageObj = JSON.parse(msg.content.toString())
-  let stateObj = {}
-  stateObj.state_id = uuidv1()
-  stateObj.hash_id = messageObj.hash_id
-  stateObj.type = 'btc'
-  stateObj.state = messageObj.state
-  console.log(stateObj)
-
-  // TODO: Store this state information in DB/Redis/??
-
-  // TODO: Handle remaining messaging tasks
+* Parses a message and performs the required work for that message
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function processMessage (msg) {
+  if (msg !== null) {
+    // determine the source of the message and handle appropriately
+    switch (msg.fields.routingKey) {
+      case RMQ_WORK_IN_SPLITTER_ROUTING_KEY:
+        // Consumes a message from the Splitter service
+        // Stores state information and publishes message bound for aggregation service
+        doStorageAndMessageWork(msg, 'splitter', [RMQ_WORK_OUT_AGGREGATOR_0_ROUTING_KEY])
+        break
+      case RMQ_WORK_IN_AGG_0_ROUTING_KEY:
+        // Consumes a message from the Aggregator service
+        // Stores state information and publishes message bound for Calendar service
+        doStorageAndMessageWork(msg, 'agg_0', [RMQ_WORK_OUT_CAL_ROUTING_KEY])
+        break
+      case RMQ_WORK_IN_CAL_ROUTING_KEY:
+        // Consumes a message from the Calendar service
+        // Stores state information and publishes message bound for Generator, Eth Anchor and Btc service
+        doStorageAndMessageWork(msg, 'cal', [RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, RMQ_WORK_OUT_ETH_ROUTING_KEY, RMQ_WORK_OUT_BTC_ROUTING_KEY])
+        break
+      case RMQ_WORK_IN_ETH_ROUTING_KEY:
+        // Consumes a message from the Eth Anchor service
+        // Stores state information and publishes message bound for Generator
+        doStorageAndMessageWork(msg, 'eth', [RMQ_WORK_OUT_ETH_GEN_ROUTING_KEY])
+        break
+      case RMQ_WORK_IN_BTC_ROUTING_KEY:
+        // Consumes a message from the Calendar service
+        // Stores state information and publishes message bound for Generator
+        doStorageAndMessageWork(msg, 'btc', [RMQ_WORK_OUT_BTC_GEN_ROUTING_KEY])
+        break
+      default:
+        // This is an unknown state type, unknown routing key
+        console.error('Unknown state type or routing key', msg.fields.routingKey)
+    }
+  }
 }
 
 /**
@@ -194,41 +170,42 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return amqpChannel.assertQueue('', { durable: true }).then(function (q) {
-        amqpChannel.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return amqpChannel.consume(q.queue, function (msg) {
-          if (msg !== null) {
-            // determine the source of the message and handle appropriately
-            switch (msg.fields.routingKey) {
-              case RMQ_WORK_IN_SPLITTER_ROUTING_KEY:
-                processSplitterWork(msg)
-                break
-              case RMQ_WORK_IN_AGG_0_ROUTING_KEY:
-                processAggregatorWork(msg)
-                break
-              case RMQ_WORK_IN_CAL_ROUTING_KEY:
-                processCalWork(msg)
-                break
-              case RMQ_WORK_IN_ETH_ROUTING_KEY:
-                processEthWork(msg)
-                break
-              case RMQ_WORK_IN_BTC_ROUTING_KEY:
-                processBtcWork(msg)
-                break
-              default:
-                // This is an unknown state type, unknown routing key
-                console.error('Unknown state type or routing key', msg.fields.routingKey)
-            }
-          }
+      return chan.assertQueue('', { durable: true }).then(function (q) {
+        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
+        return chan.consume(q.queue, function (msg) {
+          processMessage(msg)
         })
       })
     })
   }).catch(() => {
     // catch errors when attempting to establish connection
-    console.error('Cannot establish connection. Attempting in 5 seconds...')
+    console.error('Cannot establish rmq connection. Attempting in 5 seconds...')
     setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
   })
 }
 
-// Start reading from queue and splitting hashes
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+/**
+ * Opens a storage connection
+ *
+ * @param {object} options - object containing 'port' and 'uri' parameters
+ */
+function openStorageConnection (callback) {
+  storageClient.openConnection(function (err, success) {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish storage connection. Attempting in 5 seconds...')
+      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+    } else {
+      return callback(null, true)
+    }
+  })
+}
+
+// Open storage connection and then amqp connection
+openStorageConnection(function (err, result) {
+  if (err) {
+    console.error(err)
+  } else {
+    amqpOpenConnection(RABBITMQ_CONNECT_URI)
+  }
+})

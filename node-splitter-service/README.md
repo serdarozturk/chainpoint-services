@@ -77,13 +77,15 @@ The following is an example of a proof state object message sent to the proof st
   "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
   "state": {
     "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
-  } 
+  },
+  "value": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
 }
 ```
 | Name             | Description                                                            |
 | :--------------- |:-----------------------------------------------------------------------|
 | hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp, used to reference the state of a particular hash |
 | state  | The state data being stored, in this case, the starting hash value |
+| value | The last calculated value from the ops array, in this case, the starting hash value |
 
 When all hash objects in the array have been processed, the original message is acked.
 

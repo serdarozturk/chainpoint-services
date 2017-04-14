@@ -67,6 +67,7 @@ function consumeHashMessage (msg) {
       stateObj.hash_id = hashObj.hash_id
       stateObj.state = {}
       stateObj.state.hash = hashObj.hash
+      stateObj.value = hashObj.hash
       amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
         function (err, ok) {
           if (err !== null) {
