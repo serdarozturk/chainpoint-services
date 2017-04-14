@@ -34,6 +34,11 @@ namespace :build do
     system 'cd node-splitter-service && yarn && docker build -t chainpoint/node-splitter-service:latest --no-cache=true .'
   end
 
+  desc 'Build node-btc-tx-service image from Dockerfile'
+  task :node_btc_tx_service do
+    system 'cd node-btc-tx-service && yarn && docker build -t chainpoint/node-btc-tx-service:latest --no-cache=true .'
+  end
+
   desc 'Build all images from Dockerfiles'
   task all: [:node_base,
              :node_web_service,
@@ -41,7 +46,8 @@ namespace :build do
              :node_proof_state_service,
              :node_proof_gen_service,
              :node_calendar_service,
-             :node_splitter_service
+             :node_splitter_service,
+             :node_btc_tx_service
             ]
 end
 
