@@ -1,5 +1,12 @@
 # chainpoint-services
 
+Chainpoint services is a modern scalable microservices architecture
+based on Node.js services running on Docker containers. These containers
+are intended to be hosted within a full Docker container orchestration
+system such as Kubernetes for production use. For light hashing or
+development the entire environment can be spun-up on a single host
+using `docker-compose up`.
+
 ## Setup
 
 This repository contains all of the code for the full
@@ -20,7 +27,8 @@ Homebrew can be found at [https://brew.sh/](https://brew.sh/).
 
 ## Build
 
-Build and install all service docker images into your local Docker environment. This command Will use `yarn` to install any JavaScript
+Build and install all service docker images into your local Docker
+environment. This command Will use `yarn` to install any JavaScript
 dependencies for each service and will then build the full suite of
 Docker images.
 
@@ -36,7 +44,7 @@ Foreground:
 docker compose up
 ```
 
-Stop w/ `control-c`
+Stop w/ `control-c` (`docker-compose down` is sometimes necessary)
 
 
 Daemonized:
@@ -50,16 +58,16 @@ Stop w/ `docker-compose down`
 ## Test Running Services
 
 ```
-$ curl -H "Content-Type: application/json" -H "Host: web" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 0.0.0.0:4140/hashes | jq
-
-# quick load test
-ab -n 10000 -c 10 -H "Host: web" http://0.0.0.0:4140/
+curl -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1:8080/hashes | jq
 ```
 
-## Access the linkerd Admin Page:
+## Lite Local Load Test
+
+Install the `hey` load testing tool. [https://github.com/rakyll/hey](https://github.com/rakyll/hey)
 
 ```
-open http://0.0.0.0:9990/
+hey -m POST -H "Content-Type: application/json" -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' -T 'application/json' -n 1000 -c 25 -cpus 3 http://127.0.0.1:8080/hashes
+
 ```
 
 ## Cleanup
