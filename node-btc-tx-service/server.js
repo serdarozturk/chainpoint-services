@@ -1,3 +1,4 @@
+const async = require('async')
 const _ = require('lodash')
 require('dotenv').config()
 
