@@ -39,6 +39,16 @@ namespace :build do
     system 'cd node-btc-tx-service && yarn && docker build -t chainpoint/node-btc-tx-service:latest --no-cache=true .'
   end
 
+  desc 'Build node-btc-fee-service image from Dockerfile'
+  task :node_btc_fee_service do
+    system 'cd node-btc-fee-service && yarn && docker build -t chainpoint/node-btc-fee-service:latest --no-cache=true .'
+  end
+
+  desc 'Build node-btc-mon-service image from Dockerfile'
+  task :node_btc_mon_service do
+    system 'cd node-btc-mon-service && yarn && docker build -t chainpoint/node-btc-mon-service:latest --no-cache=true .'
+  end
+
   desc 'Build all images from Dockerfiles'
   task all: [:node_base,
              :node_web_service,
@@ -47,7 +57,9 @@ namespace :build do
              :node_proof_gen_service,
              :node_calendar_service,
              :node_splitter_service,
-             :node_btc_tx_service
+             :node_btc_tx_service,
+             :node_btc_fee_service,
+             :node_btc_mon_service
             ]
 end
 

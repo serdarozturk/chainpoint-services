@@ -92,6 +92,40 @@ services:
     networks:
       - back-end
 
+  # Bitcoin Fees
+  # Retrieve and store recommended transaction fees for Bitcoin
+  # 
+  # PORTS
+  # none
+  #
+  btc-fee:
+    restart: always
+    image: chainpoint/node-btc-fee-service
+    container_name: btc-fee
+    build:
+      context: ./node-btc-fee-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # Bitcoin Transmit Monitor
+  # Monitor and report on the state of BTC transactions this app has submitted.
+  # 
+  # PORTS
+  # none
+  #
+  btc-mon:
+    restart: always
+    image: chainpoint/node-btc-mon-service
+    container_name: btc-mon
+    build:
+      context: ./node-btc-mon-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
   # 
