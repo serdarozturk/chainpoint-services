@@ -3,17 +3,17 @@ version: '3'
 services:
 
   # HTTP API
-  # Restify Node public web service.
+  # Restify Node public web API service.
   # 
   # PORTS
   # http : 8080
   #
   api:
     restart: always
-    image: chainpoint/node-web-service
+    image: chainpoint/node-api-service
     container_name: api
     build:
-      context: ./node-web-service
+      context: ./node-api-service
     ports:
       - "8080:8080"
     depends_on:
