@@ -74,9 +74,14 @@ let getRecommendedFees = function () {
         }
       })
     } else {
+      // Bail out and let the service get restarted
       console.error('unexpected return value : %s', JSON.stringify(responseBody))
       process.exit(1)
     }
+  }).fail(function (response) {
+    // Bail out and let the service get restarted
+    console.error('HTTP GET Error : %s : %s', response.getCode(), JSON.stringify(response))
+    process.exit(1)
   })
 }
 
