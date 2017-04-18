@@ -39,7 +39,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.splitter' | 
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string       | 'work.agg_0' |  
+| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string       | 'work.agg' |  
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 

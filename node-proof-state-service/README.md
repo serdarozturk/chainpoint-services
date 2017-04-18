@@ -44,7 +44,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
 | RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | string       | 'work.splitter.state' | 
-| RMQ\_WORK\_IN\_AGG\_0\_ROUTING\_KEY     | string       | 'work.agg_0.state' | 
+| RMQ\_WORK\_IN\_AGG\_0\_ROUTING\_KEY     | string       | 'work.agg.state' | 
 | RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | string       | 'work.cal.state' | 
 | RMQ\_WORK\_OUT\_GEN\_CAL\_ROUTING\_KEY       | string       | 'work.generator.cal' |  
 | RMQ\_WORK\_OUT\_GEN\_ETH\_ROUTING\_KEY       | string       | 'work.generator.eth' |  
@@ -130,7 +130,7 @@ The following is an example of a proof state object:
 
 ```json
 {
-  "type": "agg_0",
+  "type": "agg",
   "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
   "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb",
   "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",

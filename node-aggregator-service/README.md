@@ -42,9 +42,9 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | Name           | Type         | Default | Min | Max |
 | :------------- |:-------------|:-------------|:----|:--------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string      | work\_topic\_exchange' |  |  | 
-| RMQ\_WORK\_IN\_ROUTING\_KEY       | string      | 'work.agg_0' |  |  | 
+| RMQ\_WORK\_IN\_ROUTING\_KEY       | string      | 'work.agg' |  |  | 
 | RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string      | 'work.cal' |  |  | 
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string      | 'work.agg_0.state' |  |  | 
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string      | 'work.agg.state' |  |  | 
 | AGGREGATION_INTERVAL       | integer       | 1,000 | 250 | 10,000 | 
 | HASHES\_PER\_MERKLE_TREE     | integer       | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer       | 250 | 250 | 10,000 | 

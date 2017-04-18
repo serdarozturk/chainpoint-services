@@ -12,7 +12,7 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.*.state'
 
 // the topic exchange routing key for message consumption originating from aggregator service
-const RMQ_WORK_IN_AGG_0_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_0_ROUTING_KEY || 'work.agg_0.state'
+const RMQ_WORK_IN_AGG_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_ROUTING_KEY || 'work.agg.state'
 
 // the topic exchange routing key for message consumption originating from calendar service
 const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.cal.state'
@@ -116,7 +116,7 @@ function processMessage (msg) {
   if (msg !== null) {
     // determine the source of the message and handle appropriately
     switch (msg.fields.routingKey) {
-      case RMQ_WORK_IN_AGG_0_ROUTING_KEY:
+      case RMQ_WORK_IN_AGG_ROUTING_KEY:
         // Consumes a state message from the Aggregator service
         // Stores state information
         ConsumeAggregationMessage(msg)
