@@ -30,7 +30,7 @@ The following are the descriptions of the configuration parameters:
 | :------------- |:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating the web service
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
+| RMQ\_WORK\_OUT\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the aggregtion service 
 | RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI 
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
@@ -39,7 +39,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.splitter' | 
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string       | 'work.splitter.state' |  
+| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string       | 'work.agg_0' |  
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 
@@ -69,23 +69,19 @@ The following is an example of a hash object array message body:
 Once a message is consumed, the hash object array is split into individual hash objects. 
 
 ## Data Out
-For each hash object, a proof state object message is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the proof state service.
+For each hash object, a hash object message is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the aggregation service.
 
-The following is an example of a proof state object message sent to the proof state service: 
+The following is an example of a hash object message sent to the aggregation service: 
 ```json
 {
   "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",
-  "state": {
-    "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
-  },
-  "value": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
+  "hash": "4814d42d7b92ef685cc5c7dca06f5f3f1506c148bb5e7ab2231c91a8f0f119b2"
 }
 ```
 | Name             | Description                                                            |
 | :--------------- |:-----------------------------------------------------------------------|
 | hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp, used to reference the state of a particular hash |
-| state  | The state data being stored, in this case, the starting hash value |
-| value | The last calculated value from the ops array, in this case, the starting hash value |
+| hash | The hash value submitted by the client to be anchored |
 
 When all hash objects in the array have been processed, the original message is acked.
 

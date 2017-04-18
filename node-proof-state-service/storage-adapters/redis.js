@@ -30,9 +30,17 @@ function getStateObjectsByHashId (hashId, callback) {
   })
 }
 
-function writeStateObject (stateObject, callback) {
+function writeAggStateObject (stateObject, callback) {
   console.log('writing')
-  redis.hset(stateObject.hash_id, stateObject.type, JSON.stringify(stateObject.state), function (err, reply) {
+  redis.hset(stateObject.hash_id, stateObject.type, JSON.stringify(stateObject.agg_state), function (err, reply) {
+    if (err) return callback(err, false)
+    return callback(null, true)
+  })
+}
+
+function writeCalStateObject (stateObject, callback) {
+  console.log('writing')
+  redis.hset(stateObject.agg_id, stateObject.type, JSON.stringify(stateObject.cal_state), function (err, reply) {
     if (err) return callback(err, false)
     return callback(null, true)
   })
@@ -41,5 +49,6 @@ function writeStateObject (stateObject, callback) {
 module.exports = {
   openConnection: openConnection,
   getStateObjectsByHashId: getStateObjectsByHashId,
-  writeStateObject: writeStateObject
+  writeAggStateObject: writeAggStateObject,
+  writeCalStateObject: writeCalStateObject
 }

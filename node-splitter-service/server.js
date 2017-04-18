@@ -9,8 +9,8 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 // The RabbitMQ topic key for incoming message from the web service
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.splitter'
 
-// The RabbitMQ topic key for outgoing message to the proof state service
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.splitter.state'
+// The RabbitMQ topic key for outgoing message to the aggregation service
+const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.agg_0'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -63,12 +63,7 @@ function consumeHashMessage (msg) {
 
     async.each(incomingHashBatch, function (hashObj, callback) {
       console.log(hashObj)
-      let stateObj = {}
-      stateObj.hash_id = hashObj.hash_id
-      stateObj.state = {}
-      stateObj.state.hash = hashObj.hash
-      stateObj.value = hashObj.hash
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
         function (err, ok) {
           if (err !== null) {
             console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')

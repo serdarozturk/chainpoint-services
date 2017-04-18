@@ -3,6 +3,7 @@ const MerkleTools = require('merkle-tools')
 const amqp = require('amqplib')
 const crypto = require('crypto')
 const async = require('async')
+const uuidv1 = require('uuid/v1')
 
 require('dotenv').config()
 
@@ -47,8 +48,11 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 // The topic exchange routing key for message consumption originating from proof state service
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.agg_0'
 
+// The topic exchange routing key for message publishing bound for the calendar service
+const RMQ_WORK_OUT_CAL_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_ROUTING_KEY || 'work.cal'
+
 // The topic exchange routing key for message publishing bound for the proof state service
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.agg_0.state'
+const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.agg_0.state'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -122,7 +126,7 @@ let aggregate = function () {
     // clear the merkleTools instance to prepare for a new tree
     merkleTools.resetTree()
 
-    // concatonate and hash the hash ids and hash values into new array
+    // concatenate and hash the hash ids and hash values into new array
     let leaves = hashesForTree.map(hashObj => {
       let hashIdBuffer = Buffer.from(hashObj.hash_id, 'utf8')
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
@@ -135,6 +139,7 @@ let aggregate = function () {
 
     // Collect and store the aggregation id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
+    treeData.agg_id = uuidv1()
     treeData.root = merkleTools.getMerkleRoot().toString('hex')
 
     let treeSize = merkleTools.getLeafCount()
@@ -143,6 +148,7 @@ let aggregate = function () {
       // push the hash_id and corresponding proof onto the array, inserting the UUID concat/hash step at the beginning
       let proofDataItem = {}
       proofDataItem.hash_id = hashesForTree[x].hash_id
+      proofDataItem.hash = hashesForTree[x].hash
       proofDataItem.hash_msg = hashesForTree[x].msg
       var proof = merkleTools.getProof(x)
       proof.unshift({ left: hashesForTree[x].hash_id })
@@ -156,8 +162,9 @@ let aggregate = function () {
   }
 }
 
-// Finalize already aggregated hash proofs by queuing message bound for proof state service
-// and acking the original hash object message for all messages in all trees ready for finalization
+// Finalize already aggregated hash proofs by queuing state messages bound for proof state service,
+// queuing aggregation event message bound for the calendar service, and acking the original
+// hash object message for all messages in all trees ready for finalization
 let finalize = function () {
   // if the amqp channel is null (closed), processing should not continue, defer to next finalize call
   if (amqpChannel === null) return
@@ -167,35 +174,80 @@ let finalize = function () {
   _.forEach(treesToFinalize, function (treeDataObj) {
     console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
-    // for each hash , queue up message containing updated proof state bound for proof state service
-    async.each(treeDataObj.proofData, function (proofDataItem, callback) {
-      let stateObj = {}
-      stateObj.hash_id = proofDataItem.hash_id
-      stateObj.state = {}
-      stateObj.state.ops = proofDataItem.proof
-      stateObj.value = treeDataObj.root
+    // queue state messages, and when complete, queue message for calendar service to continue processing
+    async.series([
+      function (callback) {
+        // for each hash, queue up message containing updated proof state bound for proof state service
+        async.each(treeDataObj.proofData, function (proofDataItem, eachCallback) {
+          let stateObj = {}
+          stateObj.hash_id = proofDataItem.hash_id
+          stateObj.hash = proofDataItem.hash
+          stateObj.agg_id = treeDataObj.agg_id
+          stateObj.agg_root = treeDataObj.root
+          stateObj.agg_state = {}
+          stateObj.agg_state.ops = proofDataItem.proof
 
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
-        function (err, ok) {
-          if (err !== null) {
-            // An error as occurred publishing a message, nack consumption of message
-            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
-            amqpChannel.nack(proofDataItem.hash_msg)
-            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
-            return callback(null)
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+            function (err, ok) {
+              if (err !== null) {
+                // An error as occurred publishing a message
+                console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
+                return eachCallback(err)
+              } else {
+                // New message has been published
+                console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
+                return eachCallback(null)
+              }
+            })
+        }, function (err) {
+          if (err) {
+            console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
+            return callback(err)
           } else {
-            // New message has been published, ack consumption of original message
-            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
-            amqpChannel.ack(proofDataItem.hash_msg)
-            console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
-            return callback(null)
+            console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+            // pass all the hash_msg objects to the series() callback
+            let messages = treeDataObj.proofData.map(proofDataItem => {
+              return proofDataItem.hash_msg
+            })
+            return callback(null, messages)
           }
         })
-    }, function (err) {
+      },
+      function (callback) {
+        let aggObj = {}
+        aggObj.agg_id = treeDataObj.agg_id
+        aggObj.agg_root = treeDataObj.root
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, new Buffer(JSON.stringify(aggObj)), { persistent: true },
+          function (err, ok) {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_CAL_ROUTING_KEY, 'publish message nacked')
+              return callback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_CAL_ROUTING_KEY, 'publish message acked')
+              return callback(null)
+            }
+          })
+      }
+    ], function (err, results) {
+      // results[0] contains an array of hash_msg objects from the first function in this series
       if (err) {
-        console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
+        _.forEach(results[0], function (message) {
+          // nack consumption of all original hash messages part of this aggregation event
+          if (message !== null) {
+            amqpChannel.nack(message)
+            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+          }
+        })
       } else {
-        console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+        _.forEach(results[0], function (message) {
+          if (message !== null) {
+            // ack consumption of all original hash messages part of this aggregation event
+            amqpChannel.ack(message)
+            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+          }
+        })
       }
     })
   })

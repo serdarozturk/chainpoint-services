@@ -30,7 +30,8 @@ The following are the descriptions of the configuration parameters:
 | :------------- |:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from proof state service
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
+| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the calendar service 
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
 | AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds 
 | HASHES\_PER\_MERKLE_TREE     | maximum number of hashes the aggregation process will consume per aggregation interval 
 | FINALIZE_INTERVAL       | how often the finalize process should run, in milliseconds 
@@ -42,7 +43,8 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|:----|:--------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string      | work\_topic\_exchange' |  |  | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY       | string      | 'work.agg_0' |  |  | 
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string      | 'work.agg_0.state' |  |  | 
+| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string      | 'work.cal' |  |  | 
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string      | 'work.agg_0.state' |  |  | 
 | AGGREGATION_INTERVAL       | integer       | 1,000 | 250 | 10,000 | 
 | HASHES\_PER\_MERKLE_TREE     | integer       | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer       | 250 | 250 | 10,000 | 
@@ -86,15 +88,18 @@ A treeData object is created that contains the results of this aggregation event
 The following is an example of a treeData object:
 ```json
 {
+  "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671", // a UUIDv1 for this aggregation event
   "root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
   "proofData": [
     {
       "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
+      "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb",
       "hash_msg": /* the RMQ message object for this hash */,
       "proof": [ /* proof path array from merkle tree for leaf 0 ... */ ]
     },
     {
       "hash_id": "6d627180-1883-11e7-a8f9-edb8c212ef23",
+      "hash": "2222d5f509d86e2627b1f498d7b44db1f8e70aae1528634580a9b68f05d57a9f",
       "hash_msg": /* the RMQ message object for this hash */,
       "proof": [ /* proof path array from merkle tree for leaf 1 ... */ ]
     },
@@ -103,13 +108,13 @@ The following is an example of a treeData object:
 }
 ```
 
-For each leaf on the tree, the proof path to the merkle root is calculated and stored within the treeObject's proofData.proof array. These proof paths are prepeneded with the additional hash operation representing the earlier H1=SHA256(id|hash) calculation. The original hash_id and hash object message are appended for use during the finalize process.
+For each leaf on the tree, the proof path to the merkle root is calculated and stored within the treeObject's proofData.proof array. These proof paths are prepeneded with the additional hash operation representing the earlier H1=SHA256(id|hash) calculation. The original hash_id, hash, and hash object message are appended for use during the finalize process.
 
 Once all these fields are populated for this object, it is added to the TREES array to await finalizing.
 
 
 ## Data Out [finalize]
-This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will publish proof state information in persistent state object messages to a durable topic exchange within RabbitMQ. The routing key is defined by the RMQ\_WORK\_OUT\_ROUTING\_KEY configuration parameter.
+This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will publish proof state information and aggregation events in persistent state object messages to a durable topic exchange within RabbitMQ. The routing keys are defined by the RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY and RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY configuration parameters.
 
 The finalize method will loop through and process every treeData object ready for finalization in the TREES array. For each hash and proof in each tree, a proof state object message is constructed and queued for the proof state service to consume.
 
@@ -117,24 +122,42 @@ The following is an example of a proof state object message sent to the proof st
 ```json
 {
   "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  "state": {
+  "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb",
+  "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",
+  "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
+  "agg_state": {
     "ops": [
       { "l": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
       { "op": "sha-256" },
       { "r": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" },
       { "op": "sha-256" }
     ]
-  },
-  "value": "ecbdb5e9691b2e77bd45706e3945becf3330819f59541a478fef0124d1072408"
+  }
 }
 ```
 | Name             | Description                                                            |
 | :--------------- |:-----------------------------------------------------------------------|
-| hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp, used to reference the state of a particular hash |
-| state  | The state data being stored, in this case, aggregation operations |
-| value | The last calculated value from the ops array, typically a merkle root, to be passed on to the next service |
+| hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp |
+| hash          | A hex string representing the hash to be processed  |
+| agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
+| agg_root          | A hex string representing the merkle root for the aggregation event  |
+| agg_state  | The state data being stored, in this case, aggregation operations |
 
-Once proof state messages are successfully queued, an acknowledgment is sent back to RabbitMQ for the original hash object message.
+Once proof state messages are successfully queued, an aggregation event message is queued for the calendar service.
+
+The following is an example of an aggregation event message sent to the calendar service: 
+```json
+{
+  "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",
+  "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05"
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
+| agg_root          | A hex string representing the merkle root for the aggregation event  |
+
+Once this message is successfully queued, all the original hash object messages received that were part of this aggregation event are acked.
 
 
 ## Service Failure

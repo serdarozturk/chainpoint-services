@@ -173,10 +173,12 @@ describe('Finalize', function () {
     })
     server.setHASHES([1])
     let treeObj1 = {
+      agg_id: 'agg_id1',
       root: 'root1',
       proofData: [
         {
           'hash_id': 'id1',
+          'hash': 'hash1',
           'hash_msg': 'msg1',
           'proof': [
             { 'left': 'ab1234' }
@@ -197,13 +199,19 @@ describe('Finalize', function () {
     expect(chan.results[0]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id1')
-    expect(chan.results[0]).to.have.property('state')
-    expect(chan.results[0].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[0].state.ops.length).to.equal(1)
-    expect(chan.results[0]).to.have.property('value')
+    expect(chan.results[0]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1')
+    expect(chan.results[0]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[0]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[0]).to.have.property('agg_state')
+    expect(chan.results[0].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[0].agg_state.ops.length).to.equal(1)
     done()
   })
 
@@ -216,10 +224,12 @@ describe('Finalize', function () {
     })
     server.setHASHES([1])
     let treeObj1 = {
+      agg_id: 'agg_id1',
       root: 'root1',
       proofData: [
         {
           'hash_id': 'id1',
+          'hash': 'hash1',
           'hash_msg': 'msg1',
           'proof': [
             { 'left': 'ab1234' }
@@ -227,9 +237,10 @@ describe('Finalize', function () {
         },
         {
           'hash_id': 'id2',
+          'hash': 'hash2',
           'hash_msg': 'msg2',
           'proof': [
-            { 'left': 'ab2222' }
+            { 'left': '22222222' }
           ]
         }
       ]
@@ -247,23 +258,35 @@ describe('Finalize', function () {
     expect(chan.results[0]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id1')
-    expect(chan.results[0]).to.have.property('state')
-    expect(chan.results[0].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[0].state.ops.length).to.equal(1)
-    expect(chan.results[0]).to.have.property('value')
+    expect(chan.results[0]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1')
+    expect(chan.results[0]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[0]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[0]).to.have.property('agg_state')
+    expect(chan.results[0].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[0].agg_state.ops.length).to.equal(1)
     expect(chan.results[1]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id2')
-    expect(chan.results[1]).to.have.property('state')
-    expect(chan.results[1].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[1].state.ops.length).to.equal(1)
-    expect(chan.results[1]).to.have.property('value')
+    expect(chan.results[1]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash2')
+    expect(chan.results[1]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[1]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[1]).to.have.property('agg_state')
+    expect(chan.results[1].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[1].agg_state.ops.length).to.equal(1)
     done()
   })
 
@@ -276,10 +299,12 @@ describe('Finalize', function () {
     })
     server.setHASHES([1])
     let treeObj1 = {
+      agg_id: 'agg_id1',
       root: 'root1',
       proofData: [
         {
           'hash_id': 'id1',
+          'hash': 'hash1',
           'hash_msg': 'msg1',
           'proof': [
             { 'left': 'ab1234' }
@@ -288,13 +313,15 @@ describe('Finalize', function () {
       ]
     }
     let treeObj2 = {
+      agg_id: 'agg_id2',
       root: 'root2',
       proofData: [
         {
-          'hash_id': 'id2',
-          'hash_msg': 'msg2',
+          'hash_id': 'id1',
+          'hash': 'hash1',
+          'hash_msg': 'msg1',
           'proof': [
-            { 'left': 'ab2222' }
+            { 'left': 'cd1234' }
           ]
         }
       ]
@@ -312,23 +339,35 @@ describe('Finalize', function () {
     expect(chan.results[0]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id1')
-    expect(chan.results[0]).to.have.property('state')
-    expect(chan.results[0].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[0].state.ops.length).to.equal(1)
-    expect(chan.results[0]).to.have.property('value')
+    expect(chan.results[0]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1')
+    expect(chan.results[0]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[0]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[0]).to.have.property('agg_state')
+    expect(chan.results[0].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[0].agg_state.ops.length).to.equal(1)
     expect(chan.results[1]).to.have.property('hash_id')
       .and.to.be.a('string')
-      .and.to.equal('id2')
-    expect(chan.results[1]).to.have.property('state')
-    expect(chan.results[1].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[1].state.ops.length).to.equal(1)
-    expect(chan.results[1]).to.have.property('value')
+      .and.to.equal('id1')
+    expect(chan.results[1]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1')
+    expect(chan.results[1]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id2')
+    expect(chan.results[1]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root2')
+    expect(chan.results[1]).to.have.property('agg_state')
+    expect(chan.results[1].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[1].agg_state.ops.length).to.equal(1)
     done()
   })
 
@@ -341,10 +380,12 @@ describe('Finalize', function () {
     })
     server.setHASHES([1])
     let treeObj1 = {
+      agg_id: 'agg_id1',
       root: 'root1',
       proofData: [
         {
           'hash_id': 'id1',
+          'hash': 'hash1',
           'hash_msg': 'msg1',
           'proof': [
             { 'left': 'ab1234' }
@@ -352,28 +393,32 @@ describe('Finalize', function () {
         },
         {
           'hash_id': 'id1b',
+          'hash': 'hash1b',
           'hash_msg': 'msg1b',
           'proof': [
-            { 'left': 'bb1234' }
+            { 'left': 'ab1234b' }
           ]
         }
       ]
     }
     let treeObj2 = {
+      agg_id: 'agg_id2',
       root: 'root2',
       proofData: [
         {
           'hash_id': 'id2',
+          'hash': 'hash2',
           'hash_msg': 'msg2',
           'proof': [
-            { 'left': 'ab2222' }
+            { 'left': '221234' }
           ]
         },
         {
           'hash_id': 'id2b',
+          'hash': 'hash2b',
           'hash_msg': 'msg2b',
           'proof': [
-            { 'left': 'bb2222' }
+            { 'left': '221234b' }
           ]
         }
       ]
@@ -391,43 +436,67 @@ describe('Finalize', function () {
     expect(chan.results[0]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id1')
-    expect(chan.results[0]).to.have.property('state')
-    expect(chan.results[0].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[0].state.ops.length).to.equal(1)
-    expect(chan.results[0]).to.have.property('value')
+    expect(chan.results[0]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1')
+    expect(chan.results[0]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[0]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[0]).to.have.property('agg_state')
+    expect(chan.results[0].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[0].agg_state.ops.length).to.equal(1)
     expect(chan.results[1]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id1b')
-    expect(chan.results[1]).to.have.property('state')
-    expect(chan.results[1].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[1].state.ops.length).to.equal(1)
-    expect(chan.results[1]).to.have.property('value')
+    expect(chan.results[1]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash1b')
+    expect(chan.results[1]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id1')
+    expect(chan.results[1]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root1')
+    expect(chan.results[1]).to.have.property('agg_state')
+    expect(chan.results[1].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[1].agg_state.ops.length).to.equal(1)
     expect(chan.results[2]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id2')
-    expect(chan.results[2]).to.have.property('state')
-    expect(chan.results[2].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[2].state.ops.length).to.equal(1)
-    expect(chan.results[2]).to.have.property('value')
+    expect(chan.results[2]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash2')
+    expect(chan.results[2]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id2')
+    expect(chan.results[2]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root2')
+    expect(chan.results[2]).to.have.property('agg_state')
+    expect(chan.results[2].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[2].agg_state.ops.length).to.equal(1)
     expect(chan.results[3]).to.have.property('hash_id')
       .and.to.be.a('string')
       .and.to.equal('id2b')
-    expect(chan.results[3]).to.have.property('state')
-    expect(chan.results[3].state).to.have.property('ops')
-      .and.to.be.a('array')
-    expect(chan.results[3].state.ops.length).to.equal(1)
-    expect(chan.results[3]).to.have.property('value')
+    expect(chan.results[3]).to.have.property('hash')
+      .and.to.be.a('string')
+      .and.to.equal('hash2b')
+    expect(chan.results[3]).to.have.property('agg_id')
+      .and.to.be.a('string')
+      .and.to.equal('agg_id2')
+    expect(chan.results[3]).to.have.property('agg_root')
       .and.to.be.a('string')
       .and.to.equal('root2')
+    expect(chan.results[3]).to.have.property('agg_state')
+    expect(chan.results[3].agg_state).to.have.property('ops')
+      .and.to.be.a('array')
+    expect(chan.results[3].agg_state.ops.length).to.equal(1)
     done()
   })
 })
