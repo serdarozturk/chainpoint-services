@@ -4,7 +4,7 @@ require('dotenv').config()
 
 // just a temp function
 let finalize = function () {
-  console.log('BTC TX...')
+  console.log('BTC TX monitoring...')
 }
 
 setInterval(() => finalize(), 1000)

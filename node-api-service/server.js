@@ -108,7 +108,7 @@ function lowerCaseHashes (hashes) {
 function generatePostHashesResponseMetadata () {
   let metaDataObj = {}
   let timestamp = new Date()
-  metaDataObj.timestamp = formatDateISO8601NoMs(timestamp)
+  metaDataObj.submitted_at = formatDateISO8601NoMs(timestamp)
 
   metaDataObj.processing_hints = {
     cal: formatDateISO8601NoMs(addMinutes(timestamp, 1)),

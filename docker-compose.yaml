@@ -1,46 +1,32 @@
 version: '3'
 
 services:
-  calendar:
-    restart: always
-    image: chainpoint/node-calendar-service
-    container_name: calendar
-    build:
-      context: ./node-calendar-service
-    depends_on:
-      - l5d
-      - rabbitmq
 
-  aggregator:
+  # HTTP API
+  # Restify Node public web API service.
+  # 
+  # PORTS
+  # http : 8080
+  #
+  api:
     restart: always
-    image: chainpoint/node-aggregator-service
-    container_name: aggregator
+    image: chainpoint/node-api-service
+    container_name: api
     build:
-      context: ./node-aggregator-service
+      context: ./node-api-service
+    ports:
+      - "8080:8080"
     depends_on:
-      - l5d
       - rabbitmq
+    networks:
+      - front-end
 
-  proof-state:
-    restart: always
-    image: chainpoint/node-proof-state-service
-    container_name: proof-state
-    build:
-      context: ./node-proof-state-service
-    depends_on:
-      - l5d
-      - rabbitmq
-
-  proof-gen:
-    restart: always
-    image: chainpoint/node-proof-gen-service
-    container_name: proof-gen
-    build:
-      context: ./node-proof-gen-service
-    depends_on:
-      - l5d
-      - rabbitmq
-
+  # Splitter
+  # Consume batches of incoming hashes from 'api' and re-queue them individually.
+  # 
+  # PORTS
+  # none
+  #
   splitter:
     restart: always
     image: chainpoint/node-splitter-service
@@ -48,9 +34,53 @@ services:
     build:
       context: ./node-splitter-service
     depends_on:
-      - l5d
       - rabbitmq
+    networks:
+      - back-end
 
+  # Aggregator
+  # Aggregate individual hashes into a Merkle tree
+  # sending the Merkle root to the `calendar` service, and
+  # partial proof data to the `proof-state` service.
+  # 
+  # PORTS
+  # none
+  #
+  aggregator:
+    restart: always
+    image: chainpoint/node-aggregator-service
+    container_name: aggregator
+    build:
+      context: ./node-aggregator-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # Calendar
+  # Aggregate Merkle roots from the `aggregator` service instances
+  # and write them to the Calendar event/block chains.
+  # 
+  # PORTS
+  # none
+  #
+  calendar:
+    restart: always
+    image: chainpoint/node-calendar-service
+    container_name: calendar
+    build:
+      context: ./node-calendar-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # Bitcoin Transmit
+  # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
+  # 
+  # PORTS
+  # none
+  #
   btc-tx:
     restart: always
     image: chainpoint/node-btc-tx-service
@@ -58,24 +88,91 @@ services:
     build:
       context: ./node-btc-tx-service
     depends_on:
-      - l5d
       - rabbitmq
+    networks:
+      - back-end
 
-  # HTTP API front-end chainpoint/node-web-service
-  web:
+  # Bitcoin Fees
+  # Retrieve and store recommended transaction fees for Bitcoin
+  # 
+  # PORTS
+  # none
+  #
+  btc-fee:
     restart: always
-    image: chainpoint/node-web-service
-    container_name: web
+    image: chainpoint/node-btc-fee-service
+    container_name: btc-fee
     build:
-      context: ./node-web-service
+      context: ./node-btc-fee-service
     depends_on:
-      - l5d
       - rabbitmq
+    networks:
+      - back-end
 
-  # RabbitMQ Admin Page : http://127.0.0.1:15672/
+  # Bitcoin Transmit Monitor
+  # Monitor and report on the state of BTC transactions this app has submitted.
+  # 
+  # PORTS
+  # none
+  #
+  btc-mon:
+    restart: always
+    image: chainpoint/node-btc-mon-service
+    container_name: btc-mon
+    build:
+      context: ./node-btc-mon-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # Proof State
+  # Encapsulates all persistent data storage for partial proof data.
+  # 
+  # PORTS
+  # none
+  #
+  proof-state:
+    restart: always
+    image: chainpoint/node-proof-state-service
+    container_name: proof-state
+    build:
+      context: ./node-proof-state-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # Proof Generation
+  # Responsible for constructing, signing, and validating Chainpoint proofs
+  # for Calendar, Bitcoin, and Ethereum attestation levels.
+  # 
+  # PORTS
+  # none
+  #
+  proof-gen:
+    restart: always
+    image: chainpoint/node-proof-gen-service
+    container_name: proof-gen
+    build:
+      context: ./node-proof-gen-service
+    depends_on:
+      - rabbitmq
+    networks:
+      - back-end
+
+  # RabbitMQ
+  #
+  # Realtime Admin Page (username:pass)
+  # http://127.0.0.1:15672/ (rabbitmq:rabbitmq)
+  #
+  # PORTS:
+  # amqp : 5672
+  # http : 15672
+  #
   rabbitmq:
     restart: always
-    image: "rabbitmq:management-alpine"
+    image: "rabbitmq:3.6.9-management-alpine"
     hostname: rabbitmq
     container_name: rabbitmq
     ports:
@@ -84,24 +181,59 @@ services:
     environment:
     - RABBITMQ_DEFAULT_USER=chainpoint
     - RABBITMQ_DEFAULT_PASS=chainpoint
+    networks:
+      - back-end
+      - front-end
 
+  # Redis
+  #
+  # PORTS:
+  # redis : 6379
+  #
   redis:
     restart: always
-    image: "redis:alpine"
+    image: "redis:3.2.8-alpine"
     container_name: redis
+    networks:
+      - back-end
 
-  # linkerd
-  # l5d Admin Page : http://127.0.0.1:9990/
-  l5d:
+  crate1:
     restart: always
-    image: buoyantio/linkerd:0.9.1
-    container_name: l5d
+    image: crate:1.1.2
+    container_name: crate-01
     ports:
-    - "4140:4140"
-    - "9990:9990"
-    # we must mount the config file and the disco directory
+      - "4200:4200"
+      - "4300:4300"
     volumes:
-    - ./linkerd.yaml:/io.buoyant/linkerd.yaml:ro
-    - ./disco:/io.buoyant/disco
-    command: >
-      /io.buoyant/linkerd.yaml
+      - /tmp/data/crate:/data
+    environment:
+      CRATE_HEAP_SIZE: 4g
+    command: crate -Cpath.conf=/crate/config -Ccluster.name=cluster -Ccluster.routing.allocation.disk.watermark.high=500mb -Ccluster.routing.allocation.disk.threshold_enabled=false
+    networks:
+      - back-end
+
+  crate2:
+    restart: always
+    image: crate:1.1.2
+    container_name: crate-02
+    volumes:
+      - /tmp/data/crate:/data
+    environment:
+      CRATE_HEAP_SIZE: 4g
+    command: crate -Cpath.conf=/crate/config -Ccluster.name=cluster -Ccluster.routing.allocation.disk.watermark.high=500mb -Ccluster.routing.allocation.disk.threshold_enabled=false
+    networks:
+      - back-end
+
+# Networks
+#
+# Front end network
+#   Shared by HTTP API service and RabbitMQ only.
+#
+# Back end network
+#   Available to all services except HTTP API
+#
+networks:
+  front-end:
+    driver: bridge
+  back-end:
+    driver: bridge

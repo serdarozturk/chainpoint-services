@@ -1,3 +1,4 @@
+const async = require('async')
 const _ = require('lodash')
 const MerkleTools = require('merkle-tools')
 const amqp = require('amqplib')

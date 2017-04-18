@@ -3,11 +3,11 @@
 # A base container that all chainpoint node based
 # services will inherit from.
 
-# Node.js current LTS version 6.10 (Boron) on Alpine Linux
+# Node.js on Alpine Linux
 # see: https://github.com/nodejs/LTS
 # see: https://hub.docker.com/_/node/
 # see: https://alpinelinux.org/
-FROM node:7.8.0-alpine
+FROM node:7.9.0-alpine
 
 # /me
 MAINTAINER Glenn Rempe <glenn@tierion.com>
