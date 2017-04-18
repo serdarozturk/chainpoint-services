@@ -4,7 +4,7 @@ const r = require('redis')
 require('dotenv').config()
 
 // Connection URI for Redis
-const REDIS_CONNECT_URI = process.env.STORAGE_PORT || 'redis://redis:6379'
+const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 
 // the storage client connection to use for all storage communication
 var redis = null
