@@ -80,7 +80,7 @@ function consumeHashMessage (msg) {
         })
     }, function (err) {
       if (err) {
-        // An error as occurred publishing a message, nack consumption of message
+        // An error has occurred publishing a message, nack consumption of message
         amqpChannel.nack(msg)
         console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
       } else {
