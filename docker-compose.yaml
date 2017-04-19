@@ -5,7 +5,7 @@ services:
   # HTTP API
   # Restify Node public web API service.
   # 
-  # PORTS
+  # LOCAL PORTS
   # http : 8080
   #
   api:
@@ -163,12 +163,12 @@ services:
 
   # RabbitMQ
   #
-  # Realtime Admin Page (username:pass)
-  # http://127.0.0.1:15672/ (rabbitmq:rabbitmq)
+  # Admin Page (username:pass)
+  # http://127.0.0.1:15673/ (rabbitmq:rabbitmq)
   #
-  # PORTS:
-  # amqp : 5672
-  # http : 15672
+  # LOCAL PORTS:
+  # amqp : 5673 (+1 over default)
+  # http : 15673 (+1 over default)
   #
   rabbitmq:
     restart: always
@@ -176,8 +176,8 @@ services:
     hostname: rabbitmq
     container_name: rabbitmq
     ports:
-    - 5672:5672
-    - 15672:15672
+    - 5673:5672
+    - 15673:15672
     environment:
     - RABBITMQ_DEFAULT_USER=chainpoint
     - RABBITMQ_DEFAULT_PASS=chainpoint
@@ -187,8 +187,8 @@ services:
 
   # Redis
   #
-  # PORTS:
-  # redis : 6379
+  # LOCAL PORTS:
+  # redis : 6380 (+1 over default)
   #
   redis:
     restart: always
@@ -197,19 +197,28 @@ services:
     build:
       context: ./redis
     ports:
-      - "7379:6379"
+      - "6380:6379"
     volumes:
       - ./data/redis:/data
     networks:
       - back-end
 
+  # Crate
+  #
+  # Admin Page
+  # http://127.0.0.1:4200/#/
+  #
+  # LOCAL PORTS:
+  # web   : 4201 (+1 over default)
+  # crate : 4301 (+1 over default)
+  #
   crate:
     restart: always
     image: crate:1.1.2
     container_name: crate
     ports:
-      - "4200:4200"
-      - "4300:4300"
+      - "4201:4200"
+      - "4301:4300"
     volumes:
       - ./data/crate:/data
     environment:
