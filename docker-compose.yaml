@@ -203,30 +203,18 @@ services:
     networks:
       - back-end
 
-  crate1:
+  crate:
     restart: always
     image: crate:1.1.2
-    container_name: crate-01
+    container_name: crate
     ports:
       - "4200:4200"
       - "4300:4300"
     volumes:
-      - /tmp/data/crate:/data
+      - ./data/crate:/data
     environment:
       CRATE_HEAP_SIZE: 4g
-    command: crate -Cpath.conf=/crate/config -Ccluster.name=cluster -Ccluster.routing.allocation.disk.watermark.high=500mb -Ccluster.routing.allocation.disk.threshold_enabled=false
-    networks:
-      - back-end
-
-  crate2:
-    restart: always
-    image: crate:1.1.2
-    container_name: crate-02
-    volumes:
-      - /tmp/data/crate:/data
-    environment:
-      CRATE_HEAP_SIZE: 4g
-    command: crate -Cpath.conf=/crate/config -Ccluster.name=cluster -Ccluster.routing.allocation.disk.watermark.high=500mb -Ccluster.routing.allocation.disk.threshold_enabled=false
+    command: crate -Cpath.conf=/crate/config -Ccluster.name=cluster
     networks:
       - back-end
 
