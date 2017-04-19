@@ -11,9 +11,11 @@
   "dependencies": {
     "amqplib": "^0.5.1",
     "async": "^2.3.0",
+    "coin-ticker": "^1.2.2",
     "dotenv": "^4.0.0",
     "lodash": "^4.17.4",
     "redis": "^2.7.1",
-    "requestify": "^0.2.5"
+    "requestify": "^0.2.5",
+    "satoshi-bitcoin": "^1.0.4"
   }
 }
