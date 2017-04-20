@@ -234,7 +234,7 @@ function getProofByIDV1 (req, res, next) {
  *
  */
 function rootV1 (req, res, next) {
-  return next(new restify.ImATeapotError('This is an API endpoint. Please consult https://www.chainpoint.org'))
+  return next(new restify.ImATeapotError('This is an API endpoint. Please consult https://chainpoint.org'))
 }
 
 // RESTIFY
