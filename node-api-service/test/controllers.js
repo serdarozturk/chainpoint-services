@@ -181,7 +181,7 @@ describe('Hashes Controller', function () {
           expect(err).to.equal(null)
           expect(res).to.have.property('body')
           expect(res.body).to.have.property('meta')
-          expect(res.body.meta).to.have.property('timestamp')
+          expect(res.body.meta).to.have.property('submitted_at')
           expect(res.body.meta).to.have.property('processing_hints')
           expect(res.body.meta.processing_hints).to.have.property('cal')
             .and.to.be.a('string')
@@ -206,7 +206,7 @@ describe('Functions', function () {
     it('should return proper repsonse object', function (done) {
       let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
-      expect(res.meta).to.have.property('timestamp')
+      expect(res.meta).to.have.property('submitted_at')
       expect(res.meta).to.have.property('processing_hints')
       expect(res.meta.processing_hints).to.have.property('cal')
         .and.to.be.a('string')
@@ -230,7 +230,7 @@ describe('Functions', function () {
         'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
-      expect(res.meta).to.have.property('timestamp')
+      expect(res.meta).to.have.property('submitted_at')
       expect(res.meta).to.have.property('processing_hints')
       expect(res.meta.processing_hints).to.have.property('cal')
         .and.to.be.a('string')
