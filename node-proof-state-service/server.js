@@ -1,7 +1,7 @@
 const amqp = require('amqplib')
 const async = require('async')
 
-const storageClient = require('./storage-adapters/redis.js')
+const storageClient = require('./storage-adapters/crate.js')
 
 require('dotenv').config()
 
@@ -176,8 +176,14 @@ function openStorageConnection (callback) {
   storageClient.openConnection(function (err, success) {
     if (err) {
       // catch errors when attempting to establish connection
-      console.error('Cannot establish storage connection. Attempting in 5 seconds...')
-      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+      if (err === 'not_ready') {
+        // the storage service is not ready to accept connections, schedule retry
+        console.error('Cannot establish storage connection. Attempting in 5 seconds...')
+        setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+      } else {
+        // a fatal error has occured, exit
+        return callback('fatal error opening storage connection')
+      }
     } else {
       return callback(null, true)
     }
