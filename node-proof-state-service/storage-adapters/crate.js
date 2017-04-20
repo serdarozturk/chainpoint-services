@@ -166,7 +166,7 @@ function writeAggStateObject (stateObject, callback) {
     stateObject.hash_id,
     stateObject.hash,
     stateObject.agg_id,
-    stateObject.agg_state
+    JSON.stringify(stateObject.agg_state)
   ]).then((res) => {
     return callback(null, true)
   }).catch((err) => {
@@ -178,7 +178,7 @@ function writeCalStateObject (stateObject, callback) {
   crate.execute('INSERT INTO proof_state_service.cal_states (agg_id, cal_id, cal_state) VALUES (?,?,?)', [
     stateObject.agg_id,
     stateObject.cal_id,
-    stateObject.cal_state
+    JSON.stringify(stateObject.cal_state)
   ]).then((res) => {
     return callback(null, true)
   }).catch((err) => {
@@ -190,7 +190,7 @@ function writeBTCTxStateObject (stateObject, callback) {
   crate.execute('INSERT INTO proof_state_service.btctx_states (cal_id, btctx_id, btctx_state) VALUES (?,?,?)', [
     stateObject.cal_id,
     stateObject.btctx_id,
-    stateObject.btctx_state
+    JSON.stringify(stateObject.btctx_state)
   ]).then((res) => {
     return callback(null, true)
   }).catch((err) => {
@@ -202,7 +202,7 @@ function writeBTCHeadStateObject (stateObject, callback) {
   crate.execute('INSERT INTO proof_state_service.btchead_states (btctx_id, btchead_height, btchead_state) VALUES (?,?,?)', [
     stateObject.btctx_id,
     stateObject.btchead_height,
-    stateObject.btchead_state
+    JSON.stringify(stateObject.btchead_state)
   ]).then((res) => {
     return callback(null, true)
   }).catch((err) => {
