@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "amqplib": "^0.5.1",
-    "cors": "^2.8.3",
     "dotenv": "^4.0.0",
     "lodash": "^4.17.4",
     "restify": "^4.3.0",
+    "restify-cors-middleware": "^0.0.8",
     "uuid": "^3.0.1"
   },
   "devDependencies": {

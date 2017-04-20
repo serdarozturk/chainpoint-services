@@ -1,8 +1,8 @@
 require('dotenv').config()
 const _ = require('lodash')
 const restify = require('restify')
+const corsMiddleware = require('restify-cors-middleware')
 const amqp = require('amqplib')
-const cors = require('cors')
 
 require('dotenv').config()
 
@@ -242,7 +242,27 @@ var server = restify.createServer({
   name: 'chainpoint'
 })
 
-server.use(cors())
+// CORS
+// See : https://github.com/TabDigital/restify-cors-middleware
+// See : https://github.com/restify/node-restify/issues/1151#issuecomment-271402858
+//
+// Test w/
+//
+// curl \
+// --verbose \
+// --request OPTIONS \
+// http://127.0.0.1:8080/hashes \
+// --header 'Origin: http://localhost:9292' \
+// --header 'Access-Control-Request-Headers: Origin, Accept, Content-Type' \
+// --header 'Access-Control-Request-Method: POST'
+//
+var cors = corsMiddleware({
+  preflightMaxAge: 600,
+  origins: ['*']
+})
+server.pre(cors.preflight)
+server.use(cors.actual)
+
 server.use(restify.queryParser())
 server.use(restify.bodyParser())
 
