@@ -35,7 +35,7 @@ function assertDBTables (callback) {
   console.log('asserting tables')
 
   let assertAggStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."agg_states" (' +
-    '"hash_id" STRING, ' +
+    '"hash_id" STRING PRIMARY KEY, ' +
     '"hash" STRING, ' +
     '"agg_id" STRING, ' +
     '"agg_state" STRING' +
@@ -43,21 +43,21 @@ function assertDBTables (callback) {
   )
 
   let assertCalStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."cal_states" (' +
-    '"agg_id" STRING, ' +
+    '"agg_id" STRING PRIMARY KEY, ' +
     '"cal_id" STRING, ' +
     '"cal_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCTxStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btctx_states" (' +
-    '"cal_id" STRING, ' +
+    '"cal_id" STRING PRIMARY KEY, ' +
     '"btctx_id" STRING, ' +
     '"btctx_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCHeadStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btchead_states" (' +
-    '"btctx_id" STRING, ' +
+    '"btctx_id" STRING PRIMARY KEY, ' +
     '"btchead_height" INTEGER, ' +
     '"btchead_state" STRING' +
     ') ' + getTableExtendedProperties()
