@@ -140,7 +140,7 @@ let aggregate = function () {
     // Collect and store the aggregation id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
     treeData.agg_id = uuidv1()
-    treeData.root = merkleTools.getMerkleRoot().toString('hex')
+    treeData.agg_root = merkleTools.getMerkleRoot().toString('hex')
 
     let treeSize = merkleTools.getLeafCount()
     let proofData = []
@@ -150,7 +150,7 @@ let aggregate = function () {
       proofDataItem.hash_id = hashesForTree[x].hash_id
       proofDataItem.hash = hashesForTree[x].hash
       proofDataItem.hash_msg = hashesForTree[x].msg
-      var proof = merkleTools.getProof(x)
+      let proof = merkleTools.getProof(x)
       proof.unshift({ left: hashesForTree[x].hash_id })
       proofDataItem.proof = proof
       proofData.push(proofDataItem)
@@ -183,7 +183,7 @@ let finalize = function () {
           stateObj.hash_id = proofDataItem.hash_id
           stateObj.hash = proofDataItem.hash
           stateObj.agg_id = treeDataObj.agg_id
-          stateObj.agg_root = treeDataObj.root
+          stateObj.agg_root = treeDataObj.agg_root
           stateObj.agg_state = {}
           stateObj.agg_state.ops = proofDataItem.proof
 
@@ -216,7 +216,7 @@ let finalize = function () {
       function (callback) {
         let aggObj = {}
         aggObj.agg_id = treeDataObj.agg_id
-        aggObj.agg_root = treeDataObj.root
+        aggObj.agg_root = treeDataObj.agg_root
         amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, new Buffer(JSON.stringify(aggObj)), { persistent: true },
           function (err, ok) {
             if (err !== null) {
