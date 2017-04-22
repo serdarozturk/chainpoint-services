@@ -79,6 +79,7 @@ function ConsumeCalendarMessage (msg) {
   stateObj.type = 'cal'
   stateObj.agg_id = messageObj.agg_id
   stateObj.agg_root = messageObj.agg_root
+  stateObj.agg_hash_count = messageObj.agg_hash_count
   stateObj.cal_id = messageObj.cal_id
   stateObj.cal_root = messageObj.cal_root
   stateObj.cal_state = messageObj.cal_state
@@ -86,15 +87,16 @@ function ConsumeCalendarMessage (msg) {
 
   async.waterfall([
     function (callback) {
-      // write the calendar state object to storage
-      storageClient.writeCalStateObject(stateObj, function (err, success) {
-        if (err) return callback(err)
-        return callback(null)
-      })
-    },
-    function (callback) {
       // get all hash ids for a given agg_id
       storageClient.getHashIdsByAggId(stateObj.agg_id, function (err, rows) {
+        if (err) return callback(err)
+        if (rows.length < stateObj.agg_hash_count) return callback('unable to read all hash data')
+        return callback(null, rows)
+      })
+    },
+    function (rows, callback) {
+      // write the calendar state object to storage
+      storageClient.writeCalStateObject(stateObj, function (err, success) {
         if (err) return callback(err)
         return callback(null, rows)
       })
@@ -125,8 +127,17 @@ function ConsumeCalendarMessage (msg) {
     if (err) {
       console.error('error consuming calendar message', err)
       // An error as occurred publishing a message, nack consumption of original message
-      amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, 'consume message nacked')
+      if (err === 'unable to read all hash data') {
+      // delay the nack for 500ms to slightly delay requeuing to prevent a flood of retries
+      // until the data is read, in cases of hash data not being fully readable yet
+        setTimeout(() => {
+          amqpChannel.nack(msg)
+          console.error(msg.fields.routingKey, 'consume message nacked')
+        }, 500)
+      } else {
+        amqpChannel.nack(msg)
+        console.error(msg.fields.routingKey, 'consume message nacked')
+      }
     } else {
       // New messages have been published, ack consumption of original message
       amqpChannel.ack(msg)

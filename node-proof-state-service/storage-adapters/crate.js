@@ -41,22 +41,22 @@ function assertDBTables (callback) {
   )
 
   let assertCalStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."cal_states" (' +
-    '"agg_id" STRING, ' +
-    '"cal_id" STRING PRIMARY KEY, ' +
+    '"agg_id" STRING PRIMARY KEY, ' +
+    '"cal_id" STRING, ' +
     '"cal_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCTxStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btctx_states" (' +
-    '"cal_id" STRING, ' +
-    '"btctx_id" STRING PRIMARY KEY, ' +
+    '"cal_id" STRING PRIMARY KEY, ' +
+    '"btctx_id" STRING, ' +
     '"btctx_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCHeadStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btchead_states" (' +
-    '"btctx_id" STRING, ' +
-    '"btchead_height" INTEGER PRIMARY KEY, ' +
+    '"btctx_id" STRING PRIMARY KEY, ' +
+    '"btchead_height" INTEGER, ' +
     '"btchead_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
@@ -80,7 +80,7 @@ function getTableExtendedProperties () {
     'column_policy = \'dynamic\', ' +
     'number_of_replicas = \'1\', ' +
     '"recovery.initial_shards" = \'quorum\', ' +
-    'refresh_interval = 1000, ' +
+    'refresh_interval = 500, ' +
     '"routing.allocation.enable" = \'all\', ' +
     '"routing.allocation.total_shards_per_node" = -1, ' +
     '"translog.disable_flush" = false, ' +

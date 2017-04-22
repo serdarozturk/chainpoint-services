@@ -161,12 +161,14 @@ let aggregate = function () {
     merkleTools.addLeaves(leaves)
     merkleTools.makeTree()
 
+    let treeSize = merkleTools.getLeafCount()
+
     // Collect and store the aggregation id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
     treeData.agg_id = uuidv1()
     treeData.agg_root = merkleTools.getMerkleRoot().toString('hex')
+    treeData.agg_hash_count = treeSize
 
-    let treeSize = merkleTools.getLeafCount()
     let proofData = []
     for (let x = 0; x < treeSize; x++) {
       // push the hash_id and corresponding proof onto the array, inserting the UUID concat/hash step at the beginning
@@ -241,6 +243,8 @@ let finalize = function () {
         let aggObj = {}
         aggObj.agg_id = treeDataObj.agg_id
         aggObj.agg_root = treeDataObj.agg_root
+        aggObj.agg_hash_count = treeDataObj.agg_hash_count
+
         amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, new Buffer(JSON.stringify(aggObj)), { persistent: true },
           function (err, ok) {
             if (err !== null) {

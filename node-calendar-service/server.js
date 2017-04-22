@@ -150,6 +150,7 @@ let generateCalendar = function () {
       proofDataItem.agg_id = rootsForTree[x].agg_id
       proofDataItem.agg_root = rootsForTree[x].agg_root
       proofDataItem.agg_msg = rootsForTree[x].msg
+      proofDataItem.agg_hash_count = rootsForTree[x].agg_hash_count
       let proof = merkleTools.getProof(x)
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
@@ -171,21 +172,18 @@ let finalize = function () {
   _.forEach(treesToFinalize, function (treeDataObj) {
     console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
+    // TODO store Merkle root of calendar in DB and chain to previous calendar entries
+    console.log('calendar write')
+
     // queue proof state messages for each aggregation root in the tree
     async.series([
-
-      function (callback) {
-        // TODO store Merkle root of calendar in DB and chain to previous calendar entries
-        console.log('calendar write')
-        // TODO this should all work without the line below, CrateDB eventual consistency to blame?
-        setTimeout(callback, 1100)
-      },
       function (callback) {
         // for each aggregation root, queue up message containing updated proof state bound for proof state service
         async.each(treeDataObj.proofData, function (proofDataItem, eachCallback) {
           let stateObj = {}
           stateObj.agg_id = proofDataItem.agg_id
           stateObj.agg_root = proofDataItem.agg_root
+          stateObj.agg_hash_count = proofDataItem.agg_hash_count
           stateObj.cal_id = treeDataObj.cal_id
           stateObj.cal_root = treeDataObj.cal_root
           stateObj.cal_state = {}

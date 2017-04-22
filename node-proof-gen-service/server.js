@@ -71,7 +71,7 @@ function addChainpointHeader (proof, hash, hashId) {
 
 function addCalendarBranch (proof, aggState, calState) {
   let calendarBranch = {}
-  calendarBranch.label = 'root_branch'
+  calendarBranch.label = 'cal_anchor_branch'
   calendarBranch.ops = aggState.ops.concat(calState.ops)
 
   let calendarAnchor = {}
