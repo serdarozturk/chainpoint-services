@@ -22,14 +22,70 @@ const RMQ_WORK_IN_BTC_ROUTING_KEY = process.env.RMQ_WORK_IN_BTC_ROUTING_KEY || '
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+let amqpChannel = null
+
 function generateCALProof (msg) {
-  console.log('building cal proof')
+  let messageObj = JSON.parse(msg.content.toString())
+
+  let proof = {}
+  proof = addChainpointHeader(proof, messageObj.hash, messageObj.hash_id)
+  proof = addCalendarBranch(proof, messageObj.agg_state, messageObj.cal_state)
+
+  console.log(JSON.stringify(proof))
+
+  amqpChannel.ack(msg)
+  console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
 }
 function generateETHProof (msg) {
   console.log('building eth proof')
 }
 function generateBTCProof (msg) {
   console.log('building btc proof')
+}
+
+function addChainpointHeader (proof, hash, hashId) {
+  proof['@context'] = 'https://w3id.org/chainpoint/v3'
+  proof.type = 'Chainpoint'
+  proof.hash = hash
+  proof.hash_id = hashId
+
+  // TODO find an npm package that does this, or at least clean this up and explain it
+  // Parsing timestamp our of UUID v1
+  // Adapted from https://github.com/xehrad/UUID_to_Date/blob/master/UUID_to_Date.js
+  // fda9a5e0-26d6-11e7-b437-d3889624c9fd
+  const GREGORIAN_OFFSET = 122192928000000000
+  let uuidArray = hashId.split('-')
+  let timeString = [
+    uuidArray[2].substring(1), // 1e7
+    uuidArray[1], // 26d6
+    uuidArray[0] // fda9a5e0
+  ].join('')
+  let nanoGregorian = parseInt(timeString, 16) // 100 nano second intervals since 00:00:00.00, 15 October 1582
+  let nanoEpoch = nanoGregorian - GREGORIAN_OFFSET // 100 nano second intervals since 00:00:00.00, 01 January 1970
+  let milliEpoch = Math.floor(nanoEpoch / 10000) // milliseconds since 00:00:00.00, 01 January 1970
+  let hashDate = new Date(milliEpoch)
+
+  // TODO Remove millisecond component from timestamp?
+  proof.hash_submitted_at = hashDate
+  return proof
+}
+
+function addCalendarBranch (proof, aggState, calState) {
+  let calendarBranch = {}
+  calendarBranch.label = 'root_branch'
+  calendarBranch.ops = aggState.ops.concat(calState.ops)
+
+  let calendarAnchor = {}
+  calendarAnchor.type = 'cal'
+  calendarAnchor.anchor_id = calState.anchor.anchor_id
+  calendarAnchor.uris = calState.anchor.uris
+
+  calendarBranch.anchors = [calendarAnchor]
+
+  proof.branches = [calendarBranch]
+  return proof
 }
 
 /**
@@ -73,6 +129,8 @@ function amqpOpenConnection (connectionString) {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+      // channel is lost, reset to null
+      amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then(function (chan) {
@@ -80,6 +138,7 @@ function amqpOpenConnection (connectionString) {
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
+      amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
       return chan.assertQueue('', { durable: true }).then(function (q) {

@@ -17,6 +17,12 @@ const RMQ_WORK_IN_AGG_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_ROUTING_KEY || '
 // the topic exchange routing key for message consumption originating from calendar service
 const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.cal.state'
 
+// the topic exchange routing key for message consumption originating from proof state service
+const RMQ_WORK_IN_PROOF_ROUTING_KEY = process.env.RMQ_WORK_IN_PROOF_ROUTING_KEY || 'work.proof.state'
+
+// the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
+const RMQ_WORK_OUT_PROOF_ROUTING_KEY = process.env.RMQ_WORK_OUT_PROOF_ROUTING_KEY || 'work.proof.state'
+
 // the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
 const RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY || 'work.generator.cal'
 
@@ -63,7 +69,7 @@ function ConsumeAggregationMessage (msg) {
 }
 
 /**
-* Writes the state data to persistent storage and queues a calendar proof generation message
+* Writes the state data to persistent storage and queues proof ready messages bound for the proof state service
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
 */
@@ -78,33 +84,122 @@ function ConsumeCalendarMessage (msg) {
   stateObj.cal_state = messageObj.cal_state
   console.log(stateObj)
 
-  // Store this state information
-  storageClient.writeCalStateObject(stateObj, function (err, success) {
+  async.waterfall([
+    function (callback) {
+      // write the calendar state object to storage
+      storageClient.writeCalStateObject(stateObj, function (err, success) {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    },
+    function (callback) {
+      // get all hash ids for a given agg_id
+      storageClient.getHashIdsByAggId(stateObj.agg_id, function (err, rows) {
+        if (err) return callback(err)
+        return callback(null, rows)
+      })
+    },
+    function (rows, callback) {
+      async.eachLimit(rows, 50, function (hashIdRow, eachCallback) {
+        // construct a calendar 'proof ready' message for a given hash
+        let dataOutObj = {}
+        dataOutObj.type = 'cal'
+        dataOutObj.hash_id = hashIdRow.hash_id
+        // Publish a proof ready object for consumption by the proof state service
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_PROOF_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+          function (err, ok) {
+            if (err) {
+              console.error(RMQ_WORK_OUT_PROOF_ROUTING_KEY, 'publish message nacked')
+              return eachCallback(err)
+            } else {
+              console.log(RMQ_WORK_OUT_PROOF_ROUTING_KEY, 'publish message acked')
+              return eachCallback(null)
+            }
+          })
+      }, function (err) {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    }
+  ], function (err) {
     if (err) {
-      console.error('error writing state object', err)
+      console.error('error consuming calendar message', err)
+      // An error as occurred publishing a message, nack consumption of original message
       amqpChannel.nack(msg)
       console.error(msg.fields.routingKey, 'consume message nacked')
     } else {
-      let dataOutObj = {}
-      dataOutObj.agg_id = messageObj.agg_id
-
-      // Publish an object for consumption by the proof generation service
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
-        function (err, ok) {
-          if (err) {
-            console.error(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message nacked')
-            // An error as occurred publishing a message, nack consumption of original message
-            amqpChannel.nack(msg)
-            console.error(msg.fields.routingKey, 'consume message nacked')
-          } else {
-            console.log(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message acked')
-            // New message has been published, ack consumption of original message
-            amqpChannel.ack(msg)
-            console.log(msg.fields.routingKey, 'consume message acked')
-          }
-        })
+      // New messages have been published, ack consumption of original message
+      amqpChannel.ack(msg)
+      console.log(msg.fields.routingKey, 'consume message acked')
     }
   })
+}
+
+/**
+* Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function ConsumeProofReadyMessage (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+  console.log('messageObj', messageObj)
+
+  switch (messageObj.type) {
+    case 'cal':
+      async.waterfall([
+        function (callback) {
+          // get the agg_state object for the hash_id
+          storageClient.getAggStateObjectByHashId(messageObj.hash_id, function (err, rows) {
+            if (err) return callback(err)
+            if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching add_state data found')
+            return callback(null, rows[0])
+          })
+        },
+        function (aggStateObj, callback) {
+          // get the cal_state object for the hash_id's agg_id
+          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, function (err, rows) {
+            if (err) return callback(err)
+            if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching cal_state data found')
+            return callback(null, aggStateObj, rows[0])
+          })
+        },
+        function (aggStateObj, calStateObj, callback) {
+          let dataOutObj = {}
+          dataOutObj.type = 'cal'
+          dataOutObj.hash_id = aggStateObj.hash_id
+          dataOutObj.hash = aggStateObj.hash
+          dataOutObj.agg_state = JSON.parse(aggStateObj.agg_state)
+          dataOutObj.cal_state = JSON.parse(calStateObj.cal_state)
+
+          // Publish a proof data object for consumption by the proof generation service
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+            function (err, ok) {
+              if (err) {
+                console.error(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message nacked')
+                return callback(err)
+              } else {
+                console.log(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message acked')
+                return callback(null)
+              }
+            })
+        }
+      ], function (err) {
+        if (err) {
+          console.error('error consuming proof ready message', err)
+          // An error as occurred consuming a message, nack consumption of original message
+          amqpChannel.nack(msg)
+          console.error(msg.fields.routingKey, 'consume message nacked')
+        } else {
+          // Proof ready message has been consumed, ack consumption of original message
+          amqpChannel.ack(msg)
+          console.log(msg.fields.routingKey, 'consume message acked')
+        }
+      })
+      break
+    default:
+      // This is an unknown proof ready type
+      console.error('Unknown proof ready type', messageObj.type)
+  }
 }
 
 /**
@@ -123,8 +218,13 @@ function processMessage (msg) {
         break
       case RMQ_WORK_IN_CAL_ROUTING_KEY:
         // Consumes a state message from the Calendar service
-        // Stores state information and publishes message bound for the proof generator service
+        // Stores state information and publishes proof ready messages bound for the proof state service
         ConsumeCalendarMessage(msg)
+        break
+      case RMQ_WORK_IN_PROOF_ROUTING_KEY:
+        // Consumes a proof ready message from the proof state service
+        // Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
+        ConsumeProofReadyMessage(msg)
         break
       default:
         // This is an unknown state type, unknown routing key

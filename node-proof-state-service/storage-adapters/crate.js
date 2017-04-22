@@ -32,7 +32,6 @@ function openConnection (callback) {
 }
 
 function assertDBTables (callback) {
-  console.log('asserting tables')
 
   let assertAggStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."agg_states" (' +
     '"hash_id" STRING PRIMARY KEY, ' +
@@ -43,22 +42,22 @@ function assertDBTables (callback) {
   )
 
   let assertCalStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."cal_states" (' +
-    '"agg_id" STRING PRIMARY KEY, ' +
-    '"cal_id" STRING, ' +
+    '"agg_id" STRING, ' +
+    '"cal_id" STRING PRIMARY KEY, ' +
     '"cal_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCTxStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btctx_states" (' +
-    '"cal_id" STRING PRIMARY KEY, ' +
-    '"btctx_id" STRING, ' +
+    '"cal_id" STRING, ' +
+    '"btctx_id" STRING PRIMARY KEY, ' +
     '"btctx_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
 
   let assertBTCHeadStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."btchead_states" (' +
-    '"btctx_id" STRING PRIMARY KEY, ' +
-    '"btchead_height" INTEGER, ' +
+    '"btctx_id" STRING, ' +
+    '"btchead_height" INTEGER PRIMARY KEY, ' +
     '"btchead_state" STRING' +
     ') ' + getTableExtendedProperties()
   )
@@ -97,8 +96,16 @@ function getTableExtendedProperties () {
   return extProperties
 }
 
+function getHashIdsByAggId (aggId, callback) {
+  crate.execute('SELECT hash_id FROM proof_state_service.agg_states WHERE agg_id = ?', [aggId]).then((res) => {
+    return callback(null, res.json)
+  }).catch((err) => {
+    return callback(err)
+  })
+}
+
 function getAggStateObjectByHashId (hashId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.agg_states WHERE hash_id == ?', [hashId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.agg_states WHERE hash_id = ?', [hashId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -106,7 +113,7 @@ function getAggStateObjectByHashId (hashId, callback) {
 }
 
 function getCalStateObjectByAggId (aggId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.cal_states WHERE agg_id == ?', [aggId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.cal_states WHERE agg_id = ?', [aggId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -114,7 +121,7 @@ function getCalStateObjectByAggId (aggId, callback) {
 }
 
 function getBTCTxStateObjectByCalId (calId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.btctx_states WHERE cal_id == ?', [calId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.btctx_states WHERE cal_id = ?', [calId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -122,7 +129,7 @@ function getBTCTxStateObjectByCalId (calId, callback) {
 }
 
 function getBTCHeadStateObjectByBTCTxId (btcTxId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.btchead_states WHERE btctx_id == ?', [btcTxId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.btchead_states WHERE btctx_id = ?', [btcTxId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -130,7 +137,7 @@ function getBTCHeadStateObjectByBTCTxId (btcTxId, callback) {
 }
 
 function getAggStateObjectsByAggId (aggId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.agg_states WHERE agg_id == ?', [aggId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.agg_states WHERE agg_id = ?', [aggId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -138,7 +145,7 @@ function getAggStateObjectsByAggId (aggId, callback) {
 }
 
 function getCalStateObjectsByCalId (calId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.cal_states WHERE cal_id == ?', [calId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.cal_states WHERE cal_id = ?', [calId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -146,7 +153,7 @@ function getCalStateObjectsByCalId (calId, callback) {
 }
 
 function getBTCTxStateObjectsByBTCTxId (btcTxId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.btctx_states WHERE btctx_id == ?', [btcTxId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.btctx_states WHERE btctx_id = ?', [btcTxId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -154,7 +161,7 @@ function getBTCTxStateObjectsByBTCTxId (btcTxId, callback) {
 }
 
 function getBTCHeadStateObjectsByBTCHeadId (btcHeadId, callback) {
-  crate.execute('SELECT * FROM proof_state_service.btchead_states WHERE btchead_id == ?', [btcHeadId]).then((res) => {
+  crate.execute('SELECT * FROM proof_state_service.btchead_states WHERE btchead_id = ?', [btcHeadId]).then((res) => {
     return callback(null, res.json)
   }).catch((err) => {
     return callback(err)
@@ -212,6 +219,7 @@ function writeBTCHeadStateObject (stateObject, callback) {
 
 module.exports = {
   openConnection: openConnection,
+  getHashIdsByAggId: getHashIdsByAggId,
   getAggStateObjectByHashId: getAggStateObjectByHashId,
   getCalStateObjectByAggId: getCalStateObjectByAggId,
   getBTCTxStateObjectByCalId: getBTCTxStateObjectByCalId,

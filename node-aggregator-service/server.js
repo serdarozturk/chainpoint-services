@@ -114,6 +114,23 @@ function consumeHashMessage (msg) {
   }
 }
 
+// TODO move this elsewhere
+function formatAsChpOps (proof, op) {
+  let chpProof = proof.map(function (item) {
+    if (item.left) {
+      return { l: item.left }
+    } else {
+      return { r: item.right }
+    }
+  })
+  let chpProofWithOps = []
+  for (let x = 0; x < chpProof.length; x++) {
+    chpProofWithOps.push(chpProof[x])
+    chpProofWithOps.push({ op: op })
+  }
+  return chpProofWithOps
+}
+
 // AMQP initialization
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
@@ -152,7 +169,7 @@ let aggregate = function () {
       proofDataItem.hash_msg = hashesForTree[x].msg
       let proof = merkleTools.getProof(x)
       proof.unshift({ left: hashesForTree[x].hash_id })
-      proofDataItem.proof = proof
+      proofDataItem.proof = formatAsChpOps(proof, 'sha256')
       proofData.push(proofDataItem)
     }
     treeData.proofData = proofData

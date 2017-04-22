@@ -9,6 +9,9 @@ require('dotenv').config()
 // The frequency to generate new calendar trees
 const CALENDAR_INTERVAL = process.env.CALENDAR_INTERVAL || 1000
 
+// How often should calendar trees be finalized
+const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
+
 // The name of the RabbitMQ topic exchange to use
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
@@ -16,7 +19,7 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.cal'
 
 // The topic exchange routing key for message publishing bound for the proof state service
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_ROUTING_KEY || 'work.cal.state'
+const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.cal.state'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -40,6 +43,23 @@ let TREES = []
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
+
+// TODO move this elsewhere
+function formatAsChpOps (proof, op) {
+  let chpProof = proof.map(function (item) {
+    if (item.left) {
+      return { l: item.left }
+    } else {
+      return { r: item.right }
+    }
+  })
+  let chpProofWithOps = []
+  for (let x = 0; x < chpProof.length; x++) {
+    chpProofWithOps.push(chpProof[x])
+    chpProofWithOps.push({ op: op })
+  }
+  return chpProofWithOps
+}
 
 /**
  * Opens an AMPQ connection and channel
@@ -123,7 +143,8 @@ let generateCalendar = function () {
       proofDataItem.agg_id = rootsForTree[x].agg_id
       proofDataItem.agg_root = rootsForTree[x].agg_root
       proofDataItem.agg_msg = rootsForTree[x].msg
-      proofDataItem.proof = merkleTools.getProof(x)
+      let proof = merkleTools.getProof(x)
+      proofDataItem.proof = formatAsChpOps(proof)
       proofData.push(proofDataItem)
     }
     treeData.proofData = proofData
@@ -133,7 +154,112 @@ let generateCalendar = function () {
   }
 }
 
-// TODO store Merkle root of calendar in DB and chain to previous calendar entries
-// TODO store proofs for roots with their associated hashes in proof service to build calendar attestation proof
+// Temp/incomplete finalize function for writing to proof state service only, no calendar functions yet
+let finalize = function () {
+  // if the amqp channel is null (closed), processing should not continue, defer to next finalize call
+  if (amqpChannel === null) return
+
+  // process each set of tree data
+  let treesToFinalize = TREES.splice(0)
+  _.forEach(treesToFinalize, function (treeDataObj) {
+    console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
+
+    // queue state messages, and when complete, queue message for calendar service to continue processing
+    async.series([
+
+      function (callback) {
+        // TODO store Merkle root of calendar in DB and chain to previous calendar entries
+        console.log('calendar write')
+        // TODO this should all work without the line below, CrateDB eventual consistency to blame?
+        setTimeout(callback, 1100)
+      },
+      function (callback) {
+        // for each aggregation root, queue up message containing updated proof state bound for proof state service
+        async.each(treeDataObj.proofData, function (proofDataItem, eachCallback) {
+          let stateObj = {}
+          stateObj.agg_id = proofDataItem.agg_id
+          stateObj.agg_root = proofDataItem.agg_root
+          stateObj.cal_id = treeDataObj.cal_id
+          stateObj.cal_root = treeDataObj.cal_root
+          stateObj.cal_state = {}
+          stateObj.cal_state.ops = proofDataItem.proof
+          // temp anchor data until real values are generated
+          stateObj.cal_state.anchor = {
+            anchor_id: '1027',
+            uris: [
+              'http://a.cal.chainpoint.org/1027/root',
+              'http://b.cal.chainpoint.org/1027/root'
+            ]
+          }
+
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+            function (err, ok) {
+              if (err !== null) {
+                // An error as occurred publishing a message
+                console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
+                return eachCallback(err)
+              } else {
+                // New message has been published
+                console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
+                return eachCallback(null)
+              }
+            })
+        }, function (err) {
+          if (err) {
+            console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
+            return callback(err)
+          } else {
+            console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+            // pass all the agg_msg objects to the series() callback
+            let messages = treeDataObj.proofData.map(proofDataItem => {
+              return proofDataItem.agg_msg
+            })
+            return callback(null, messages)
+          }
+        })
+      },
+      function (callback) {
+        let calObj = {}
+        calObj.cal_id = treeDataObj.cal_id
+        calObj.cal_root = treeDataObj.cal_root
+        /*
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, new Buffer(JSON.stringify(aggObj)), { persistent: true },
+          function (err, ok) {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_CAL_ROUTING_KEY, 'publish message nacked')
+              return callback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_CAL_ROUTING_KEY, 'publish message acked')
+              return callback(null)
+            }
+          }) */
+        return callback(null)
+      }
+    ], function (err, results) {
+      // results[0] contains an array of agg_msg objects from the first function in this series
+      if (err) {
+        _.forEach(results[0], function (message) {
+          // nack consumption of all original hash messages part of this aggregation event
+          if (message !== null) {
+            amqpChannel.nack(message)
+            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+          }
+        })
+      } else {
+        _.forEach(results[0], function (message) {
+          if (message !== null) {
+            // ack consumption of all original hash messages part of this aggregation event
+            amqpChannel.ack(message)
+            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+          }
+        })
+      }
+    })
+  })
+}
 
 setInterval(() => generateCalendar(), CALENDAR_INTERVAL)
+
+setInterval(() => finalize(), FINALIZATION_INTERVAL)
