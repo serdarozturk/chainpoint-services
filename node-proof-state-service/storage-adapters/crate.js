@@ -32,7 +32,6 @@ function openConnection (callback) {
 }
 
 function assertDBTables (callback) {
-
   let assertAggStateTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."agg_states" (' +
     '"hash_id" STRING PRIMARY KEY, ' +
     '"hash" STRING, ' +

@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "amqplib": "^0.5.1",
-    "async": "^2.3.0",
-    "dotenv": "^4.0.0",
-    "lodash": "^4.17.4"
+    "dotenv": "^4.0.0"
   }
 }

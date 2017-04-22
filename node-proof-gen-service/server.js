@@ -1,6 +1,4 @@
 const amqp = require('amqplib')
-const async = require('async')
-const _ = require('lodash')
 
 require('dotenv').config()
 
@@ -26,6 +24,22 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 // This value is set once the connection has been established
 let amqpChannel = null
 
+/**
+* Extracts and returns the timestamp embedded within a UUIDv1
+*
+* @param {string} uuid - The UUID v1 string from which to extract the timestamp
+*/
+function getTimestampFromUUIDv1 (uuid) {
+  const GREGORIAN_OFFSET = 122192928000000000
+  let uuidSegments = uuid.split('-')
+  let hexTime = uuidSegments[2].substring(1).concat(uuidSegments[1], uuidSegments[0])
+  let nanoGregorian = parseInt(hexTime, 16) // 100 nano second intervals since 00:00:00.00, 15 October 1582
+  let nanoEpoch = nanoGregorian - GREGORIAN_OFFSET // 100 nano second intervals since 00:00:00.00, 01 January 1970
+  let milliEpoch = Math.floor(nanoEpoch / 10000) // milliseconds since 00:00:00.00, 01 January 1970
+  let timestamp = new Date(milliEpoch) // the Date object containing timestamp value with millisecond precision
+  return timestamp
+}
+
 function generateCALProof (msg) {
   let messageObj = JSON.parse(msg.content.toString())
 
@@ -50,25 +64,8 @@ function addChainpointHeader (proof, hash, hashId) {
   proof.type = 'Chainpoint'
   proof.hash = hash
   proof.hash_id = hashId
-
-  // TODO find an npm package that does this, or at least clean this up and explain it
-  // Parsing timestamp our of UUID v1
-  // Adapted from https://github.com/xehrad/UUID_to_Date/blob/master/UUID_to_Date.js
-  // fda9a5e0-26d6-11e7-b437-d3889624c9fd
-  const GREGORIAN_OFFSET = 122192928000000000
-  let uuidArray = hashId.split('-')
-  let timeString = [
-    uuidArray[2].substring(1), // 1e7
-    uuidArray[1], // 26d6
-    uuidArray[0] // fda9a5e0
-  ].join('')
-  let nanoGregorian = parseInt(timeString, 16) // 100 nano second intervals since 00:00:00.00, 15 October 1582
-  let nanoEpoch = nanoGregorian - GREGORIAN_OFFSET // 100 nano second intervals since 00:00:00.00, 01 January 1970
-  let milliEpoch = Math.floor(nanoEpoch / 10000) // milliseconds since 00:00:00.00, 01 January 1970
-  let hashDate = new Date(milliEpoch)
-
   // TODO Remove millisecond component from timestamp?
-  proof.hash_submitted_at = hashDate
+  proof.hash_submitted_at = getTimestampFromUUIDv1(hashId)
   return proof
 }
 
@@ -103,12 +100,10 @@ function processMessage (msg) {
         break
       case RMQ_WORK_IN_ETH_ROUTING_KEY:
         // Consumes a generate eth anchor proof message
-        // Stores state information and publishes message bound for Generator
         generateETHProof(msg)
         break
       case RMQ_WORK_IN_BTC_ROUTING_KEY:
         // Consumes a generate btc anchor proof message
-        // Stores state information and publishes message bound for Generator
         generateBTCProof(msg)
         break
       default:

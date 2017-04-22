@@ -9,6 +9,7 @@ The following is a description of methods that must be defined in a storage adap
 | Name           | Description  | Returns  |
 | :------------- |:-------------|:-------------|
 | openConnection(callback(err, success))       | opens the connection to the underlying storage provider | boolean indicating success |
+| getHashIdsByAggId(aggId, callback(err, hashIds))     | gets all hash ids associated with an aggregation event | hash id string array |
 | getAggStateObjectByHashId(hashId, callback(err, stateObject))     | gets the agg state object for a given hash id | agg state object |
 | getCalStateObjectByAggId(aggId, callback(err, stateObject))     | gets the cal state object for a given agg id | cal state object |
 | getBTCTxStateObjectByCalId(calId, callback(err, stateObject))     | gets the btctx state object for a given cal id | btctx state object |
@@ -21,3 +22,4 @@ The following is a description of methods that must be defined in a storage adap
 | writeCalStateObject(stateObject, callback(err, success))     | write the cal state object to storage | boolean indicating success |
 | writeBTCTxStateObject(stateObject, callback(err, success))     | write the btctx state object to storage | boolean indicating success |
 | writeBTCHeadStateObject(stateObject, callback(err, success))     | write the btchead state object to storage | boolean indicating success |
+
