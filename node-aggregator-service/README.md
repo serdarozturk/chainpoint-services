@@ -41,7 +41,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 
 | Name           | Type         | Default | Min | Max |
 | :------------- |:-------------|:-------------|:----|:--------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | string      | work\_topic\_exchange' |  |  | 
+| RMQ\_WORK\_EXCHANGE\_NAME       | string      | 'work\_topic\_exchange' |  |  | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY       | string      | 'work.agg' |  |  | 
 | RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string      | 'work.cal' |  |  | 
 | RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string      | 'work.agg.state' |  |  | 
@@ -89,26 +89,27 @@ The following is an example of a treeData object:
 ```json
 {
   "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671", // a UUIDv1 for this aggregation event
-  "root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
+  "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
+  "agg_hash_count": 100, // the number of hashes included in this aggregation event
   "proofData": [
     {
       "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
       "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb",
       "hash_msg": /* the RMQ message object for this hash */,
-      "proof": [ /* proof path array from merkle tree for leaf 0 ... */ ]
+      "proof": [ /* Chainpoint v3 ops list for leaf 0 ... */ ]
     },
     {
       "hash_id": "6d627180-1883-11e7-a8f9-edb8c212ef23",
       "hash": "2222d5f509d86e2627b1f498d7b44db1f8e70aae1528634580a9b68f05d57a9f",
       "hash_msg": /* the RMQ message object for this hash */,
-      "proof": [ /* proof path array from merkle tree for leaf 1 ... */ ]
+      "proof": [ /* Chainpoint v3 ops list for leaf 1 ... */ ]
     },
     { /* more ... */ },
   ]
 }
 ```
 
-For each leaf on the tree, the proof path to the merkle root is calculated and stored within the treeObject's proofData.proof array. These proof paths are prepeneded with the additional hash operation representing the earlier H1=SHA256(id|hash) calculation. The original hash_id, hash, and hash object message are appended for use during the finalize process.
+For each leaf on the tree, the proof path to the merkle root is calculated, converted to a Chainpoint v3 ops list, and stored within the treeObject's proofData.proof array. These proof paths are prepeneded with the additional hash operation representing the earlier H1=SHA256(id|hash) calculation. The original hash_id, hash, and hash object message are appended for use during the finalize process.
 
 Once all these fields are populated for this object, it is added to the TREES array to await finalizing.
 
@@ -149,13 +150,15 @@ The following is an example of an aggregation event message sent to the calendar
 ```json
 {
   "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",
-  "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05"
+  "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
+  "agg_hash_count": 100
 }
 ```
 | Name             | Description                                                            |
 | :--------------- |:-----------------------------------------------------------------------|
 | agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
 | agg_root          | A hex string representing the merkle root for the aggregation event  |
+| agg\_hash\_count          | An integer representing the total hash count for this aggregation event  |
 
 Once this message is successfully queued, all the original hash object messages received that were part of this aggregation event are acked.
 

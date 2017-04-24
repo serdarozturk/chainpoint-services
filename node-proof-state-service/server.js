@@ -18,10 +18,10 @@ const RMQ_WORK_IN_AGG_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_ROUTING_KEY || '
 const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.cal.state'
 
 // the topic exchange routing key for message consumption originating from proof state service
-const RMQ_WORK_IN_PROOF_ROUTING_KEY = process.env.RMQ_WORK_IN_PROOF_ROUTING_KEY || 'work.proof.state'
+const RMQ_WORK_IN_STATE_ROUTING_KEY = process.env.RMQ_WORK_IN_STATE_ROUTING_KEY || 'work.state.state'
 
-// the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
-const RMQ_WORK_OUT_PROOF_ROUTING_KEY = process.env.RMQ_WORK_OUT_PROOF_ROUTING_KEY || 'work.proof.state'
+// the topic exchange routing key for message publishing bound for the proof state service for proof state data retrieval
+const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.state.state'
 
 // the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
 const RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY || 'work.generator.cal'
@@ -108,13 +108,13 @@ function ConsumeCalendarMessage (msg) {
         dataOutObj.type = 'cal'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
-        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_PROOF_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
           function (err, ok) {
             if (err) {
-              console.error(RMQ_WORK_OUT_PROOF_ROUTING_KEY, 'publish message nacked')
+              console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
               return eachCallback(err)
             } else {
-              console.log(RMQ_WORK_OUT_PROOF_ROUTING_KEY, 'publish message acked')
+              console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
               return eachCallback(null)
             }
           })
@@ -232,7 +232,7 @@ function processMessage (msg) {
         // Stores state information and publishes proof ready messages bound for the proof state service
         ConsumeCalendarMessage(msg)
         break
-      case RMQ_WORK_IN_PROOF_ROUTING_KEY:
+      case RMQ_WORK_IN_STATE_ROUTING_KEY:
         // Consumes a proof ready message from the proof state service
         // Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
         ConsumeProofReadyMessage(msg)

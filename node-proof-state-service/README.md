@@ -30,8 +30,10 @@ The following are the descriptions of the configuration parameters:
 | :------------- |:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use |
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from all other services |
-| RMQ\_WORK\_IN\_AGG\_0\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from aggregator service |
+| RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from aggregator service |
 | RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from calendar service |
+| RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from proof state service |
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service |
 | RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
 | RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
 | RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
@@ -43,9 +45,10 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
-| RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | string       | 'work.splitter.state' | 
-| RMQ\_WORK\_IN\_AGG\_0\_ROUTING\_KEY     | string       | 'work.agg.state' | 
+| RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | string       | 'work.agg.state' | 
 | RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | string       | 'work.cal.state' | 
+| RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | string       | 'work.state.state' | 
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string       | 'work.state.state' |  
 | RMQ\_WORK\_OUT\_GEN\_CAL\_ROUTING\_KEY       | string       | 'work.generator.cal' |  
 | RMQ\_WORK\_OUT\_GEN\_ETH\_ROUTING\_KEY       | string       | 'work.generator.eth' |  
 | RMQ\_WORK\_OUT\_GEN\_BTC\_ROUTING\_KEY       | string       | 'work.generator.btc' |   
@@ -53,12 +56,10 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 
 
 ## Data In
-The proof state service serves as the a proof state storage mechanism for all hashes as they are being processed. As proofs are constructed for each hash, state data is received and stored from the aggregator and calendar services. As anchors objects are completed and added to the proof, a message is also sent to the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data.
-
-TODO: Decide how data is stored and document it here.
+The proof state service serves as the a proof state storage mechanism for all hashes as they are being processed. As proofs are constructed for each hash, state data is received and stored in a Crate DB cluster from the aggregator and calendar services. As anchors objects are completed and added to the proof, a proof ready message is also queued for the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data. These proof ready messages are both published and consumed by this service. When receiving 
 
 #### Aggregator Service
-
+When an aggregation event occurs, the aggregation service will queue messages bound for the proof state service for each hash in that aggregation event.
 The following is an example of state data published from the aggregator service: 
 ```json
 {
@@ -85,19 +86,20 @@ The following is an example of state data published from the aggregator service:
 | agg_state  | The state data being stored, in this case, aggregation operations |
 
 #### Calendar Service
-
+When a new calendar entrty is created, the calendar service will queue messages bound for the proof state service for each aggregation event in that calendar entry.
 The following is an example of state data published from the calendar service: 
 ```json
 {
   "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",
   "agg_root": "419001851bcf08329f0c34bb89570028ff500fc85707caa53a3e5b8b2ecacf05",
+  "agg_hash_count": 100,
   "cal_id": "b117b242-2458-11e7-93ae-92361f002671",
   "cal_root": "c7d5bd8fff415efa38bd20465132107a02c7117e4ede0272f5a88a8daf694089",
   "cal_state": {
     "ops": [
-      { "l": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
+      { "l": "315be5d46580b617928b53f3bac5bac3d5e0d10a1c6143cc1fdab224cd1450ea" },
       { "op": "sha-256" },
-      { "r": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" },
+      { "r": "585a960c51c665432f52d2ceb5a31a11bdc375bac136ffa0af84afa1b1e7840f" },
       { "op": "sha-256" }
     ],
     "anchor": {
@@ -114,12 +116,25 @@ The following is an example of state data published from the calendar service:
 | :--------------- |:-----------------------------------------------------------------------|
 | agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
 | agg_root          | A hex string representing the merkle root for the aggregation event  |
+| agg\_hash\_count         | An integer representing the total hash count for the aggregation event  |
 | cal_id          | The UUIDv1 unique identifier for a calendar entry with embedded timestamp |
 | cal_root          | A hex string representing the merkle root for the calendar entry  |
 | cal_state  | The state data being stored, in this case, calendar aggregation operations and cal anchor information |
 
 
-
+#### Proof State Service
+After the proof state service consumes a calendar message and stores the calendar entry state data, the proof state service will also queue proof ready messages bound for the proof state service for each hash part of the aggregation event for that calendar message.
+The following is an example of proof ready data published from the proof state service: 
+```json
+{
+  "type": "cal",
+  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66"
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| type          | The type of proof ready to be generated |
+| hash_id          | The UUIDv1 unique identifier for the hash with embedded timestamp |
 
 
 
@@ -156,7 +171,73 @@ The following is an example of a proof state object:
 
 
 ## Data Out 
-If an anchor opertation has been added to the proof state, a message is queued for the proof generation service informing it that it may generate new proofs with the latest anchor state information added.
+The service will publish proof ready messages and proof generation message to a durable topic exchange within RabbitMQ. The routing keys are defined by the RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY and RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY configuration parameters.
+
+When consuming a calendar message, the proof state service will queue proof ready messages bound for the proof state service for each hash part of the aggregation event for that calendar message.
+
+The following is an example of a proof state object message sent to the proof state service: 
+```json
+{
+  "type": "cal",
+  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66"
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| type          | The type of proof ready to be generated |
+| hash_id          | The UUIDv1 unique identifier for the hash with embedded timestamp |
+
+In addition to publishing these proof ready messages, the proof state service also consumes them. All state data for the specified hash is read from storage and included in a proof generation message bound for the proof gen service. 
+
+The following is an example of a proof generation message sent to the proof gen service: 
+```json
+{
+  "type": "cal",
+  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
+  "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb",
+  "agg_state": {
+    "ops": [
+        { "l": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
+        { "op": "sha-256" },
+        { "r": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" },
+        { "op": "sha-256" }
+      ]
+  },
+  "cal_state": {
+    "ops": [
+      { "l": "315be5d46580b617928b53f3bac5bac3d5e0d10a1c6143cc1fdab224cd1450ea" },
+      { "op": "sha-256" },
+      { "r": "585a960c51c665432f52d2ceb5a31a11bdc375bac136ffa0af84afa1b1e7840f" },
+      { "op": "sha-256" }
+    ],
+    "anchor": {
+      "anchor_id" : "1027",
+      "uris": [
+        "http://a.cal.chainpoint.org/1027/root",
+        "http://b.cal.chainpoint.org/1027/root"
+      ]
+    }
+  }
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| type          | The type of proof ready to be generated |
+| hash_id          | The UUIDv1 unique identifier for the hash with embedded timestamp |
+| hash          | A hex string representing the hash being processed  |
+| agg_state  | The aggregation state data for this hash to be used for proof generation |
+| cal_state  | The calendar state data for this hash to be used for proof generation |
+
+## Service Failure
+In the event of any error occurring, the service will log that error to STDERR and kill itself with a process.exit(). RabbitMQ will be configured so that upon service exit, unacknowledged messages will be requeued to ensure than unfinished work lost due to failure will be processed again in full.
+
+
+## Notable NPM packages
+| Name         | Description                                                            |
+| :---         |:-----------------------------------------------------------------------|
+| dotenv       | for managing and optionally overriding environment variables |
+| amqplib      | for communication between the service and RabbitMQ |
+| async      | for handling flow control for some asynchronous operations |
 
 
 

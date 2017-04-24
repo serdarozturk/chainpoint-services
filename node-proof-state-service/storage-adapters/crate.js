@@ -7,7 +7,7 @@ require('dotenv').config()
 // Connection URI for CrateDB
 const CRATE_CONNECT_PROTOCOL = process.env.CRATE_CONNECT_PROTOCOL || 'http:'
 const CRATE_CONNECT_HOST = process.env.CRATE_CONNECT_HOST || 'crate'
-const CRATE_CONNECT_PORT = process.env.CRATE_CONNECT_PORT || '4200'
+const CRATE_CONNECT_PORT = process.env.CRATE_CONNECT_PORT || 4200
 const CRATE_CONNECT_URI = CRATE_CONNECT_PROTOCOL + '//' + CRATE_CONNECT_HOST + ':' + CRATE_CONNECT_PORT
 
 function openConnection (callback) {
