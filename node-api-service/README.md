@@ -1,4 +1,4 @@
-# chainpoint-node-web-service
+# chainpoint-node-api-service
 
 ## Build and Run Locally
 
