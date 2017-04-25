@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "amqplib": "^0.5.1",
-    "chainpoint-proof-json-schema": "^0.0.1",
+    "chainpoint-proof-json-schema": "^0.0.2",
     "dotenv": "^4.0.0"
   }
 }
