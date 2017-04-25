@@ -1,4 +1,5 @@
 const amqp = require('amqplib')
+const chainpointProofSchema = require('chainpoint-proof-json-schema')
 
 require('dotenv').config()
 
@@ -25,6 +26,17 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 let amqpChannel = null
 
 /**
+ * Convert Date to ISO8601 string, stripping milliseconds
+ * '2017-03-19T23:24:32Z'
+ *
+ * @param {Date} date - The date to convert
+ * @returns {string} An ISO8601 formatted time string
+ */
+function formatDateISO8601NoMs (date) {
+  return date.toISOString().slice(0, 19) + 'Z'
+}
+
+/**
 * Extracts and returns the timestamp embedded within a UUIDv1
 *
 * @param {string} uuid - The UUID v1 string from which to extract the timestamp
@@ -47,10 +59,21 @@ function generateCALProof (msg) {
   proof = addChainpointHeader(proof, messageObj.hash, messageObj.hash_id)
   proof = addCalendarBranch(proof, messageObj.agg_state, messageObj.cal_state)
 
+  // ensure the proof is valid according to the defined Chainpoint v3 JSON schema
+  let isValidSchema = chainpointProofSchema.validate(proof).valid
+  if (!isValidSchema) {
+    // This schema is not valid, ack the message but log an error and end processing
+    // We are not nacking here because the poorly formatted proof would just be
+    // re-qeueud and re-processed on and on forever
+    amqpChannel.ack(msg)
+    console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked, but with invalid JSON schema error')
+    return
+  }
+
   console.log(JSON.stringify(proof))
 
   amqpChannel.ack(msg)
-  console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
+  console.log(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
 }
 function generateETHProof (msg) {
   console.log('building eth proof')
@@ -64,8 +87,7 @@ function addChainpointHeader (proof, hash, hashId) {
   proof.type = 'Chainpoint'
   proof.hash = hash
   proof.hash_id = hashId
-  // TODO Remove millisecond component from timestamp?
-  proof.hash_submitted_at = getTimestampFromUUIDv1(hashId)
+  proof.hash_submitted_at = formatDateISO8601NoMs(getTimestampFromUUIDv1(hashId))
   return proof
 }
 
@@ -79,7 +101,7 @@ function addCalendarBranch (proof, aggState, calState) {
   calendarAnchor.anchor_id = calState.anchor.anchor_id
   calendarAnchor.uris = calState.anchor.uris
 
-  calendarBranch.anchors = [calendarAnchor]
+  calendarBranch.ops.push({ anchors: [calendarAnchor] })
 
   proof.branches = [calendarBranch]
   return proof
