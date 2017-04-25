@@ -239,7 +239,7 @@ let finalize = function () {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+            console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
           }
         })
       }
