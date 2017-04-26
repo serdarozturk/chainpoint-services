@@ -38,7 +38,7 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then((chan) =>  {
+    conn.createConfirmChannel().then((chan) => {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.error('Connection established')
@@ -282,7 +282,7 @@ server.listen(8080, () => {
 
 // export these functions for testing purposes
 module.exports = {
-  setAMQPChannel: (chan) =>  { amqpChannel = chan },
+  setAMQPChannel: (chan) => { amqpChannel = chan },
   server: server,
   generatePostHashesResponse: generatePostHashesResponse
 }

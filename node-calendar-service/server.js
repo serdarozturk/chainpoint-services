@@ -59,7 +59,7 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then((chan) =>  {
+    conn.createConfirmChannel().then((chan) => {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
