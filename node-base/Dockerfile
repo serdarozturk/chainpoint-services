@@ -9,8 +9,7 @@
 # see: https://alpinelinux.org/
 FROM node:7.9.0-alpine
 
-# /me
-MAINTAINER Glenn Rempe <glenn@tierion.com>
+LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 
 # tini
 #   A tiny but valid `init` for containers
