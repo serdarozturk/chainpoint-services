@@ -84,7 +84,6 @@ function amqpOpenConnection (connectionString) {
 function consumeAggRootMessage (msg) {
   if (msg !== null) {
     let rootObj = JSON.parse(msg.content.toString())
-    console.log(rootObj)
 
     // add msg to the root object so that we can ack it during the finalize process for this root object
     rootObj.msg = msg

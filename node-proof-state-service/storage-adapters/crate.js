@@ -105,7 +105,7 @@ function getTableExtendedProperties () {
 
 function getHashIdCountByAggId (aggId, callback) {
   crate.execute('SELECT COUNT(hash_id) FROM proof_state_service.agg_states WHERE agg_id = ?', [aggId]).then((res) => {
-    return callback(null, res.json[0])
+    return callback(null, res.json[0]['count(hash_id)'])
   }).catch((err) => {
     return callback(err)
   })

@@ -65,7 +65,6 @@ function consumeHashMessage (msg) {
     let incomingHashBatch = JSON.parse(msg.content.toString()).hashes
 
     async.each(incomingHashBatch, (hashObj, callback) => {
-      console.log(hashObj)
       async.series([
         (seriesCallback) => {
           // Send this hash object message to the aggregator service

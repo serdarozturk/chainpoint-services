@@ -106,7 +106,6 @@ function amqpOpenConnection (connectionString) {
 function consumeHashMessage (msg) {
   if (msg !== null) {
     let hashObj = JSON.parse(msg.content.toString())
-    console.log(hashObj)
 
     // add msg to the hash object so that we can ack it during the finalize process for this hash
     hashObj.msg = msg

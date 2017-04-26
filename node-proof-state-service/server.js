@@ -75,7 +75,6 @@ function ConsumeAggregationMessage (msg) {
   stateObj.agg_id = messageObj.agg_id
   stateObj.agg_root = messageObj.agg_root
   stateObj.agg_state = messageObj.agg_state
-  console.log(stateObj)
 
   async.series([
     (callback) => {
@@ -119,7 +118,6 @@ function ConsumeCalendarMessage (msg) {
   stateObj.cal_id = messageObj.cal_id
   stateObj.cal_root = messageObj.cal_root
   stateObj.cal_state = messageObj.cal_state
-  console.log(stateObj)
 
   async.waterfall([
     (callback) => {
@@ -127,6 +125,7 @@ function ConsumeCalendarMessage (msg) {
       storageClient.getHashIdCountByAggId(stateObj.agg_id, (err, count) => {
         if (err) return callback(err)
         if (count < stateObj.agg_hash_count) return callback('unable to read all hash data')
+        console.log(count, stateObj.agg_hash_count)
         return callback(null)
       })
     },
@@ -145,7 +144,7 @@ function ConsumeCalendarMessage (msg) {
       })
     },
     (rows, callback) => {
-      async.eachLimit(rows, 50, (hashIdRow, eachCallback) => {
+      async.eachLimit(rows, 10, (hashIdRow, eachCallback) => {
         // construct a calendar 'proof ready' message for a given hash
         let dataOutObj = {}
         dataOutObj.type = 'cal'
@@ -196,7 +195,6 @@ function ConsumeCalendarMessage (msg) {
 */
 function ConsumeProofReadyMessage (msg) {
   let messageObj = JSON.parse(msg.content.toString())
-  console.log('messageObj', messageObj)
 
   switch (messageObj.type) {
     case 'cal':
