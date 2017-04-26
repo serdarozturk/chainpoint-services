@@ -3,6 +3,9 @@ const async = require('async')
 
 require('dotenv').config()
 
+// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
+
 // The RabbitMQ exchange name
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
@@ -38,7 +41,9 @@ function amqpOpenConnection (connectionString) {
     })
     conn.createConfirmChannel().then((chan) => {
       // the connection and channel have been established
+      // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
+      chan.prefetch(RMQ_PREFETCH_COUNT)
       amqpChannel = chan
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
 

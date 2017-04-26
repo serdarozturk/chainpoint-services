@@ -42,6 +42,9 @@ const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
 // during each AGGREGATION_INTERVAL.
 const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
 
+// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
+
 // The name of the RabbitMQ topic exchange to use
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
@@ -85,6 +88,7 @@ function amqpOpenConnection (connectionString) {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
+      chan.prefetch(RMQ_PREFETCH_COUNT)
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
       amqpChannel = chan
 

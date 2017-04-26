@@ -5,6 +5,9 @@ const storageClient = require('./storage-adapters/crate.js')
 
 require('dotenv').config()
 
+// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 10
+
 // the name of the RabbitMQ topic exchange to use
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
 
@@ -312,11 +315,10 @@ function amqpOpenConnection (connectionString) {
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then((chan) => {
-      // limit the number of unacked messages to work with per instance
-      chan.prefetch(10)
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
+      chan.prefetch(RMQ_PREFETCH_COUNT)
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
       amqpChannel = chan
 
