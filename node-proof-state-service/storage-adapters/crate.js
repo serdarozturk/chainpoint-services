@@ -62,13 +62,10 @@ function assertDBTables (callback) {
   )
 
   let assertHashTrackerTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."hash_tracker_log" (' +
-    '"hash_id" STRING PRIMARY KEY, ' +
+    '"hash_id" STRING, ' +
     '"hash" STRING, ' +
-    '"splitter_at" TIMESTAMP, ' +
-    '"aggregator_at" TIMESTAMP, ' +
-    '"calendar_at" TIMESTAMP, ' +
-    '"eth_at" TIMESTAMP, ' +
-    '"btc_at" TIMESTAMP ' +
+    '"event" STRING, ' +
+    '"timestamp" TIMESTAMP' +
     ') ' + getTableExtendedProperties()
   )
 
@@ -193,7 +190,8 @@ function writeAggStateObject (stateObject, callback) {
 }
 
 function writeCalStateObject (stateObject, callback) {
-  crate.execute('INSERT INTO proof_state_service.cal_states (agg_id, cal_id, cal_state) VALUES (?,?,?)', [
+  crate.execute('INSERT INTO proof_state_service.cal_states (agg_id, cal_id, cal_state) VALUES (?,?,?)' +
+  'ON DUPLICATE KEY UPDATE cal_id = VALUES(cal_id), cal_state = VALUES(cal_state)', [
     stateObject.agg_id,
     stateObject.cal_id,
     JSON.stringify(stateObject.cal_state)
@@ -229,88 +227,64 @@ function writeBTCHeadStateObject (stateObject, callback) {
 }
 
 function logSplitterEventForHashId (hashId, hash, callback) {
-  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
-    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE splitter_at = VALUES(splitter_at)', [
-      hashId,
-      hash,
-      new Date(),
-      null,
-      null,
-      null,
-      null
-    ]).then((res) => {
-      return callback(null, true)
-    }).catch((err) => {
-      return callback(err, false)
-    })
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, event, timestamp) VALUES (?,?,?,?)', [
+    hashId,
+    hash,
+    'splitter',
+    new Date()
+  ]).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
 }
 
 function logAggregatorEventForHashId (hashId, callback) {
-  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
-    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE aggregator_at = VALUES(aggregator_at)', [
-      hashId,
-      null,
-      null,
-      new Date(),
-      null,
-      null,
-      null
-    ]).then((res) => {
-      return callback(null, true)
-    }).catch((err) => {
-      return callback(err, false)
-    })
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, event, timestamp) VALUES (?,?,?)', [
+    hashId,
+    'aggregator',
+    new Date()
+  ]).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
 }
 
 function logCalendarEventForHashId (hashId, callback) {
-  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
-    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE calendar_at = VALUES(calendar_at)', [
-      hashId,
-      null,
-      null,
-      null,
-      new Date(),
-      null,
-      null
-    ]).then((res) => {
-      return callback(null, true)
-    }).catch((err) => {
-      return callback(err, false)
-    })
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, event, timestamp) VALUES (?,?,?)', [
+    hashId,
+    'calendar',
+    new Date()
+  ]).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
 }
 
 function logEthEventForHashId (hashId, callback) {
-  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
-    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE eth_at = VALUES(eth_at)', [
-      hashId,
-      null,
-      null,
-      null,
-      null,
-      new Date(),
-      null
-    ]).then((res) => {
-      return callback(null, true)
-    }).catch((err) => {
-      return callback(err, false)
-    })
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, event, timestamp) VALUES (?,?,?)', [
+    hashId,
+    'eth',
+    new Date()
+  ]).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
 }
 
 function logBtcEventForHashId (hashId, callback) {
-  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
-    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE btc_at = VALUES(btc_at)', [
-      hashId,
-      null,
-      null,
-      null,
-      null,
-      null,
-      new Date()
-    ]).then((res) => {
-      return callback(null, true)
-    }).catch((err) => {
-      return callback(err, false)
-    })
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, event, timestamp) VALUES (?,?,?)', [
+    hashId,
+    'btc',
+    new Date()
+  ]).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
 }
 
 module.exports = {

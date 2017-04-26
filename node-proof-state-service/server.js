@@ -53,7 +53,7 @@ function ConsumeSplitterMessage (msg) {
   storageClient.logSplitterEventForHashId(messageObj.hash_id, messageObj.hash, function (err, success) {
     if (err) {
       amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, 'consume message nacked')
+      console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
     } else {
       // vent has been logged, ack consumption of original message
       amqpChannel.ack(msg)
@@ -95,7 +95,7 @@ function ConsumeAggregationMessage (msg) {
   ], function (err) {
     if (err) {
       amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, 'consume message nacked')
+      console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
     } else {
       // New message has been published and event logged, ack consumption of original message
       amqpChannel.ack(msg)
@@ -168,11 +168,11 @@ function ConsumeCalendarMessage (msg) {
         // until the data is read, in cases of hash data not being fully readable yet
         setTimeout(() => {
           amqpChannel.nack(msg)
-          console.error(msg.fields.routingKey, 'consume message nacked')
+          console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
         }, 500)
       } else {
         amqpChannel.nack(msg)
-        console.error(msg.fields.routingKey, 'consume message nacked')
+        console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
       }
     } else {
       // New messages have been published, ack consumption of original message
@@ -242,7 +242,7 @@ function ConsumeProofReadyMessage (msg) {
           console.error('error consuming proof ready message', err)
           // An error as occurred consuming a message, nack consumption of original message
           amqpChannel.nack(msg)
-          console.error(msg.fields.routingKey, 'consume message nacked')
+          console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
         } else {
           // Proof ready message has been consumed, ack consumption of original message
           amqpChannel.ack(msg)
