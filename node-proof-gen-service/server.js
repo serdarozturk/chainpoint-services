@@ -142,7 +142,7 @@ function processMessage (msg) {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then(function (conn) {
+  amqp.connect(connectionString).then((conn) => {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
@@ -150,7 +150,7 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then(function (chan) {
+    conn.createConfirmChannel().then((chan) =>  {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
@@ -158,9 +158,9 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return chan.assertQueue('', { durable: true }).then(function (q) {
+      return chan.assertQueue('', { durable: true }).then((q) => {
         chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, function (msg) {
+        return chan.consume(q.queue, (msg) => {
           processMessage(msg)
         })
       })

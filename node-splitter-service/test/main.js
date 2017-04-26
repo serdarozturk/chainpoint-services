@@ -5,8 +5,8 @@ var expect = require('chai').expect
 
 var server = require('../server')
 
-describe('Consume Hash Messages', function () {
-  it('should do nothing with null message', function (done) {
+describe('Consume Hash Messages', () => {
+  it('should do nothing with null message', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
@@ -21,7 +21,7 @@ describe('Consume Hash Messages', function () {
     done()
   })
 
-  it('should generate one hash object with a one hash message', function (done) {
+  it('should generate one hash object with a one hash message', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
@@ -48,7 +48,7 @@ describe('Consume Hash Messages', function () {
     done()
   })
 
-  it('should generate three state objects with a three hash messages', function (done) {
+  it('should generate three state objects with a three hash messages', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))

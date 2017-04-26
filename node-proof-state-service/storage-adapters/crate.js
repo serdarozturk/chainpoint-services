@@ -69,7 +69,7 @@ function assertDBTables (callback) {
     ') ' + getTableExtendedProperties()
   )
 
-  Promise.all([assertAggStateTable, assertCalStateTable, assertBTCTxStateTable, assertBTCHeadStateTable, assertHashTrackerTable]).then(resuts => {
+  Promise.all([assertAggStateTable, assertCalStateTable, assertBTCTxStateTable, assertBTCHeadStateTable, assertHashTrackerTable]).then((resuts) => {
     // all assertions made successfully, return success
     return callback(null)
   }).catch((err) => {

@@ -50,7 +50,7 @@ function ConsumeSplitterMessage (msg) {
   let messageObj = JSON.parse(msg.content.toString())
 
   // Store this state information
-  storageClient.logSplitterEventForHashId(messageObj.hash_id, messageObj.hash, function (err, success) {
+  storageClient.logSplitterEventForHashId(messageObj.hash_id, messageObj.hash, (err, success) => {
     if (err) {
       amqpChannel.nack(msg)
       console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
@@ -78,21 +78,21 @@ function ConsumeAggregationMessage (msg) {
   console.log(stateObj)
 
   async.series([
-    function (callback) {
+    (callback) => {
       // Store this state information
-      storageClient.writeAggStateObject(stateObj, function (err, success) {
+      storageClient.writeAggStateObject(stateObj, (err, success) => {
         if (err) return callback(err)
         return callback(null)
       })
     },
-    function (callback) {
+    (callback) => {
       // logs the aggregation event
-      storageClient.logAggregatorEventForHashId(stateObj.hash_id, function (err, success) {
+      storageClient.logAggregatorEventForHashId(stateObj.hash_id, (err, success) => {
         if (err) return callback(err)
         return callback(null)
       })
     }
-  ], function (err) {
+  ], (err) => {
     if (err) {
       amqpChannel.nack(msg)
       console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
@@ -122,30 +122,30 @@ function ConsumeCalendarMessage (msg) {
   console.log(stateObj)
 
   async.waterfall([
-    function (callback) {
+    (callback) => {
       // get all hash ids for a given agg_id
-      storageClient.getHashIdsByAggId(stateObj.agg_id, function (err, rows) {
+      storageClient.getHashIdsByAggId(stateObj.agg_id, (err, rows) => {
         if (err) return callback(err)
         if (rows.length < stateObj.agg_hash_count) return callback('unable to read all hash data')
         return callback(null, rows)
       })
     },
-    function (rows, callback) {
+    (rows, callback) => {
       // write the calendar state object to storage
-      storageClient.writeCalStateObject(stateObj, function (err, success) {
+      storageClient.writeCalStateObject(stateObj, (err, success) => {
         if (err) return callback(err)
         return callback(null, rows)
       })
     },
-    function (rows, callback) {
-      async.eachLimit(rows, 50, function (hashIdRow, eachCallback) {
+    (rows, callback) => {
+      async.eachLimit(rows, 50, (hashIdRow, eachCallback) => {
         // construct a calendar 'proof ready' message for a given hash
         let dataOutObj = {}
         dataOutObj.type = 'cal'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
         amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
-          function (err, ok) {
+          (err, ok) => {
             if (err) {
               console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
               return eachCallback(err)
@@ -154,12 +154,12 @@ function ConsumeCalendarMessage (msg) {
               return eachCallback(null)
             }
           })
-      }, function (err) {
+      }, (err) => {
         if (err) return callback(err)
         return callback(null)
       })
     }
-  ], function (err) {
+  ], (err) => {
     if (err) {
       console.error('error consuming calendar message', err)
       // An error as occurred publishing a message, nack consumption of original message
@@ -194,23 +194,23 @@ function ConsumeProofReadyMessage (msg) {
   switch (messageObj.type) {
     case 'cal':
       async.waterfall([
-        function (callback) {
+        (callback) => {
           // get the agg_state object for the hash_id
-          storageClient.getAggStateObjectByHashId(messageObj.hash_id, function (err, rows) {
+          storageClient.getAggStateObjectByHashId(messageObj.hash_id, (err, rows) => {
             if (err) return callback(err)
             if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching add_state data found')
             return callback(null, rows[0])
           })
         },
-        function (aggStateObj, callback) {
+        (aggStateObj, callback) => {
           // get the cal_state object for the hash_id's agg_id
-          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, function (err, rows) {
+          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, (err, rows) => {
             if (err) return callback(err)
             if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching cal_state data found')
             return callback(null, aggStateObj, rows[0])
           })
         },
-        function (aggStateObj, calStateObj, callback) {
+        (aggStateObj, calStateObj, callback) => {
           let dataOutObj = {}
           dataOutObj.type = 'cal'
           dataOutObj.hash_id = aggStateObj.hash_id
@@ -220,7 +220,7 @@ function ConsumeProofReadyMessage (msg) {
 
           // Publish a proof data object for consumption by the proof generation service
           amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
-            function (err, ok) {
+            (err, ok) => {
               if (err) {
                 console.error(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message nacked')
                 return callback(err)
@@ -230,14 +230,14 @@ function ConsumeProofReadyMessage (msg) {
               }
             })
         },
-        function (hashId, callback) {
+        (hashId, callback) => {
           // logs the calendar proof event
-          storageClient.logCalendarEventForHashId(hashId, function (err, success) {
+          storageClient.logCalendarEventForHashId(hashId, (err, success) => {
             if (err) return callback(err)
             return callback(null)
           })
         }
-      ], function (err) {
+      ], (err) => {
         if (err) {
           console.error('error consuming proof ready message', err)
           // An error as occurred consuming a message, nack consumption of original message
@@ -299,14 +299,14 @@ function processMessage (msg) {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then(function (conn) {
+  amqp.connect(connectionString).then((conn) => {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then(function (chan) {
+    conn.createConfirmChannel().then((chan) =>  {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
@@ -314,9 +314,9 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the HASHES from RMQ with hash objects to process
-      return chan.assertQueue('', { durable: true }).then(function (q) {
+      return chan.assertQueue('', { durable: true }).then((q) => {
         chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, function (msg) {
+        return chan.consume(q.queue, (msg) => {
           processMessage(msg)
         })
       })
@@ -332,7 +332,7 @@ function amqpOpenConnection (connectionString) {
  * Opens a storage connection
  **/
 function openStorageConnection (callback) {
-  storageClient.openConnection(function (err, success) {
+  storageClient.openConnection((err, success) => {
     if (err) {
       // catch errors when attempting to establish connection
       if (err === 'not_ready') {
@@ -350,7 +350,7 @@ function openStorageConnection (callback) {
 }
 
 // Open storage connection and then amqp connection
-openStorageConnection(function (err, result) {
+openStorageConnection((err, result) => {
   if (err) {
     console.error(err)
   } else {

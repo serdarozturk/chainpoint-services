@@ -45,23 +45,23 @@ let amqpChannel = null
 // Periodically updated with most current data from Bitcoin Exchange
 let currentExchange = null
 
-let getCurrentExchange = function () {
-  coinTicker('bitfinex', 'btcusd').then(data => {
+let getCurrentExchange = () => {
+  coinTicker('bitfinex', 'btcusd').then((data) => {
     // console.log('bitfinex exchange data : %s', JSON.stringify(data))
     currentExchange = data
-  }).catch(err => {
+  }).catch((err) => {
     console.error('bitfinex call failed, failing over to bitstamp : %s', JSON.stringify(err))
-    coinTicker('bitstamp', 'btcusd').then(data => {
+    coinTicker('bitstamp', 'btcusd').then((data) => {
       // console.log('bitstamp exchange data : %s', JSON.stringify(data))
       currentExchange = data
-    }).catch(err => {
+    }).catch((err) => {
       // Could not reach two exchanges. Something is very wrong.
       console.error('bitstamp call failed : %s', JSON.stringify(err))
     })
   })
 }
 
-let genFeeRecObj = function (recFeeInSatoshiPerByte) {
+let genFeeRecObj = (recFeeInSatoshiPerByte) => {
   let feeSatForAvgTx = Math.ceil(AVG_TX_BYTES * recFeeInSatoshiPerByte)
   let feeBtcForAvgTx = sb.toBitcoin(feeSatForAvgTx)
 
@@ -83,13 +83,13 @@ let genFeeRecObj = function (recFeeInSatoshiPerByte) {
 }
 
 // HTTP GET and cache current fees from
-let getRecommendedFees = function () {
+let getRecommendedFees = () => {
   requestify.get(REC_FEES_URI, {
     cache: {
       cache: true,
       expires: CACHE_TTL
     }
-  }).then(function (response) {
+  }).then((response) => {
     // Sample return body:
     //   { "fastestFee": 40, "halfHourFee": 20, "hourFee": 10 }
     let responseBody = response.getBody()
@@ -111,7 +111,7 @@ let getRecommendedFees = function () {
       // Also publish the recommended transaction fee data onto an RMQ
       // route that can be consumed by any interested services.
       let msg = new Buffer(JSON.stringify(feeRecObj))
-      amqpChannel.publish(RMQ_EXCHANGE_NAME, RMQ_ROUTING_KEY, msg, function (err, ok) {
+      amqpChannel.publish(RMQ_EXCHANGE_NAME, RMQ_ROUTING_KEY, msg, (err, ok) => {
         if (err !== null) {
           console.error('RMQ publish failed : %s', JSON.stringify(err))
           process.exit(1)
@@ -122,7 +122,7 @@ let getRecommendedFees = function () {
       console.error('unexpected return value : %s', JSON.stringify(responseBody))
       process.exit(1)
     }
-  }).fail(function (response) {
+  }).fail((response) => {
     // Bail out and let the service get restarted
     console.error('HTTP GET Error : %s : %s', response.getCode(), JSON.stringify(response))
     process.exit(1)
@@ -136,7 +136,7 @@ let getRecommendedFees = function () {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then(function (conn) {
+  amqp.connect(connectionString).then((conn) => {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('RMQ connection closed. Reconnecting in 5 seconds...')
@@ -145,7 +145,7 @@ function amqpOpenConnection (connectionString) {
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
 
-    conn.createConfirmChannel().then(function (chan) {
+    conn.createConfirmChannel().then((chan) =>  {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('RMQ connection established')

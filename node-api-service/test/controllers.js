@@ -7,14 +7,14 @@ var request = require('supertest')
 var app = require('../server')
 var server = app.server
 
-describe('Home Controller', function () {
-  describe('GET /', function () {
-    it('should return teapot error', function (done) {
+describe('Home Controller', () => {
+  describe('GET /', () => {
+    it('should return teapot error', (done) => {
       request(server)
         .get('/')
         .expect('Content-type', /json/)
         .expect(418)
-        .end(function (err, res) {
+        .end((err, res) => {
           if (err) return done(err)
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
@@ -29,21 +29,21 @@ describe('Home Controller', function () {
   })
 })
 
-describe('Proofs Controller', function () {
-  describe('GET /proofs/id', function () {
+describe('Proofs Controller', () => {
+  describe('GET /proofs/id', () => {
     // TODO: Add tests when code is complete
   })
 })
 
-describe('Hashes Controller', function () {
-  describe('POST /hashes', function () {
-    it('should return proper error with invalid content type', function (done) {
+describe('Hashes Controller', () => {
+  describe('POST /hashes', () => {
+    it('should return proper error with invalid content type', (done) => {
       request(server)
         .post('/hashes')
         .set('Content-type', 'text/plain')
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -55,13 +55,13 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with missing hashes', function (done) {
+    it('should return proper error with missing hashes', (done) => {
       request(server)
         .post('/hashes')
         .send({ name: 'Manny' })
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -73,13 +73,13 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with bad hash array', function (done) {
+    it('should return proper error with bad hash array', (done) => {
       request(server)
         .post('/hashes')
         .send({ hashes: 'Manny' })
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -91,13 +91,13 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with empty hash array', function (done) {
+    it('should return proper error with empty hash array', (done) => {
       request(server)
         .post('/hashes')
         .send({ hashes: [] })
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -109,7 +109,7 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with too many hashes', function (done) {
+    it('should return proper error with too many hashes', (done) => {
       let hashes = []
       for (let x = 0; x < 1100; x++) {
         hashes.push('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
@@ -120,7 +120,7 @@ describe('Hashes Controller', function () {
         .send({ hashes: hashes })
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -132,13 +132,13 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with invalid hashes', function (done) {
+    it('should return proper error with invalid hashes', (done) => {
       request(server)
         .post('/hashes')
         .send({ hashes: ['badhash'] })
         .expect('Content-type', /json/)
         .expect(409)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -150,13 +150,13 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper error with no AMQP connection', function (done) {
+    it('should return proper error with no AMQP connection', (done) => {
       request(server)
         .post('/hashes')
         .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
         .expect('Content-type', /json/)
         .expect(500)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('code')
             .and.to.be.a('string')
@@ -168,7 +168,7 @@ describe('Hashes Controller', function () {
         })
     })
 
-    it('should return proper result with on valid call', function (done) {
+    it('should return proper result with on valid call', (done) => {
       app.setAMQPChannel({
         publish: function () { }
       })
@@ -177,7 +177,7 @@ describe('Hashes Controller', function () {
         .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
         .expect('Content-type', /json/)
         .expect(200)
-        .end(function (err, res) {
+        .end((err, res) => {
           expect(err).to.equal(null)
           expect(res).to.have.property('body')
           expect(res.body).to.have.property('meta')
@@ -201,9 +201,9 @@ describe('Hashes Controller', function () {
   })
 })
 
-describe('Functions', function () {
-  describe('calling generatePostHashesResponse with one hash', function () {
-    it('should return proper repsonse object', function (done) {
+describe('Functions', () => {
+  describe('calling generatePostHashesResponse with one hash', () => {
+    it('should return proper repsonse object', (done) => {
       let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
       expect(res.meta).to.have.property('submitted_at')
@@ -224,8 +224,8 @@ describe('Functions', function () {
     })
   })
 
-  describe('calling generatePostHashesResponse with three hashes', function () {
-    it('should return proper repsonse object', function (done) {
+  describe('calling generatePostHashesResponse with three hashes', () => {
+    it('should return proper repsonse object', (done) => {
       let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])

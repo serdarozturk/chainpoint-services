@@ -5,8 +5,8 @@ var expect = require('chai').expect
 
 var server = require('../server')
 
-describe('Consume Hash Messages', function () {
-  it('should do nothing with null message', function (done) {
+describe('Consume Hash Messages', () => {
+  it('should do nothing with null message', (done) => {
     server.setHASHES([])
     let msg = null
     server.consumeHashMessage(msg)
@@ -15,7 +15,7 @@ describe('Consume Hash Messages', function () {
     done()
   })
 
-  it('should generate one state object with a one hash message', function (done) {
+  it('should generate one state object with a one hash message', (done) => {
     server.setHASHES([])
     let msg = {}
     msg.content = new Buffer(JSON.stringify({
@@ -35,8 +35,8 @@ describe('Consume Hash Messages', function () {
   })
 })
 
-describe('Aggregate', function () {
-  it('should do nothing with empty hashes', function (done) {
+describe('Aggregate', () => {
+  it('should do nothing with empty hashes', (done) => {
     server.setAMQPChannel({})
     server.setHASHES([])
     server.setTREES([])
@@ -48,7 +48,7 @@ describe('Aggregate', function () {
     done()
   })
 
-  it('should create one leaf tree with one hash', function (done) {
+  it('should create one leaf tree with one hash', (done) => {
     server.setAMQPChannel({})
     let msg = {}
     msg.content = new Buffer(JSON.stringify({
@@ -78,7 +78,7 @@ describe('Aggregate', function () {
     done()
   })
 
-  it('should create three leaf tree with three hashes', function (done) {
+  it('should create three leaf tree with three hashes', (done) => {
     server.setAMQPChannel({})
     let msg1 = {}
     msg1.content = new Buffer(JSON.stringify({
@@ -139,8 +139,8 @@ describe('Aggregate', function () {
   })
 })
 
-describe('Finalize', function () {
-  it('should do nothing with null amqpChannel', function (done) {
+describe('Finalize', () => {
+  it('should do nothing with null amqpChannel', (done) => {
     server.setAMQPChannel(null)
     server.setHASHES([1])
     server.setTREES([1])
@@ -152,7 +152,7 @@ describe('Finalize', function () {
     done()
   })
 
-  it('should do nothing with empty TREES', function (done) {
+  it('should do nothing with empty TREES', (done) => {
     server.setAMQPChannel({})
     server.setHASHES([1])
     server.setTREES([])
@@ -164,7 +164,7 @@ describe('Finalize', function () {
     done()
   })
 
-  it('should create one state object message for one tree with one proof', function (done) {
+  it('should create one state object message for one tree with one proof', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
@@ -212,7 +212,7 @@ describe('Finalize', function () {
     done()
   })
 
-  it('should create two state object messages for one tree with two proofs', function (done) {
+  it('should create two state object messages for one tree with two proofs', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
@@ -281,7 +281,7 @@ describe('Finalize', function () {
     done()
   })
 
-  it('should create two state object messages for two trees with one proof each', function (done) {
+  it('should create two state object messages for two trees with one proof each', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))
@@ -356,7 +356,7 @@ describe('Finalize', function () {
     done()
   })
 
-  it('should create four state object messages for two trees with two proofs each', function (done) {
+  it('should create four state object messages for two trees with two proofs each', (done) => {
     server.setAMQPChannel({
       publish: function (ex, key, message, opt) {
         this.results.push(JSON.parse(message.toString()))

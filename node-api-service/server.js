@@ -31,14 +31,14 @@ var amqpChannel = null
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then(function (conn) {
+  amqp.connect(connectionString).then((conn) => {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then(function (chan) {
+    conn.createConfirmChannel().then((chan) =>  {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.error('Connection established')
@@ -91,7 +91,7 @@ function formatDateISO8601NoMs (date) {
  * @returns {string[]} An array of lowercase hash strings
  */
 function lowerCaseHashes (hashes) {
-  return hashes.map(function (hash) {
+  return hashes.map((hash) => {
     return hash.toLowerCase()
   })
 }
@@ -128,7 +128,7 @@ function generatePostHashesResponseMetadata () {
  */
 function generatePostHashesResponse (hashes) {
   let lcHashes = lowerCaseHashes(hashes)
-  let hashObjects = lcHashes.map(function (hash) {
+  let hashObjects = lcHashes.map((hash) => {
     let hashObj = {}
     hashObj.hash_id = uuidv1()
     hashObj.hash = hash
@@ -183,7 +183,7 @@ function postHashesV1 (req, res, next) {
   }
 
   // validate hashes are individually well formed
-  let containsValidHashes = _.every(req.params.hashes, function (hash) {
+  let containsValidHashes = _.every(req.params.hashes, (hash) => {
     return /^[a-fA-F0-9]{40,128}$/.test(hash) && isEven(hash.length)
   })
 
@@ -200,7 +200,7 @@ function postHashesV1 (req, res, next) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
   amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(responseObj)), { persistent: true },
-    function (err, ok) {
+    (err, ok) => {
       if (err !== null) {
         console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
@@ -276,13 +276,13 @@ server.get({ path: '/', version: '1.0.0' }, rootV1)
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // SERVER
-server.listen(8080, function () {
+server.listen(8080, () => {
   console.log('%s listening at %s', server.name, server.url)
 })
 
 // export these functions for testing purposes
 module.exports = {
-  setAMQPChannel: function (chan) { amqpChannel = chan },
+  setAMQPChannel: (chan) =>  { amqpChannel = chan },
   server: server,
   generatePostHashesResponse: generatePostHashesResponse
 }

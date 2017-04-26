@@ -51,7 +51,7 @@ let amqpChannel = null
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then(function (conn) {
+  amqp.connect(connectionString).then((conn) => {
     conn.on('close', () => {
       // if the channel closes for any reason, attempt to reconnect
       console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
@@ -59,7 +59,7 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then(function (chan) {
+    conn.createConfirmChannel().then((chan) =>  {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
@@ -67,9 +67,9 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = chan
 
       // Continuously load the AGGREGATION_ROOTS from RMQ with root objects to process
-      return chan.assertQueue('', { durable: true }).then(function (q) {
+      return chan.assertQueue('', { durable: true }).then((q) => {
         chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, function (msg) {
+        return chan.consume(q.queue, (msg) => {
           consumeAggRootMessage(msg)
         })
       })
@@ -101,7 +101,7 @@ function consumeAggRootMessage (msg) {
  * @returns {ops object array}
  */
 function formatAsChainpointV3Ops (proof, op) {
-  proof = proof.map(function (item) {
+  proof = proof.map((item) => {
     if (item.left) {
       return { l: item.left }
     } else {
@@ -120,7 +120,7 @@ function formatAsChainpointV3Ops (proof, op) {
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Take work off of the AGGREGATION_ROOTS array and build Merkle tree
-let generateCalendar = function () {
+let generateCalendar = () => {
   let rootsForTree = AGGREGATION_ROOTS.splice(0)
 
   // create merkle tree only if there is at least one root to process
@@ -129,7 +129,7 @@ let generateCalendar = function () {
     merkleTools.resetTree()
 
     // get root values from root objects
-    let leaves = rootsForTree.map(rootObj => {
+    let leaves = rootsForTree.map((rootObj) => {
       return rootObj.agg_root
     })
 
@@ -163,13 +163,13 @@ let generateCalendar = function () {
 }
 
 // Temp/incomplete finalize function for writing to proof state service only, no calendar functions yet
-let finalize = function () {
+let finalize = () => {
   // if the amqp channel is null (closed), processing should not continue, defer to next finalize call
   if (amqpChannel === null) return
 
   // process each set of tree data
   let treesToFinalize = TREES.splice(0)
-  _.forEach(treesToFinalize, function (treeDataObj) {
+  _.forEach(treesToFinalize, (treeDataObj) => {
     console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
     // TODO store Merkle root of calendar in DB and chain to previous calendar entries
@@ -177,9 +177,9 @@ let finalize = function () {
 
     // queue proof state messages for each aggregation root in the tree
     async.series([
-      function (callback) {
+      (callback) => {
         // for each aggregation root, queue up message containing updated proof state bound for proof state service
-        async.each(treeDataObj.proofData, function (proofDataItem, eachCallback) {
+        async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
           let stateObj = {}
           stateObj.agg_id = proofDataItem.agg_id
           stateObj.agg_root = proofDataItem.agg_root
@@ -199,7 +199,7 @@ let finalize = function () {
           }
 
           amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
-            function (err, ok) {
+            (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
                 console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
@@ -210,24 +210,24 @@ let finalize = function () {
                 return eachCallback(null)
               }
             })
-        }, function (err) {
+        }, (err) => {
           if (err) {
             console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
             return callback(err)
           } else {
             console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
             // pass all the agg_msg objects to the series() callback
-            let messages = treeDataObj.proofData.map(proofDataItem => {
+            let messages = treeDataObj.proofData.map((proofDataItem) => {
               return proofDataItem.agg_msg
             })
             return callback(null, messages)
           }
         })
       }
-    ], function (err, results) {
+    ], (err, results) => {
       // results[0] contains an array of agg_msg objects from the first function in this series
       if (err) {
-        _.forEach(results[0], function (message) {
+        _.forEach(results[0], (message) => {
           // nack consumption of all original hash messages part of this aggregation event
           if (message !== null) {
             amqpChannel.nack(message)
@@ -235,7 +235,7 @@ let finalize = function () {
           }
         })
       } else {
-        _.forEach(results[0], function (message) {
+        _.forEach(results[0], (message) => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
