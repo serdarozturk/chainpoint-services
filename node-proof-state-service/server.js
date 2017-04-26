@@ -312,6 +312,8 @@ function amqpOpenConnection (connectionString) {
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
     conn.createConfirmChannel().then((chan) => {
+      // limit the number of unacked messages to work with per instance
+      chan.prefetch(10)
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')
