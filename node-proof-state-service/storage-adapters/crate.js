@@ -103,6 +103,14 @@ function getTableExtendedProperties () {
   return extProperties
 }
 
+function getHashIdCountByAggId (aggId, callback) {
+  crate.execute('SELECT COUNT(hash_id) FROM proof_state_service.agg_states WHERE agg_id = ?', [aggId]).then((res) => {
+    return callback(null, res.json[0])
+  }).catch((err) => {
+    return callback(err)
+  })
+}
+
 function getHashIdsByAggId (aggId, callback) {
   crate.execute('SELECT hash_id FROM proof_state_service.agg_states WHERE agg_id = ?', [aggId]).then((res) => {
     return callback(null, res.json)
@@ -289,6 +297,7 @@ function logBtcEventForHashId (hashId, callback) {
 
 module.exports = {
   openConnection: openConnection,
+  getHashIdCountByAggId: getHashIdCountByAggId,
   getHashIdsByAggId: getHashIdsByAggId,
   getAggStateObjectByHashId: getAggStateObjectByHashId,
   getCalStateObjectByAggId: getCalStateObjectByAggId,

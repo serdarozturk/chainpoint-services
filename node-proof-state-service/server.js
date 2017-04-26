@@ -123,10 +123,17 @@ function ConsumeCalendarMessage (msg) {
 
   async.waterfall([
     (callback) => {
+      // get hash id count for a given agg_id
+      storageClient.getHashIdCountByAggId(stateObj.agg_id, (err, count) => {
+        if (err) return callback(err)
+        if (count < stateObj.agg_hash_count) return callback('unable to read all hash data')
+        return callback(null)
+      })
+    },
+    (callback) => {
       // get all hash ids for a given agg_id
       storageClient.getHashIdsByAggId(stateObj.agg_id, (err, rows) => {
         if (err) return callback(err)
-        if (rows.length < stateObj.agg_hash_count) return callback('unable to read all hash data')
         return callback(null, rows)
       })
     },
@@ -164,12 +171,12 @@ function ConsumeCalendarMessage (msg) {
       console.error('error consuming calendar message', err)
       // An error as occurred publishing a message, nack consumption of original message
       if (err === 'unable to read all hash data') {
-        // delay the nack for 500ms to slightly delay requeuing to prevent a flood of retries
+        // delay the nack for 1000ms to slightly delay requeuing to prevent a flood of retries
         // until the data is read, in cases of hash data not being fully readable yet
         setTimeout(() => {
           amqpChannel.nack(msg)
           console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
-        }, 500)
+        }, 1000)
       } else {
         amqpChannel.nack(msg)
         console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
@@ -306,7 +313,7 @@ function amqpOpenConnection (connectionString) {
       amqpChannel = null
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     })
-    conn.createConfirmChannel().then((chan) =>  {
+    conn.createConfirmChannel().then((chan) => {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
       console.log('Connection established')

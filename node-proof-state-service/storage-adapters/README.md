@@ -9,6 +9,7 @@ The following is a description of methods that must be defined in a storage adap
 | Name           | Description  | Returns  |
 | :------------- |:-------------|:-------------|
 | openConnection(callback(err, success))       | opens the connection to the underlying storage provider | boolean indicating success |
+| getHashIdCountByAggId(aggId, callback(err, count))     | gets all count of hash objects for a given agg_id currently in the database | integer |
 | getHashIdsByAggId(aggId, callback(err, hashIds))     | gets all hash ids associated with an aggregation event | result array containing hash id objects |
 | getAggStateObjectByHashId(hashId, callback(err, stateObject))     | gets the agg state object for a given hash id | result array containing one agg state object |
 | getCalStateObjectByAggId(aggId, callback(err, stateObject))     | gets the cal state object for a given agg id | result array containing one cal state object |
