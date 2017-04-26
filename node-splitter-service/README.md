@@ -30,7 +30,8 @@ The following are the descriptions of the configuration parameters:
 | :------------- |:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating the web service
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the aggregtion service 
+| RMQ\_WORK\_OUT\_AGG\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the aggregation service 
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
 | RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI 
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
@@ -39,7 +40,8 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.splitter' | 
-| RMQ\_WORK\_OUT\_ROUTING\_KEY       | string       | 'work.agg' |  
+| RMQ\_WORK\_OUT\_AGG\_ROUTING\_KEY       | string       | 'work.agg' |  
+| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string       | 'work.splitter.state' |  
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 
@@ -69,9 +71,9 @@ The following is an example of a hash object array message body:
 Once a message is consumed, the hash object array is split into individual hash objects. 
 
 ## Data Out
-For each hash object, a hash object message is published using the RMQ\_WORK\_OUT\_ROUTING\_KEY for consumption by the aggregation service.
+For each hash object, a hash object message is published using the RMQ\_WORK\_OUT\_AGG\_ROUTING\_KEY and RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY for consumption by the aggregation service and proof state service respectively.
 
-The following is an example of a hash object message sent to the aggregation service: 
+The following is an example of a hash object message sent to both service: 
 ```json
 {
   "hash_id": "c46aa06e-155f-11e7-93ae-92361f002671",

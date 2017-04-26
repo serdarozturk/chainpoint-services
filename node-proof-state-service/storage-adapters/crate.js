@@ -61,7 +61,18 @@ function assertDBTables (callback) {
     ') ' + getTableExtendedProperties()
   )
 
-  Promise.all([assertAggStateTable, assertCalStateTable, assertBTCTxStateTable, assertBTCHeadStateTable]).then(resuts => {
+  let assertHashTrackerTable = crate.execute('CREATE TABLE IF NOT EXISTS "proof_state_service"."hash_tracker_log" (' +
+    '"hash_id" STRING PRIMARY KEY, ' +
+    '"hash" STRING, ' +
+    '"splitter_at" TIMESTAMP, ' +
+    '"aggregator_at" TIMESTAMP, ' +
+    '"calendar_at" TIMESTAMP, ' +
+    '"eth_at" TIMESTAMP, ' +
+    '"btc_at" TIMESTAMP ' +
+    ') ' + getTableExtendedProperties()
+  )
+
+  Promise.all([assertAggStateTable, assertCalStateTable, assertBTCTxStateTable, assertBTCHeadStateTable, assertHashTrackerTable]).then(resuts => {
     // all assertions made successfully, return success
     return callback(null)
   }).catch((err) => {
@@ -168,7 +179,8 @@ function getBTCHeadStateObjectsByBTCHeadId (btcHeadId, callback) {
 }
 
 function writeAggStateObject (stateObject, callback) {
-  crate.execute('INSERT INTO proof_state_service.agg_states (hash_id, hash, agg_id, agg_state) VALUES (?,?,?,?)', [
+  crate.execute('INSERT INTO proof_state_service.agg_states (hash_id, hash, agg_id, agg_state) VALUES (?,?,?,?) ' +
+  'ON DUPLICATE KEY UPDATE hash = VALUES(hash), agg_id = VALUES(agg_id), agg_state = VALUES(agg_state)', [
     stateObject.hash_id,
     stateObject.hash,
     stateObject.agg_id,
@@ -216,6 +228,91 @@ function writeBTCHeadStateObject (stateObject, callback) {
   })
 }
 
+function logSplitterEventForHashId (hashId, hash, callback) {
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
+    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE splitter_at = VALUES(splitter_at)', [
+      hashId,
+      hash,
+      new Date(),
+      null,
+      null,
+      null,
+      null
+    ]).then((res) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
+}
+
+function logAggregatorEventForHashId (hashId, callback) {
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
+    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE aggregator_at = VALUES(aggregator_at)', [
+      hashId,
+      null,
+      null,
+      new Date(),
+      null,
+      null,
+      null
+    ]).then((res) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
+}
+
+function logCalendarEventForHashId (hashId, callback) {
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
+    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE calendar_at = VALUES(calendar_at)', [
+      hashId,
+      null,
+      null,
+      null,
+      new Date(),
+      null,
+      null
+    ]).then((res) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
+}
+
+function logEthEventForHashId (hashId, callback) {
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
+    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE eth_at = VALUES(eth_at)', [
+      hashId,
+      null,
+      null,
+      null,
+      null,
+      new Date(),
+      null
+    ]).then((res) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
+}
+
+function logBtcEventForHashId (hashId, callback) {
+  crate.execute('INSERT INTO proof_state_service.hash_tracker_log (hash_id, hash, splitter_at, aggregator_at, calendar_at, eth_at, btc_at) ' +
+    'VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE btc_at = VALUES(btc_at)', [
+      hashId,
+      null,
+      null,
+      null,
+      null,
+      null,
+      new Date()
+    ]).then((res) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
+}
+
 module.exports = {
   openConnection: openConnection,
   getHashIdsByAggId: getHashIdsByAggId,
@@ -230,5 +327,10 @@ module.exports = {
   writeAggStateObject: writeAggStateObject,
   writeCalStateObject: writeCalStateObject,
   writeBTCTxStateObject: writeBTCTxStateObject,
-  writeBTCHeadStateObject: writeBTCHeadStateObject
+  writeBTCHeadStateObject: writeBTCHeadStateObject,
+  logSplitterEventForHashId: logSplitterEventForHashId,
+  logAggregatorEventForHashId: logAggregatorEventForHashId,
+  logCalendarEventForHashId: logCalendarEventForHashId,
+  logEthEventForHashId: logEthEventForHashId,
+  logBtcEventForHashId: logBtcEventForHashId
 }

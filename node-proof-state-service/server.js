@@ -11,6 +11,9 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 // the topic exchange routing key for message consumption originating from all other services
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.*.state'
 
+// the topic exchange routing key for message consumption originating from splitter service
+const RMQ_WORK_IN_SPLITTER_ROUTING_KEY = process.env.RMQ_WORK_IN_SPLITTER_ROUTING_KEY || 'work.splitter.state'
+
 // the topic exchange routing key for message consumption originating from aggregator service
 const RMQ_WORK_IN_AGG_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_ROUTING_KEY || 'work.agg.state'
 
@@ -39,7 +42,27 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 var amqpChannel = null
 
 /**
-* Writes the state data to persistent storage
+* Logs Splitter service event to hash tracker
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function ConsumeSplitterMessage (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+
+  // Store this state information
+  storageClient.logSplitterEventForHashId(messageObj.hash_id, messageObj.hash, function (err, success) {
+    if (err) {
+      amqpChannel.nack(msg)
+      console.error(msg.fields.routingKey, 'consume message nacked')
+    } else {
+      // vent has been logged, ack consumption of original message
+      amqpChannel.ack(msg)
+      console.log(msg.fields.routingKey, 'consume message acked')
+    }
+  })
+}
+/**
+* Writes the state data to persistent storage and logs aggregation event
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
 */
@@ -54,14 +77,27 @@ function ConsumeAggregationMessage (msg) {
   stateObj.agg_state = messageObj.agg_state
   console.log(stateObj)
 
-  // Store this state information
-  storageClient.writeAggStateObject(stateObj, function (err, success) {
+  async.series([
+    function (callback) {
+      // Store this state information
+      storageClient.writeAggStateObject(stateObj, function (err, success) {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    },
+    function (callback) {
+      // logs the aggregation event
+      storageClient.logAggregatorEventForHashId(stateObj.hash_id, function (err, success) {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    }
+  ], function (err) {
     if (err) {
-      console.error('error writing state object', err)
       amqpChannel.nack(msg)
       console.error(msg.fields.routingKey, 'consume message nacked')
     } else {
-      // New message has been published, ack consumption of original message
+      // New message has been published and event logged, ack consumption of original message
       amqpChannel.ack(msg)
       console.log(msg.fields.routingKey, 'consume message acked')
     }
@@ -128,8 +164,8 @@ function ConsumeCalendarMessage (msg) {
       console.error('error consuming calendar message', err)
       // An error as occurred publishing a message, nack consumption of original message
       if (err === 'unable to read all hash data') {
-      // delay the nack for 500ms to slightly delay requeuing to prevent a flood of retries
-      // until the data is read, in cases of hash data not being fully readable yet
+        // delay the nack for 500ms to slightly delay requeuing to prevent a flood of retries
+        // until the data is read, in cases of hash data not being fully readable yet
         setTimeout(() => {
           amqpChannel.nack(msg)
           console.error(msg.fields.routingKey, 'consume message nacked')
@@ -190,9 +226,16 @@ function ConsumeProofReadyMessage (msg) {
                 return callback(err)
               } else {
                 console.log(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message acked')
-                return callback(null)
+                return callback(null, dataOutObj.hash_id)
               }
             })
+        },
+        function (hashId, callback) {
+          // logs the calendar proof event
+          storageClient.logCalendarEventForHashId(hashId, function (err, success) {
+            if (err) return callback(err)
+            return callback(null)
+          })
         }
       ], function (err) {
         if (err) {
@@ -222,9 +265,14 @@ function processMessage (msg) {
   if (msg !== null) {
     // determine the source of the message and handle appropriately
     switch (msg.fields.routingKey) {
+      case RMQ_WORK_IN_SPLITTER_ROUTING_KEY:
+        // Consumes a state message from the Splitter service
+        // Logs event in hash tracker
+        ConsumeSplitterMessage(msg)
+        break
       case RMQ_WORK_IN_AGG_ROUTING_KEY:
         // Consumes a state message from the Aggregator service
-        // Stores state information
+        // Stores state information and logs event in hash tracker
         ConsumeAggregationMessage(msg)
         break
       case RMQ_WORK_IN_CAL_ROUTING_KEY:
@@ -234,7 +282,7 @@ function processMessage (msg) {
         break
       case RMQ_WORK_IN_STATE_ROUTING_KEY:
         // Consumes a proof ready message from the proof state service
-        // Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
+        // Retrieves all proof state data for a given hash, publishes message bound for the proof generator service, and logs event in hash tracker
         ConsumeProofReadyMessage(msg)
         break
       default:

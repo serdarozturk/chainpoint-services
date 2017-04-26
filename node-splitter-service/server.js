@@ -10,7 +10,10 @@ const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic
 const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.splitter'
 
 // The RabbitMQ topic key for outgoing message to the aggregation service
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.agg'
+const RMQ_WORK_OUT_AGG_ROUTING_KEY = process.env.RMQ_WORK_OUT_AGG_ROUTING_KEY || 'work.agg'
+
+// The RabbitMQ topic key for outgoing message to the proof state service
+const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.splitter.state'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -63,16 +66,37 @@ function consumeHashMessage (msg) {
 
     async.each(incomingHashBatch, function (hashObj, callback) {
       console.log(hashObj)
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
-        function (err, ok) {
-          if (err !== null) {
-            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
-            return callback(err)
-          } else {
-            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
-            return callback(null)
-          }
-        })
+      async.series([
+        function (seriesCallback) {
+          // Send this hash object message to the aggregator service
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGG_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+            function (err, ok) {
+              if (err !== null) {
+                console.error(RMQ_WORK_OUT_AGG_ROUTING_KEY, 'publish message nacked')
+                return seriesCallback(err)
+              } else {
+                console.log(RMQ_WORK_OUT_AGG_ROUTING_KEY, 'publish message acked')
+                return seriesCallback(null)
+              }
+            })
+        },
+        // Send this hash object message to the proof state service for the tracking log
+        function (seriesCallback) {
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+            function (err, ok) {
+              if (err !== null) {
+                console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
+                return callback(err)
+              } else {
+                console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
+                return callback(null)
+              }
+            })
+        }
+      ], function (err) {
+        if (err) return callback(err)
+        return callback(null)
+      })
     }, function (err) {
       if (err) {
         // An error has occurred publishing a message, nack consumption of message

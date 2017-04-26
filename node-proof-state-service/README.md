@@ -30,6 +30,7 @@ The following are the descriptions of the configuration parameters:
 | :------------- |:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use |
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from all other services |
+| RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from splitter service |
 | RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from aggregator service |
 | RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from calendar service |
 | RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from proof state service |
@@ -45,6 +46,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | :------------- |:-------------|:-------------|
 | RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
 | RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
+| RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | string       | 'work.splitter.state' | 
 | RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | string       | 'work.agg.state' | 
 | RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | string       | 'work.cal.state' | 
 | RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | string       | 'work.state.state' | 
@@ -56,7 +58,22 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 
 
 ## Data In
-The proof state service serves as the a proof state storage mechanism for all hashes as they are being processed. As proofs are constructed for each hash, state data is received and stored in a Crate DB cluster from the aggregator and calendar services. As anchors objects are completed and added to the proof, a proof ready message is also queued for the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data. These proof ready messages are both published and consumed by this service. When receiving 
+The proof state service serves as the a proof state storage mechanism for all hashes as they are being processed. As proofs are constructed for each hash, state data is received and stored in a Crate DB cluster from the aggregator and calendar services. As anchors objects are completed and added to the proof, a proof ready message is also queued for the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data. These proof ready messages are both published and consumed by this service. Milestone events occurring during the proof building process are logged to a hash tracker table.
+
+#### Splitter Service
+When the splitter service splits a batch of hashes received from the api service, it queues hash object messages bound for the proof state service for tracking of that event.
+The following is an example of a hash object message published from the splitter service: 
+```json
+{
+  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
+  "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb"
+}
+```
+| Name             | Description                                                            |
+| :--------------- |:-----------------------------------------------------------------------|
+| hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp |
+| hash          | A hex string representing the hash to be processed  |
+
 
 #### Aggregator Service
 When an aggregation event occurs, the aggregation service will queue messages bound for the proof state service for each hash in that aggregation event.
@@ -84,6 +101,7 @@ The following is an example of state data published from the aggregator service:
 | agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
 | agg_root          | A hex string representing the merkle root for the aggregation event  |
 | agg_state  | The state data being stored, in this case, aggregation operations |
+
 
 #### Calendar Service
 When a new calendar entrty is created, the calendar service will queue messages bound for the proof state service for each aggregation event in that calendar entry.
@@ -168,6 +186,16 @@ The following is an example of a proof state object:
 | agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
 | agg_root          | A hex string representing the merkle root for the aggregation event  |
 | agg_state  | The state data being stored, in this case, aggregation operations |
+
+In addition to storing state data, the proof state service also updates the hash tracker log for milestone events that occurring during the proof generation process. The events being tracked are shown in the following table.
+
+| Name | Description                                                            |
+| :--- |:-----------------------------------------------------------------------|
+| splitter_at          | A timestamp value indicating when the hash was processed by the splitter service |
+| aggregator_at          | A timestamp value indicating when the hash was processed by the aggregator service |
+| calendar_at          | A timestamp value indicating when calendar proof generation has begun for this hash |
+| eth_at          | A timestamp value indicating when eth proof generation has begun for this hash |
+| btc_at          | A timestamp value indicating when btc proof generation has begun for this hash |
 
 
 ## Data Out 

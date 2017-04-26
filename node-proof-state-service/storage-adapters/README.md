@@ -22,6 +22,11 @@ The following is a description of methods that must be defined in a storage adap
 | writeCalStateObject(stateObject, callback(err, success))     | write the cal state object to storage | boolean indicating success |
 | writeBTCTxStateObject(stateObject, callback(err, success))     | write the btctx state object to storage | boolean indicating success |
 | writeBTCHeadStateObject(stateObject, callback(err, success))     | write the btchead state object to storage | boolean indicating success |
+| logSplitterEventForHashId(hashId, hash, callback(err, success))     | log a splitter event for the given hash id to the hash tracker | boolean indicating success |
+| logAggregationEventForHashId(hashId, callback(err, success))     | log an aggregation event for the given hash id to the hash tracker | boolean indicating success |
+| logCalendarEventForHashId(hashId, callback(err, success))     | log a calendar event for the given hash id to the hash tracker | boolean indicating success |
+| logEthEventForHashId(hashId, callback(err, success))     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
+| logBtcEventForHashId(hashId, callback(err, success))     | log a btc event for the given hash id to the hash tracker | boolean indicating success |
 
 ## Crate DB Adapter Configuration
 Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
