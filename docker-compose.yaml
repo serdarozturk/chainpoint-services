@@ -4,33 +4,43 @@ services:
 
   # HTTP API
   # Restify Node public web API service.
-  # 
-  # LOCAL PORTS
-  # http : 8080
+  #
+  # Note : You don't access this directly, but through
+  # the nginx-proxy load balancer. This service cannot be
+  # given an explicit container_name since it needs
+  # to be scalable with 'docker-compose scale api=5'
+  #
+  # The VIRTUAL_HOST env var is used by the nginx-proxy
+  # to rebuild its reverse proxy host config and must be
+  # passed in by the HTTP client:
+  #
+  # curl -i -H 'Host: api.local' http://127.0.0.1/
+  #
+  # PORTS : 8080
   #
   api:
     restart: always
     image: chainpoint/node-api-service
-    container_name: api
     build:
       context: ./node-api-service
-    ports:
-      - "8080:8080"
     depends_on:
       - rabbitmq
     networks:
       - front-end
+    environment:
+      - VIRTUAL_HOST=api.local
 
   # Splitter
-  # Consume batches of incoming hashes from 'api' and re-queue them individually.
+  # Consume batches of incoming hashes from 'api' and re-queue them
+  # individually.
+  #
+  # SCALED: true
   # 
-  # PORTS
-  # none
+  # PORTS : none
   #
   splitter:
     restart: always
     image: chainpoint/node-splitter-service
-    container_name: splitter
     build:
       context: ./node-splitter-service
     depends_on:
@@ -42,14 +52,14 @@ services:
   # Aggregate individual hashes into a Merkle tree
   # sending the Merkle root to the `calendar` service, and
   # partial proof data to the `proof-state` service.
-  # 
-  # PORTS
-  # none
+  #
+  # SCALED: true
+  #
+  # PORTS : none
   #
   aggregator:
     restart: always
     image: chainpoint/node-aggregator-service
-    container_name: aggregator
     build:
       context: ./node-aggregator-service
     depends_on:
@@ -60,9 +70,10 @@ services:
   # Calendar
   # Aggregate Merkle roots from the `aggregator` service instances
   # and write them to the Calendar event/block chains.
-  # 
-  # PORTS
-  # none
+  #
+  # SCALED: false
+  #
+  # PORTS : none
   #
   calendar:
     restart: always
@@ -78,8 +89,9 @@ services:
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
   # 
-  # PORTS
-  # none
+  # SCALED: false
+  #
+  # PORTS : none
   #
   btc-tx:
     restart: always
@@ -95,8 +107,9 @@ services:
   # Bitcoin Fees
   # Retrieve and store recommended transaction fees for Bitcoin
   # 
-  # PORTS
-  # none
+  # SCALED: false
+  #
+  # PORTS : none
   #
   btc-fee:
     restart: always
@@ -112,8 +125,9 @@ services:
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
   # 
-  # PORTS
-  # none
+  # SCALED: false
+  #
+  # PORTS : none
   #
   btc-mon:
     restart: always
@@ -129,13 +143,13 @@ services:
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
   # 
-  # PORTS
-  # none
+  # SCALED: true
+  #
+  # PORTS : none
   #
   proof-state:
     restart: always
     image: chainpoint/node-proof-state-service
-    container_name: proof-state
     build:
       context: ./node-proof-state-service
     depends_on:
@@ -147,13 +161,13 @@ services:
   # Responsible for constructing, signing, and validating Chainpoint proofs
   # for Calendar, Bitcoin, and Ethereum attestation levels.
   # 
-  # PORTS
-  # none
+  # SCALED : true
+  #
+  # PORTS : none
   #
   proof-gen:
     restart: always
     image: chainpoint/node-proof-gen-service
-    container_name: proof-gen
     build:
       context: ./node-proof-gen-service
     depends_on:
@@ -183,6 +197,33 @@ services:
     - RABBITMQ_DEFAULT_PASS=chainpoint
     networks:
       - back-end
+      - front-end
+
+  # NGINX Proxy
+  #
+  # An auto-scaling reverse proxy that reconfigures
+  # itself based on which API services are available
+  # for requests.
+  #
+  # See : https://github.com/jwilder/nginx-proxy
+  #
+  # SCALED : false
+  #
+  # PORTS:
+  # http : 80
+  #
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    environment:
+      - DEFAULT_HOST=api.local
+    depends_on:
+      - api
+    networks:
       - front-end
 
   # Redis
@@ -230,10 +271,10 @@ services:
 # Networks
 #
 # Front end network
-#   Shared by HTTP API service and RabbitMQ only.
+#   Shared by NGNINX Proxy, HTTP API, and RabbitMQ only.
 #
 # Back end network
-#   Available to all services except HTTP API
+#   Available to all services except NGINX Proxy and HTTP API
 #
 networks:
   front-end:

@@ -54,7 +54,7 @@ Stop w/ `docker-compose down`
 ## Test Running Services
 
 ```
-curl -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1:8080/hashes | jq
+curl -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1/hashes | jq
 ```
 
 ## Lite Local Load Test
@@ -62,7 +62,7 @@ curl -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd
 Install the `hey` load testing tool. [https://github.com/rakyll/hey](https://github.com/rakyll/hey)
 
 ```
-hey -m POST -H "Content-Type: application/json" -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' -T 'application/json' -n 1000 -c 25 -cpus 3 http://127.0.0.1:8080/hashes
+hey -m POST -H "Content-Type: application/json" -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' -T 'application/json' -n 1000 -c 25 http://127.0.0.1/hashes
 
 ```
 
