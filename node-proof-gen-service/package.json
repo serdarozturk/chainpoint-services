@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "amqplib": "^0.5.1",
+    "async": "^2.3.0",
     "chainpoint-proof-json-schema": "^0.0.2",
-    "dotenv": "^4.0.0"
+    "dotenv": "^4.0.0",
+    "redis": "^2.7.1"
   }
 }

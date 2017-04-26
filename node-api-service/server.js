@@ -6,12 +6,22 @@ const amqp = require('amqplib')
 
 require('dotenv').config()
 
+const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
+const r = require('redis')
+const redis = r.createClient(REDIS_CONNECT_URI)
+
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
+// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
+
 // The RabbitMQ exchange name
 const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+
+// The topic exchange routing key for message consumption originating from proof gen service
+const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.api'
 
 // The RabbitMQ topic key for outgoing message to the splitter service
 const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.splitter'
@@ -41,15 +51,42 @@ function amqpOpenConnection (connectionString) {
     conn.createConfirmChannel().then((chan) => {
       // the connection and channel have been established
       // set 'amqpChannel' so that publishers have access to the channel
-      console.error('Connection established')
+      console.log('Connection established')
+      chan.prefetch(RMQ_PREFETCH_COUNT)
       chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
       amqpChannel = chan
+
+      // Continuously load the HASHES from RMQ with hash objects to process
+      return chan.assertQueue('', { durable: true }).then((q) => {
+        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
+        return chan.consume(q.queue, (msg) => {
+          processProofMessage(msg)
+        })
+      })
     })
   }).catch(() => {
     // catch errors when attempting to establish connection
     console.error('Cannot establish connection. Attempting in 5 seconds...')
     setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
   })
+}
+
+/**
+* Parses a proof message and performs the required work for that message
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function processProofMessage (msg) {
+  if (msg !== null) {
+    let hashId = msg.content.toString()
+    redis.get(hashId, (err, res) => {
+      if (err) {
+        console.log(err)
+      } else {
+        console.log(res)
+      }
+    })
+  }
 }
 
 /**

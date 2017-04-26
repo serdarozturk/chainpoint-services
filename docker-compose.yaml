@@ -243,6 +243,7 @@ services:
       - ./data/redis:/data
     networks:
       - back-end
+      - front-end
 
   # Crate
   #

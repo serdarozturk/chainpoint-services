@@ -1,7 +1,12 @@
 const amqp = require('amqplib')
 const chainpointProofSchema = require('chainpoint-proof-json-schema')
+const async = require('async')
 
 require('dotenv').config()
+
+const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
+const r = require('redis')
+const redis = r.createClient(REDIS_CONNECT_URI)
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -20,6 +25,9 @@ const RMQ_WORK_IN_ETH_ROUTING_KEY = process.env.RMQ_WORK_IN_ETH_ROUTING_KEY || '
 
 // the topic exchange routing key for btc generation message consumption originating from btc anchor service
 const RMQ_WORK_IN_BTC_ROUTING_KEY = process.env.RMQ_WORK_IN_BTC_ROUTING_KEY || 'work.generator.btc'
+
+// the topic exchange routing key for message publishing bound for the api service for proof delivery
+const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.api'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -73,10 +81,42 @@ function generateCALProof (msg) {
     return
   }
 
-  console.log(JSON.stringify(proof))
+  var proofString = JSON.stringify(proof)
 
-  amqpChannel.ack(msg)
-  console.log(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
+  async.series([
+    // save proof to redis
+    (callback) => {
+      redis.set(messageObj.hash_id, proofString, (err, res) => {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    },
+    // publish 'ready' message for API service
+    (callback) => {
+      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(messageObj.hash_id), { persistent: true },
+        (err, ok) => {
+          if (err !== null) {
+            // An error as occurred publishing a message
+            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+            return callback(err)
+          } else {
+            // New message has been published
+            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+            return callback(null)
+          }
+        })
+    }
+  ],
+    (err) => {
+      if (err) {
+        // An error has occurred saving the proof and publishing the ready message, nack consumption of message
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message nacked')
+      } else {
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
+      }
+    })
 }
 function generateETHProof (msg) {
   console.log('building eth proof')
