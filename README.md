@@ -29,6 +29,9 @@ Build and install all Chainpoint service docker images in your Docker
 environment.
 
 ```
+# In dev build the base image first. docker-compose won't do this:
+cd node-base && docker build -t chainpoint/node-base:latest --no-cache=true .
+
 docker-compose build
 ```
 
