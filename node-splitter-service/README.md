@@ -28,25 +28,25 @@ The following are the descriptions of the configuration parameters:
 
 | Name           | Description  |
 | :------------- |:-------------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
-| RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating the web service
-| RMQ\_WORK\_OUT\_AGG\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the aggregation service 
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
-| RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI 
+| RMQ\_PREFETCH\_COUNT | the maximum number of messages sent over the channel that can be awaiting acknowledgement |
+| RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the api service |
+| RMQ\_WORK\_OUT\_AGG\_QUEUE       | the queue name for outgoing message to the aggregator service | 
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | the queue name for outgoing message to the proof state service |
+| RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI | 
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
 | Name           | Type         | Default | 
 | :------------- |:-------------|:-------------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
-| RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.splitter' | 
-| RMQ\_WORK\_OUT\_AGG\_ROUTING\_KEY       | string       | 'work.agg' |  
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string       | 'work.splitter.state' |  
+| RMQ\_PREFETCH\_COUNT      | integer      | 0 | 0 | - | 
+| RMQ\_WORK\_IN\_QUEUE      | string      | 'work.splitter' |  |  | 
+| RMQ\_WORK\_OUT\_AGG\_QUEUE       | string      | 'work.agg' |  |  | 
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | string      | 'work.state' |  |  | 
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 
 ## Data In
-The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable topic exchange within RabbitMQ. The routing key is defined by the RMQ\_WORK\_IN\_ROUTING\_KEY configuration parameter.
+The service will receive persistent hash object messages from a durable queue within RabbitMQ. The queue name is defined by the RMQ\_WORK\_IN\_QUEUE  configuration parameter.
 
 The following is an example of a hash object array message body: 
 ```json

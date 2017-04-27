@@ -28,32 +28,20 @@ The following are the descriptions of the configuration parameters:
 
 | Name           | Description  |
 | :------------- |:-------------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use |
-| RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from all other services |
-| RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from splitter service |
-| RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from aggregator service |
-| RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from calendar service |
-| RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from proof state service |
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service |
-| RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
-| RMQ\_WORK\_OUT\_ETH\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
-| RMQ\_WORK\_OUT\_BTC\_GEN\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof generator service |
+| RMQ\_PREFETCH\_COUNT | the maximum number of messages sent over the channel that can be awaiting acknowledgement |
+| RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the api service |
+| RMQ\_WORK\_OUT\_GEN\_QUEUE       | the queue name for outgoing message to the proof gen service | 
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | the queue name for outgoing message to the proof state service |
 | RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI |
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
 | Name           | Type         | Default | 
 | :------------- |:-------------|:-------------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | string       | 'work\_topic\_exchange' | 
-| RMQ\_WORK\_IN\_ROUTING\_KEY     | string       | 'work.*.state' | 
-| RMQ\_WORK\_IN\_SPLITTER\_ROUTING\_KEY     | string       | 'work.splitter.state' | 
-| RMQ\_WORK\_IN\_AGG\_ROUTING\_KEY     | string       | 'work.agg.state' | 
-| RMQ\_WORK\_IN\_CAL\_ROUTING\_KEY     | string       | 'work.cal.state' | 
-| RMQ\_WORK\_IN\_STATE\_ROUTING\_KEY     | string       | 'work.state.state' | 
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string       | 'work.state.state' |  
-| RMQ\_WORK\_OUT\_GEN\_CAL\_ROUTING\_KEY       | string       | 'work.generator.cal' |  
-| RMQ\_WORK\_OUT\_GEN\_ETH\_ROUTING\_KEY       | string       | 'work.generator.eth' |  
-| RMQ\_WORK\_OUT\_GEN\_BTC\_ROUTING\_KEY       | string       | 'work.generator.btc' |   
+| RMQ\_PREFETCH\_COUNT      | integer      | 10 | 0 | - | 
+| RMQ\_WORK\_IN\_QUEUE      | string      | 'work.state' |  |  | 
+| RMQ\_WORK\_OUT\_GEN\_QUEUE       | string      | 'work.gen' |  |  | 
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | string      | 'work.state' |  |  |   
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
 
 
@@ -199,7 +187,7 @@ In addition to storing state data, the proof state service also updates the hash
 
 
 ## Data Out 
-The service will publish proof ready messages and proof generation message to a durable topic exchange within RabbitMQ. The routing keys are defined by the RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY and RMQ\_WORK\_OUT\_CAL\_GEN\_ROUTING\_KEY configuration parameters.
+The service will publish proof ready messages and proof generation message to durable queues within RabbitMQ. The queue names are defined by the RMQ\_WORK\_OUT\_STATE\_QUEUE and RMQ\_WORK\_OUT\_GEN\_QUEUE configuration parameters.
 
 When consuming a calendar message, the proof state service will queue proof ready messages bound for the proof state service for each hash part of the aggregation event for that calendar message.
 

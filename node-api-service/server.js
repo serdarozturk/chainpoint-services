@@ -2,7 +2,8 @@ require('dotenv').config()
 const _ = require('lodash')
 const restify = require('restify')
 const corsMiddleware = require('restify-cors-middleware')
-const amqp = require('amqplib')
+const amqp = require('amqplib/callback_api')
+const async = require('async')
 
 require('dotenv').config()
 
@@ -17,14 +18,11 @@ const uuidv1 = require('uuid/v1')
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// The RabbitMQ exchange name
-const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+// The queue name for message consumption originating from proof gen service
+const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.api'
 
-// The topic exchange routing key for message consumption originating from proof gen service
-const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.api'
-
-// The RabbitMQ topic key for outgoing message to the splitter service
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.splitter'
+// The queue name for outgoing message to the splitter service
+const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.splitter'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -41,33 +39,44 @@ var amqpChannel = null
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then((conn) => {
-    conn.on('close', () => {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      amqpChannel = null
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    })
-    conn.createConfirmChannel().then((chan) => {
-      // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
-      console.log('Connection established')
-      chan.prefetch(RMQ_PREFETCH_COUNT)
-      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
-
-      // Continuously load the HASHES from RMQ with hash objects to process
-      return chan.assertQueue('', { durable: true }).then((q) => {
-        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, (msg) => {
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+        // Continuously load the HASHES from RMQ with hash objects to process)
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
           processProofMessage(msg)
         })
+        return callback(null)
       })
-    })
-  }).catch(() => {
-    // catch errors when attempting to establish connection
-    console.error('Cannot establish connection. Attempting in 5 seconds...')
-    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
   })
 }
 
@@ -86,6 +95,8 @@ function processProofMessage (msg) {
         console.log(res)
       }
     })
+    amqpChannel.ack(msg)
+    console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
   }
 }
 
@@ -236,13 +247,13 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
     (err, ok) => {
       if (err !== null) {
-        console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+        console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+        console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
       }
     })
 

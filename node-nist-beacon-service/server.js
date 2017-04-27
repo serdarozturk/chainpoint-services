@@ -8,7 +8,7 @@ const redis = r.createClient(REDIS_CONNECT_URI)
 const NIST_KEY_BASE = process.env.NIST_KEY_BASE || 'nist:'
 
 let retrieveLatest = () => {
-  beacon.last(function (err, res) {
+  beacon.last((err, res) => {
     if (err) {
       console.error(err)
     } else {
@@ -39,6 +39,6 @@ let retrieveLatest = () => {
 retrieveLatest()
 
 // Run every minute, at the top of the minute.
-setInterval(function () {
+setInterval(() => {
   if (new Date().getSeconds() === 0) retrieveLatest()
 }, 1000)

@@ -1,7 +1,7 @@
 const async = require('async')
 const _ = require('lodash')
 const MerkleTools = require('merkle-tools')
-const amqp = require('amqplib')
+const amqp = require('amqplib/callback_api')
 const uuidv1 = require('uuid/v1')
 
 require('dotenv').config()
@@ -15,14 +15,11 @@ const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// The name of the RabbitMQ topic exchange to use
-const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+// The queue name for message consumption originating from the aggregator service
+const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.cal'
 
-// The topic exchange routing key for message consumption originating from the aggregation service
-const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.cal'
-
-// The topic exchange routing key for message publishing bound for the proof state service
-const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.cal.state'
+// The queue name for outgoing message to the proof state service
+const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -54,34 +51,46 @@ let amqpChannel = null
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then((conn) => {
-    conn.on('close', () => {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      // channel is lost, reset to null
-      amqpChannel = null
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    })
-    conn.createConfirmChannel().then((chan) => {
-      // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
-      console.log('Connection established')
-      chan.prefetch(RMQ_PREFETCH_COUNT)
-      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
-
-      // Continuously load the AGGREGATION_ROOTS from RMQ with root objects to process
-      return chan.assertQueue('', { durable: true }).then((q) => {
-        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, (msg) => {
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        // un-acked messaged will be requeued, so clear all work in progress
+        AGGREGATION_ROOTS = TREES = []
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+        // Continuously load the AGGREGATION_ROOTS from RMQ with root objects to process
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
           consumeAggRootMessage(msg)
         })
+        return callback(null)
       })
-    })
-  }).catch(() => {
-    // catch errors when attempting to establish connection
-    console.error('Cannot establish connection. Attempting in 5 seconds...')
-    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
   })
 }
 
@@ -201,15 +210,15 @@ let finalize = () => {
             ]
           }
 
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(stateObj)), { persistent: true },
+          amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
+                console.error(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
+                console.log(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -234,7 +243,7 @@ let finalize = () => {
           // nack consumption of all original hash messages part of this aggregation event
           if (message !== null) {
             amqpChannel.nack(message)
-            console.error(RMQ_WORK_IN_ROUTING_KEY, 'consume message nacked')
+            console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
           }
         })
       } else {
@@ -242,7 +251,7 @@ let finalize = () => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.log(RMQ_WORK_IN_ROUTING_KEY, 'consume message acked')
+            console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
           }
         })
       }

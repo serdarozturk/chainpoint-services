@@ -1,4 +1,4 @@
-const amqp = require('amqplib')
+const amqp = require('amqplib/callback_api')
 const chainpointProofSchema = require('chainpoint-proof-json-schema')
 const async = require('async')
 
@@ -11,23 +11,11 @@ const redis = r.createClient(REDIS_CONNECT_URI)
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// the name of the RabbitMQ topic exchange to use
-const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+// The queue name for message consumption originating from the proof state service
+const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.gen'
 
-// the topic exchange routing key for all message consumption originating from proof state services
-const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.generator.*'
-
-// the topic exchange routing key for cal generation message consumption originating from calendar service
-const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.generator.cal'
-
-// the topic exchange routing key for eth generation message consumption originating from ethereum anchor service
-const RMQ_WORK_IN_ETH_ROUTING_KEY = process.env.RMQ_WORK_IN_ETH_ROUTING_KEY || 'work.generator.eth'
-
-// the topic exchange routing key for btc generation message consumption originating from btc anchor service
-const RMQ_WORK_IN_BTC_ROUTING_KEY = process.env.RMQ_WORK_IN_BTC_ROUTING_KEY || 'work.generator.btc'
-
-// the topic exchange routing key for message publishing bound for the api service for proof delivery
-const RMQ_WORK_OUT_ROUTING_KEY = process.env.RMQ_WORK_OUT_ROUTING_KEY || 'work.api'
+// The queue name for outgoing message to the api service
+const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.api'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -77,7 +65,7 @@ function generateCALProof (msg) {
     // We are not nacking here because the poorly formatted proof would just be
     // re-qeueud and re-processed on and on forever
     amqpChannel.ack(msg)
-    console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked, but with invalid JSON schema error')
+    console.error(RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
     return
   }
 
@@ -93,15 +81,15 @@ function generateCALProof (msg) {
     },
     // publish 'ready' message for API service
     (callback) => {
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, Buffer.from(messageObj.hash_id), { persistent: true },
+      amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(messageObj.hash_id), { persistent: true },
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
-            console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')
+            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
             return callback(err)
           } else {
             // New message has been published
-            console.log(RMQ_WORK_OUT_ROUTING_KEY, 'publish message acked')
+            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -111,10 +99,10 @@ function generateCALProof (msg) {
       if (err) {
         // An error has occurred saving the proof and publishing the ready message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message nacked')
+        console.error(RMQ_WORK_IN_QUEUE, '[cal] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_CAL_ROUTING_KEY, 'consume message acked')
+        console.log(RMQ_WORK_IN_QUEUE, '[cal] consume message acked')
       }
     })
 }
@@ -158,22 +146,22 @@ function addCalendarBranch (proof, aggState, calState) {
 function processMessage (msg) {
   if (msg !== null) {
     // determine the source of the message and handle appropriately
-    switch (msg.fields.routingKey) {
-      case RMQ_WORK_IN_CAL_ROUTING_KEY:
+    switch (msg.properties.type) {
+      case 'cal':
         // Consumes a generate calendar proof message
         generateCALProof(msg)
         break
-      case RMQ_WORK_IN_ETH_ROUTING_KEY:
+      case 'eth':
         // Consumes a generate eth anchor proof message
         generateETHProof(msg)
         break
-      case RMQ_WORK_IN_BTC_ROUTING_KEY:
+      case 'btc':
         // Consumes a generate btc anchor proof message
         generateBTCProof(msg)
         break
       default:
-        // This is an unknown state type, unknown routing key
-        console.error('Unknown state type or routing key', msg.fields.routingKey)
+        // This is an unknown state type
+        console.error('Unknown state type', msg.properties.type)
     }
   }
 }
@@ -185,34 +173,44 @@ function processMessage (msg) {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then((conn) => {
-    conn.on('close', () => {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      // channel is lost, reset to null
-      amqpChannel = null
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    })
-    conn.createConfirmChannel().then((chan) => {
-      // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
-      console.log('Connection established')
-      chan.prefetch(RMQ_PREFETCH_COUNT)
-      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
-
-      // Continuously load the HASHES from RMQ with hash objects to process
-      return chan.assertQueue('', { durable: true }).then((q) => {
-        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, (msg) => {
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+        // Continuously load the HASHES from RMQ with hash objects to process
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
           processMessage(msg)
         })
+        return callback(null)
       })
-    })
-  }).catch(() => {
-    // catch errors when attempting to establish connection
-    console.error('Cannot establish rmq connection. Attempting in 5 seconds...')
-    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
   })
 }
 

@@ -1,4 +1,4 @@
-const amqp = require('amqplib')
+const amqp = require('amqplib/callback_api')
 const async = require('async')
 const _ = require('lodash')
 const sb = require('satoshi-bitcoin')
@@ -15,11 +15,11 @@ const requestify = require('requestify')
 const coreCacheTransporters = requestify.coreCacheTransporters
 requestify.cacheTransporter(coreCacheTransporters.redis(redis))
 
-// The name of the RabbitMQ topic exchange to use
-const RMQ_EXCHANGE_NAME = process.env.RMQ_EXCHANGE_NAME || 'work_topic_exchange'
+// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// The topic exchange routing key for message publishing bound for the BTC transaction service
-const RMQ_ROUTING_KEY = process.env.RMQ_ROUTING_KEY || 'btc.rec_fee'
+// The queue name for outgoing message to the btc tx service
+const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.btctx'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -110,13 +110,16 @@ let getRecommendedFees = () => {
 
       // Also publish the recommended transaction fee data onto an RMQ
       // route that can be consumed by any interested services.
-      let msg = Buffer.from(JSON.stringify(feeRecObj))
-      amqpChannel.publish(RMQ_EXCHANGE_NAME, RMQ_ROUTING_KEY, msg, (err, ok) => {
-        if (err !== null) {
-          console.error('RMQ publish failed : %s', JSON.stringify(err))
-          process.exit(1)
-        }
-      })
+      amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(feeRecObj)), { persistent: true },
+        (err, ok) => {
+          if (err !== null) {
+            // An error as occurred publishing a message
+            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+          } else {
+            // New message has been published
+            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
+          }
+        })
     } else {
       // Bail out and let the service get restarted
       console.error('unexpected return value : %s', JSON.stringify(responseBody))
@@ -136,26 +139,38 @@ let getRecommendedFees = () => {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then((conn) => {
-    conn.on('close', () => {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      console.error('RMQ connection closed. Reconnecting in 5 seconds...')
-      // channel is lost, reset to null
-      amqpChannel = null
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
+        amqpChannel = chan
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    })
-
-    conn.createConfirmChannel().then((chan) => {
-      // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
-      console.log('RMQ connection established')
-      chan.assertExchange(RMQ_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
-    })
-  }).catch(() => {
-    // catch errors when attempting to establish connection
-    console.error('Cannot establish connection. Attempting in 5 seconds...')
-    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
   })
 }
 

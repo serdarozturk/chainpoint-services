@@ -1,4 +1,4 @@
-const amqp = require('amqplib')
+const amqp = require('amqplib/callback_api')
 const async = require('async')
 
 const storageClient = require('./storage-adapters/crate.js')
@@ -8,35 +8,14 @@ require('dotenv').config()
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 10
 
-// the name of the RabbitMQ topic exchange to use
-const RMQ_WORK_EXCHANGE_NAME = process.env.RMQ_WORK_EXCHANGE_NAME || 'work_topic_exchange'
+// The queue name for message consumption originating from the splitter, aggregator, calendar, and proof state services
+const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.state'
 
-// the topic exchange routing key for message consumption originating from all other services
-const RMQ_WORK_IN_ROUTING_KEY = process.env.RMQ_WORK_IN_ROUTING_KEY || 'work.*.state'
+// The queue name for outgoing message to the proof state service
+const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
 
-// the topic exchange routing key for message consumption originating from splitter service
-const RMQ_WORK_IN_SPLITTER_ROUTING_KEY = process.env.RMQ_WORK_IN_SPLITTER_ROUTING_KEY || 'work.splitter.state'
-
-// the topic exchange routing key for message consumption originating from aggregator service
-const RMQ_WORK_IN_AGG_ROUTING_KEY = process.env.RMQ_WORK_IN_AGG_ROUTING_KEY || 'work.agg.state'
-
-// the topic exchange routing key for message consumption originating from calendar service
-const RMQ_WORK_IN_CAL_ROUTING_KEY = process.env.RMQ_WORK_IN_CAL_ROUTING_KEY || 'work.cal.state'
-
-// the topic exchange routing key for message consumption originating from proof state service
-const RMQ_WORK_IN_STATE_ROUTING_KEY = process.env.RMQ_WORK_IN_STATE_ROUTING_KEY || 'work.state.state'
-
-// the topic exchange routing key for message publishing bound for the proof state service for proof state data retrieval
-const RMQ_WORK_OUT_STATE_ROUTING_KEY = process.env.RMQ_WORK_OUT_STATE_ROUTING_KEY || 'work.state.state'
-
-// the topic exchange routing key for message publishing bound for the proof generation service for calendar generation
-const RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY = process.env.RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY || 'work.generator.cal'
-
-// the topic exchange routing key for message publishing bound for the proof generation service for eth anchor generation
-const RMQ_WORK_OUT_ETH_GEN_ROUTING_KEY = process.env.RMQ_WORK_OUT_ETH_GEN_ROUTING_KEY || 'work.generator.eth'
-
-// the topic exchange routing key for message publishing bound for the proof generation service for btc anchor generation
-const RMQ_WORK_OUT_BTC_GEN_ROUTING_KEY = process.env.RMQ_WORK_OUT_BTC_GEN_ROUTING_KEY || 'work.generator.btc'
+// The queue name for outgoing message to the proof gen service
+const RMQ_WORK_OUT_GEN_QUEUE = process.env.RMQ_WORK_OUT_GEN_QUEUE || 'work.gen'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -56,11 +35,11 @@ function ConsumeSplitterMessage (msg) {
   storageClient.logSplitterEventForHashId(messageObj.hash_id, messageObj.hash, (err, success) => {
     if (err) {
       amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
+      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
     } else {
       // vent has been logged, ack consumption of original message
       amqpChannel.ack(msg)
-      console.log(msg.fields.routingKey, 'consume message acked')
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
     }
   })
 }
@@ -97,11 +76,11 @@ function ConsumeAggregationMessage (msg) {
   ], (err) => {
     if (err) {
       amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
+      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
     } else {
       // New message has been published and event logged, ack consumption of original message
       amqpChannel.ack(msg)
-      console.log(msg.fields.routingKey, 'consume message acked')
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
     }
   })
 }
@@ -128,7 +107,6 @@ function ConsumeCalendarMessage (msg) {
       storageClient.getHashIdCountByAggId(stateObj.agg_id, (err, count) => {
         if (err) return callback(err)
         if (count < stateObj.agg_hash_count) return callback('unable to read all hash data')
-        console.log(count, stateObj.agg_hash_count)
         return callback(null)
       })
     },
@@ -153,13 +131,15 @@ function ConsumeCalendarMessage (msg) {
         dataOutObj.type = 'cal'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
-        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true },
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
           (err, ok) => {
-            if (err) {
-              console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
               return eachCallback(err)
             } else {
-              console.log(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message acked')
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
               return eachCallback(null)
             }
           })
@@ -177,16 +157,16 @@ function ConsumeCalendarMessage (msg) {
         // until the data is read, in cases of hash data not being fully readable yet
         setTimeout(() => {
           amqpChannel.nack(msg)
-          console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
+          console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
         }, 1000)
       } else {
         amqpChannel.nack(msg)
-        console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
+        console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
       }
     } else {
       // New messages have been published, ack consumption of original message
       amqpChannel.ack(msg)
-      console.log(msg.fields.routingKey, 'consume message acked')
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
     }
   })
 }
@@ -227,14 +207,16 @@ function ConsumeProofReadyMessage (msg) {
           dataOutObj.cal_state = JSON.parse(calStateObj.cal_state)
 
           // Publish a proof data object for consumption by the proof generation service
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true },
+          amqpChannel.sendToQueue(RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'cal' },
             (err, ok) => {
-              if (err) {
-                console.error(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message nacked')
+              if (err !== null) {
+                // An error as occurred publishing a message
+                console.error(RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
                 return callback(err)
               } else {
-                console.log(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message acked')
-                return callback(null, dataOutObj.hash_id)
+                // New message has been published
+                console.log(RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
+                return callback(null, aggStateObj.hash_id)
               }
             })
         },
@@ -250,11 +232,11 @@ function ConsumeProofReadyMessage (msg) {
           console.error('error consuming proof ready message', err)
           // An error as occurred consuming a message, nack consumption of original message
           amqpChannel.nack(msg)
-          console.error(msg.fields.routingKey, 'consume message nacked - ' + JSON.stringify(err))
+          console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
         } else {
           // Proof ready message has been consumed, ack consumption of original message
           amqpChannel.ack(msg)
-          console.log(msg.fields.routingKey, 'consume message acked')
+          console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
         }
       })
       break
@@ -272,30 +254,30 @@ function ConsumeProofReadyMessage (msg) {
 function processMessage (msg) {
   if (msg !== null) {
     // determine the source of the message and handle appropriately
-    switch (msg.fields.routingKey) {
-      case RMQ_WORK_IN_SPLITTER_ROUTING_KEY:
+    switch (msg.properties.type) {
+      case 'splitter':
         // Consumes a state message from the Splitter service
         // Logs event in hash tracker
         ConsumeSplitterMessage(msg)
         break
-      case RMQ_WORK_IN_AGG_ROUTING_KEY:
+      case 'aggregator':
         // Consumes a state message from the Aggregator service
         // Stores state information and logs event in hash tracker
         ConsumeAggregationMessage(msg)
         break
-      case RMQ_WORK_IN_CAL_ROUTING_KEY:
+      case 'cal':
         // Consumes a state message from the Calendar service
         // Stores state information and publishes proof ready messages bound for the proof state service
         ConsumeCalendarMessage(msg)
         break
-      case RMQ_WORK_IN_STATE_ROUTING_KEY:
+      case 'state':
         // Consumes a proof ready message from the proof state service
         // Retrieves all proof state data for a given hash, publishes message bound for the proof generator service, and logs event in hash tracker
         ConsumeProofReadyMessage(msg)
         break
       default:
-        // This is an unknown state type, unknown routing key
-        console.error('Unknown state type or routing key', msg.fields.routingKey)
+        // This is an unknown state type
+        console.error('Unknown state type', msg.properties.type)
     }
   }
 }
@@ -307,33 +289,45 @@ function processMessage (msg) {
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
 function amqpOpenConnection (connectionString) {
-  amqp.connect(connectionString).then((conn) => {
-    conn.on('close', () => {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-      amqpChannel = null
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    })
-    conn.createConfirmChannel().then((chan) => {
-      // the connection and channel have been established
-      // set 'amqpChannel' so that publishers have access to the channel
-      console.log('Connection established')
-      chan.prefetch(RMQ_PREFETCH_COUNT)
-      chan.assertExchange(RMQ_WORK_EXCHANGE_NAME, 'topic', { durable: true })
-      amqpChannel = chan
-
-      // Continuously load the HASHES from RMQ with hash objects to process
-      return chan.assertQueue('', { durable: true }).then((q) => {
-        chan.bindQueue(q.queue, RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_IN_ROUTING_KEY)
-        return chan.consume(q.queue, (msg) => {
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_GEN_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+        // Continuously load the HASHES from RMQ with hash objects to process
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
           processMessage(msg)
         })
+        return callback(null)
       })
-    })
-  }).catch(() => {
-    // catch errors when attempting to establish connection
-    console.error('Cannot establish rmq connection. Attempting in 5 seconds...')
-    setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
   })
 }
 

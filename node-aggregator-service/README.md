@@ -28,23 +28,23 @@ The following are the descriptions of the configuration parameters:
 
 | Name           | Description  |
 | :------------- |:-------------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | the name of the RabbitMQ topic exchange to use 
-| RMQ\_WORK\_IN\_ROUTING\_KEY     | the topic exchange routing key for message consumption originating from proof state service
-| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the calendar service 
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | the topic exchange routing key for message publishing bound for the proof state service 
-| AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds 
-| HASHES\_PER\_MERKLE_TREE     | maximum number of hashes the aggregation process will consume per aggregation interval 
-| FINALIZE_INTERVAL       | how often the finalize process should run, in milliseconds 
-| RABBITMQ\_CONNECT\_URI       | RabbitMQ connection URI
+| RMQ\_PREFETCH\_COUNT | the maximum number of messages sent over the channel that can be awaiting acknowledgement |
+| RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the splitter service |
+| RMQ\_WORK\_OUT\_CAL\_QUEUE       | the queue name for outgoing message to the calendar service |
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | the queue name for outgoing message to the proof state service |
+| AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds | 
+| HASHES\_PER\_MERKLE_TREE     | maximum number of hashes the aggregation process will consume per aggregation interval | 
+| FINALIZE_INTERVAL       | how often the finalize process should run, in milliseconds | 
+| RABBITMQ\_CONNECT\_URI       | RabbitMQ connection URI |
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
 | Name           | Type         | Default | Min | Max |
 | :------------- |:-------------|:-------------|:----|:--------|
-| RMQ\_WORK\_EXCHANGE\_NAME       | string      | 'work\_topic\_exchange' |  |  | 
-| RMQ\_WORK\_IN\_ROUTING\_KEY       | string      | 'work.agg' |  |  | 
-| RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY       | string      | 'work.cal' |  |  | 
-| RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY       | string      | 'work.agg.state' |  |  | 
+| RMQ\_PREFETCH\_COUNT      | integer      | 0 | 0 | - | 
+| RMQ\_WORK\_IN\_QUEUE      | string      | 'work.agg' |  |  | 
+| RMQ\_WORK\_OUT\_CAL\_QUEUE       | string      | 'work.cal' |  |  | 
+| RMQ\_WORK\_OUT\_STATE\_QUEUE       | string      | 'work.state' |  |  | 
 | AGGREGATION_INTERVAL       | integer       | 1,000 | 250 | 10,000 | 
 | HASHES\_PER\_MERKLE_TREE     | integer       | 1,000 | 100 | 25,000 | 
 | FINALIZE_INTERVAL       | integer       | 250 | 250 | 10,000 | 
@@ -54,7 +54,7 @@ Any values provided outside accepted ranges will result in service failure.
 
 
 ## Data In
-The service will receive persistent hash object messages via a subscription to a durable queue bound to a durable topic exchange within RabbitMQ. The routing key is defined by the RMQ\_WORK\_IN\_ROUTING\_KEY configuration parameter.
+The service will receive persistent hash object messages from a durable queue within RabbitMQ. The queue name is defined by the RMQ\_WORK\_IN\_QUEUE  configuration parameter.
 
 The following is an example of a hash object message body: 
 ```json
@@ -115,7 +115,7 @@ Once all these fields are populated for this object, it is added to the TREES ar
 
 
 ## Data Out [finalize]
-This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will publish proof state information and aggregation events in persistent state object messages to a durable topic exchange within RabbitMQ. The routing keys are defined by the RMQ\_WORK\_OUT\_STATE\_ROUTING\_KEY and RMQ\_WORK\_OUT\_CAL\_ROUTING\_KEY configuration parameters.
+This process is executed at the interval defined by the FINALIZE\_INTERVAL configuration parameter. The service will publish proof state information and aggregation events in persistent state object messages to durable queues within RabbitMQ. The queue names are defined by the RMQ\_WORK\_OUT\_STATE\_QUEUE and RMQ\_WORK\_OUT\_CAL\_QUEUE configuration parameters.
 
 The finalize method will loop through and process every treeData object ready for finalization in the TREES array. For each hash and proof in each tree, a proof state object message is constructed and queued for the proof state service to consume.
 
