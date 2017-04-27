@@ -153,7 +153,7 @@ function ConsumeCalendarMessage (msg) {
         dataOutObj.type = 'cal'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
-        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true },
           (err, ok) => {
             if (err) {
               console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')
@@ -227,7 +227,7 @@ function ConsumeProofReadyMessage (msg) {
           dataOutObj.cal_state = JSON.parse(calStateObj.cal_state)
 
           // Publish a proof data object for consumption by the proof generation service
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, new Buffer(JSON.stringify(dataOutObj)), { persistent: true },
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true },
             (err, ok) => {
               if (err) {
                 console.error(RMQ_WORK_OUT_CAL_GEN_ROUTING_KEY, 'publish message nacked')

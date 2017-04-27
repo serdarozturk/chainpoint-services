@@ -236,7 +236,7 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
     (err, ok) => {
       if (err !== null) {
         console.error(RMQ_WORK_OUT_ROUTING_KEY, 'publish message nacked')

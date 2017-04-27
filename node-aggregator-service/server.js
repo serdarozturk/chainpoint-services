@@ -216,7 +216,7 @@ let finalize = () => {
           stateObj.agg_state = {}
           stateObj.agg_state.ops = proofDataItem.proof
 
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(stateObj)), { persistent: true },
            (err, ok) => {
              if (err !== null) {
                 // An error as occurred publishing a message
@@ -248,7 +248,7 @@ let finalize = () => {
         aggObj.agg_root = treeDataObj.agg_root
         aggObj.agg_hash_count = treeDataObj.agg_hash_count
 
-        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, new Buffer(JSON.stringify(aggObj)), { persistent: true },
+        amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_CAL_ROUTING_KEY, Buffer.from(JSON.stringify(aggObj)), { persistent: true },
            (err, ok) => {
              if (err !== null) {
               // An error as occurred publishing a message

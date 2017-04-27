@@ -73,7 +73,7 @@ function consumeHashMessage (msg) {
       async.series([
         (seriesCallback) => {
           // Send this hash object message to the aggregator service
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGG_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_AGG_ROUTING_KEY, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
             (err, ok) => {
               if (err !== null) {
                 console.error(RMQ_WORK_OUT_AGG_ROUTING_KEY, 'publish message nacked')
@@ -86,7 +86,7 @@ function consumeHashMessage (msg) {
         },
         // Send this hash object message to the proof state service for the tracking log
         (seriesCallback) => {
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(hashObj)), { persistent: true },
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
             (err, ok) => {
               if (err !== null) {
                 console.error(RMQ_WORK_OUT_STATE_ROUTING_KEY, 'publish message nacked')

@@ -201,7 +201,7 @@ let finalize = () => {
             ]
           }
 
-          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, new Buffer(JSON.stringify(stateObj)), { persistent: true },
+          amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_STATE_ROUTING_KEY, Buffer.from(JSON.stringify(stateObj)), { persistent: true },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message

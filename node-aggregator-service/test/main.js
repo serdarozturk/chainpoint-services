@@ -18,7 +18,7 @@ describe('Consume Hash Messages', () => {
   it('should generate one state object with a one hash message', (done) => {
     server.setHASHES([])
     let msg = {}
-    msg.content = new Buffer(JSON.stringify({
+    msg.content = Buffer.from(JSON.stringify({
       'hash_id': '6d627180-1883-11e7-a8f9-edb8c212ef23',
       'hash': 'ed10960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4'
     }))
@@ -51,7 +51,7 @@ describe('Aggregate', () => {
   it('should create one leaf tree with one hash', (done) => {
     server.setAMQPChannel({})
     let msg = {}
-    msg.content = new Buffer(JSON.stringify({
+    msg.content = Buffer.from(JSON.stringify({
       'hash_id': '6d627180-1883-11e7-a8f9-edb8c212ef23',
       'hash': 'ed10960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4'
     }))
@@ -81,7 +81,7 @@ describe('Aggregate', () => {
   it('should create three leaf tree with three hashes', (done) => {
     server.setAMQPChannel({})
     let msg1 = {}
-    msg1.content = new Buffer(JSON.stringify({
+    msg1.content = Buffer.from(JSON.stringify({
       'hash_id': '6d627180-1883-11e7-a8f9-edb8c212ef23',
       'hash': 'ed10960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4'
     }))
@@ -91,7 +91,7 @@ describe('Aggregate', () => {
       'msg': msg1
     }
     let msg2 = {}
-    msg2.content = new Buffer(JSON.stringify({
+    msg2.content = Buffer.from(JSON.stringify({
       'hash_id': '22627180-1883-11e7-a8f9-edb8c212ef23',
       'hash': '2210960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4'
     }))
@@ -101,7 +101,7 @@ describe('Aggregate', () => {
       'msg': msg2
     }
     let msg3 = {}
-    msg3.content = new Buffer(JSON.stringify({
+    msg3.content = Buffer.from(JSON.stringify({
       'hash_id': '33627180-1883-11e7-a8f9-edb8c212ef23',
       'hash': '3310960ccc613e4ad0533a813e2027924afd051f5065bb5379a80337c69afcb4'
     }))

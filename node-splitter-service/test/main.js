@@ -29,7 +29,7 @@ describe('Consume Hash Messages', () => {
       results: []
     })
     let msg = {}
-    msg.content = new Buffer(JSON.stringify({
+    msg.content = Buffer.from(JSON.stringify({
       hashes: [
         {
           'hash_id': '6d627180-1883-11e7-a8f9-edb8c212ef23',
@@ -56,7 +56,7 @@ describe('Consume Hash Messages', () => {
       results: []
     })
     let msg = {}
-    msg.content = new Buffer(JSON.stringify({
+    msg.content = Buffer.from(JSON.stringify({
       hashes: [
         {
           'hash_id': '6d627180-1883-11e7-a8f9-edb8c212ef23',

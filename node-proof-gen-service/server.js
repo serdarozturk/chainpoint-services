@@ -93,7 +93,7 @@ function generateCALProof (msg) {
     },
     // publish 'ready' message for API service
     (callback) => {
-      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, new Buffer(messageObj.hash_id), { persistent: true },
+      amqpChannel.publish(RMQ_WORK_EXCHANGE_NAME, RMQ_WORK_OUT_ROUTING_KEY, Buffer.from(messageObj.hash_id), { persistent: true },
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message

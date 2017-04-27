@@ -110,7 +110,7 @@ let getRecommendedFees = () => {
 
       // Also publish the recommended transaction fee data onto an RMQ
       // route that can be consumed by any interested services.
-      let msg = new Buffer(JSON.stringify(feeRecObj))
+      let msg = Buffer.from(JSON.stringify(feeRecObj))
       amqpChannel.publish(RMQ_EXCHANGE_NAME, RMQ_ROUTING_KEY, msg, (err, ok) => {
         if (err !== null) {
           console.error('RMQ publish failed : %s', JSON.stringify(err))
