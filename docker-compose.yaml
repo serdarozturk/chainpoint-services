@@ -67,6 +67,24 @@ services:
     networks:
       - back-end
 
+  # NIST Beacon
+  # Retrieve and store current NIST Beacon records
+  # 
+  # SCALED: false
+  #
+  # PORTS : none
+  #
+  nist-beacon:
+    restart: always
+    image: chainpoint/node-nist-beacon-service
+    container_name: nist-beacon
+    build:
+      context: ./node-nist-beacon-service
+    depends_on:
+      - redis
+    networks:
+      - back-end
+
   # Calendar
   # Aggregate Merkle roots from the `aggregator` service instances
   # and write them to the Calendar event/block chains.
@@ -83,6 +101,7 @@ services:
       context: ./node-calendar-service
     depends_on:
       - rabbitmq
+      - nist-beacon
     networks:
       - back-end
 
@@ -101,6 +120,7 @@ services:
       context: ./node-btc-tx-service
     depends_on:
       - rabbitmq
+      - btc-fee
     networks:
       - back-end
 
@@ -154,6 +174,7 @@ services:
       context: ./node-proof-state-service
     depends_on:
       - rabbitmq
+      - crate
     networks:
       - back-end
 
