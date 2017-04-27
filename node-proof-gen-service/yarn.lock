@@ -117,6 +117,10 @@ string_decoder@~0.10.x:
   version "0.10.31"
   resolved "https://registry.yarnpkg.com/string_decoder/-/string_decoder-0.10.31.tgz#62e203bc41766c6c28c9fc84301dab1c5310fa94"
 
+uuid-time@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/uuid-time/-/uuid-time-1.0.0.tgz#8bb18fa7089987ef25b0c4047190133cfa3a14c6"
+
 xtend@^4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/xtend/-/xtend-4.0.1.tgz#a5c6d532be656e23db820efb943a1f04998d63af"
