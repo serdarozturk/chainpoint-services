@@ -17,7 +17,8 @@
     "redis": "^2.7.1",
     "restify": "^4.3.0",
     "restify-cors-middleware": "^0.0.8",
-    "uuid": "^3.0.1"
+    "uuid": "^3.0.1",
+    "uuid-validate": "^0.0.2"
   },
   "devDependencies": {
     "chai": "^3.5.0",

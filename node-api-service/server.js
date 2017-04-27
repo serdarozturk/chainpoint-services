@@ -15,6 +15,8 @@ const redis = r.createClient(REDIS_CONNECT_URI)
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
+const uuidValidate = require('uuid-validate')
+
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
@@ -269,10 +271,26 @@ function postHashesV1 (req, res, next) {
  * Returns a chainpoint proof for the requested Hash ID
  */
 function getProofByIDV1 (req, res, next) {
-  // isUUID.v1()
-  // uuidTime(v1)
-  res.send({ proof: true })
-  return next()
+  // validate id param is present
+  if (!req.params || !req.params.id) {
+    return next(new restify.InvalidArgumentError('invalid request, missing id'))
+  }
+  // validate id param is proper UUIDv1
+  if (!uuidValidate(req.params.id, 1)) {
+    return next(new restify.InvalidArgumentError('invalid request, bad id'))
+  }
+
+  let hashId = req.params.id
+
+  redis.get(hashId, (err, proof) => {
+    if (err) {
+      return next(new restify.BadGatewayError(err))
+    } else {
+      if (proof == null) return next(new restify.NotFoundError('proof not found'))
+      res.send(JSON.parse(proof))
+      return next()
+    }
+  })
 }
 
 /**
