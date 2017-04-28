@@ -4,6 +4,7 @@ const restify = require('restify')
 const corsMiddleware = require('restify-cors-middleware')
 const amqp = require('amqplib/callback_api')
 const async = require('async')
+const uuidTime = require('uuid-time')
 
 require('dotenv').config()
 
@@ -28,6 +29,9 @@ const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.splitter'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
+// Lifespan of stored proofs, in minutes
+const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -278,6 +282,14 @@ function getProofByIDV1 (req, res, next) {
   // validate id param is proper UUIDv1
   if (!uuidValidate(req.params.id, 1)) {
     return next(new restify.InvalidArgumentError('invalid request, bad id'))
+  }
+  // validate uuid time is in in valid range
+  let uuidEpoch = uuidTime.v1(req.params.id)
+  var nowEpoch = new Date().getTime()
+  let uuidDiff = nowEpoch - uuidEpoch
+  let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+  if (uuidDiff > maxDiff) {
+    return next(new restify.InvalidArgumentError('invalid request, uuid time past expiration'))
   }
 
   let hashId = req.params.id

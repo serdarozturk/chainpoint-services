@@ -21,6 +21,9 @@ const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.api'
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
+// Lifespan of stored proofs, in minutes
+const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
+
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
@@ -59,7 +62,7 @@ function generateCALProof (msg) {
   async.series([
     // save proof to redis
     (callback) => {
-      redis.set(messageObj.hash_id, proofString, (err, res) => {
+      redis.set(messageObj.hash_id, proofString, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
         if (err) return callback(err)
         return callback(null)
       })
