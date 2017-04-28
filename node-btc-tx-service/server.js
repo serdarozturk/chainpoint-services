@@ -3,6 +3,47 @@ const _ = require('lodash')
 const bcoin = require('bcoin')
 require('dotenv').config()
 
+
+var Peer = bcoin.net.Peer;
+var NetAddress = bcoin.primitives.NetAddress;
+var Network = bcoin.protocol.Network;
+
+
+let broadcastTx = (tx) => {
+
+
+  var network = Network.get('testnet');
+
+  var peer, addr;
+
+  peer = Peer.fromOptions({
+    network: 'testnet',
+    agent: 'my-subversion',
+    hasWitness: function () {
+      return false;
+    }
+  });
+
+  addr = NetAddress.fromHostname(process.env.BROADCAST_PEER, 'testnet');
+
+
+  return new Promise((resolve, reject) => {
+
+    peer.connect(addr);
+    peer.tryOpen();
+
+    peer.on('error', function (err) {
+      reject(err);
+    });
+
+
+    peer.on('open', function () {
+      peer.announceTX([tx]);
+      resolve(tx);
+    });
+  })
+}
+
 // just a temp function
 let finalize = () => {
 
