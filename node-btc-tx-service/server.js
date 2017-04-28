@@ -44,6 +44,35 @@ let broadcastTx = (tx) => {
   })
 }
 
+let genTx = (merkleRoot, spendable_ouputs, master, change_path, txfee ) =>{
+
+var keyring = bcoin.keyring()
+var coins = [];
+
+for (var output in spendable_ouputs) {
+  keyring.add(master.derive(output.path))
+  var coin = bcoin.coin.fromTX(output.tx, output.idx, output.height);
+  coins.push(coin);
+}
+
+var mtx = new bcoin.mtx();
+
+
+mtx.addOutput(bcoin.Script.fromNullData(merkle_root),null);
+
+return mtx.fund(coins, {
+  rate:TXFEE,
+  changeAddress: master.derive(change_path).toAddress()
+  }).then(
+    ()=>{
+      mtx.sign(keyring);
+      assert(mtx.verify());
+      var tx = mtx.toTX();
+      return tx
+    }
+  )
+}
+
 // just a temp function
 let finalize = () => {
 
@@ -60,37 +89,7 @@ const TXAMOUNT = parseInt(process.evn.TXFEE);
 
 //TODO get UTXO from somewhere
 //UTXO should store a tx, spendable indexes, path value, a key id, and a blockheight
-
-let utxos = []
-
-var keyring = bcoin.keyring()
-var coins = [];
-
-//Store a path with each transactions so we can derive the appropiate private key
-for (var utxo in utxos) {
-  keyring.add(master.derive(utxo.path))
-  var coin = bcoin.coin.fromTX(utxo.tx, utxo.idx, utxo.height);
-  coins.push(coin);
-}
-
-var mtx = new bcoin.mtx();
-
-//TODO Get the next path from somewhere
-const change_path = "increment path somehow"
-
-mtx.addOutput(bcoin.Script.fromNullData(merkle_root),null);
-
-mtx.fund(coins, {
-  rate:TXFEE,
-  changeAddress: master.derive(change_path)
-  }).then(
-    ()=>{
-      mtx.sign(keyring);
-      assert(mtx.verify());
-      var tx = mtx.toTX();
-      return tx
-    }
-  ).then((tx)=>{
+genTx(merkleRoot,spendable,master,changepath,TXFEE ).then((tx)=>{
     return broadcastTx(tx); //TODO
   }).then(()=>{
     return pushTxIntoFullNodeMonitoring(tx); //TODO
@@ -102,3 +101,8 @@ mtx.fund(coins, {
 }
 
 setInterval(() => finalize(), 1000)
+
+//Export for unit tests
+module.exports={
+  genTx:genTx
+}
