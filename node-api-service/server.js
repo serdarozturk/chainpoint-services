@@ -18,7 +18,7 @@ const uuidv1 = require('uuid/v1')
 
 const uuidValidate = require('uuid-validate')
 
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
+// The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
 // The queue name for message consumption originating from proof gen service
@@ -30,8 +30,11 @@ const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.splitter'
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-// Lifespan of stored proofs, in minutes
+// The lifespan of stored proofs, in minutes
 const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
+
+// The maximum number of proofs that can be requested in one GET /proofs request
+const GET_PROOFS_MAX = process.env.GET_PROOFS_MAX || 250
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -274,34 +277,49 @@ function postHashesV1 (req, res, next) {
  *
  * Returns a chainpoint proof for the requested Hash ID
  */
-function getProofByIDV1 (req, res, next) {
-  // validate id param is present
-  if (!req.params || !req.params.id) {
-    return next(new restify.InvalidArgumentError('invalid request, missing id'))
+function getProofsByIDV1 (req, res, next) {
+  let hashIdResults = []
+  // check if id parameter was included
+  if (req.params && req.params.id) {
+    // an id was specified in the url, so use that hash id only
+    hashIdResults.push(req.params.id)
+  } else if (req.headers && req.headers.ids) {
+    // no id was specified in url, read from headers.ids
+    hashIdResults = req.headers.ids.split(',')
   }
-  // validate id param is proper UUIDv1
-  if (!uuidValidate(req.params.id, 1)) {
-    return next(new restify.InvalidArgumentError('invalid request, bad id'))
+  // ensure at least one hash id was submitted
+  if (hashIdResults.length === 0) {
+    return next(new restify.InvalidArgumentError('invalid request, at least one hash id required'))
   }
-  // validate uuid time is in in valid range
-  let uuidEpoch = uuidTime.v1(req.params.id)
-  var nowEpoch = new Date().getTime()
-  let uuidDiff = nowEpoch - uuidEpoch
-  let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
-  if (uuidDiff > maxDiff) {
-    return next(new restify.InvalidArgumentError('invalid request, uuid time past expiration'))
+  // ensure that the request count does not exceed the maximum setting
+  if (hashIdResults.length > GET_PROOFS_MAX) {
+    return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + GET_PROOFS_MAX + ' max)'))
   }
 
-  let hashId = req.params.id
+  // prepare results array to hold proof results
+  hashIdResults = hashIdResults.map((hashId) => {
+    return { hash_id: hashId.trim(), proof: null }
+  })
 
-  redis.get(hashId, (err, proof) => {
-    if (err) {
-      return next(new restify.BadGatewayError(err))
-    } else {
-      if (proof == null) return next(new restify.NotFoundError('proof not found'))
-      res.send(JSON.parse(proof))
-      return next()
-    }
+  async.eachLimit(hashIdResults, 50, (hashIdResult, callback) => {
+    // validate id param is proper UUIDv1
+    if (!uuidValidate(hashIdResult.hash_id, 1)) return callback(null)
+    // validate uuid time is in in valid range
+    let uuidEpoch = uuidTime.v1(hashIdResult.hash_id)
+    var nowEpoch = new Date().getTime()
+    let uuidDiff = nowEpoch - uuidEpoch
+    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+    if (uuidDiff > maxDiff) return callback(null)
+    // retrieve proof fromn storage
+    redis.get(hashIdResult.hash_id, (err, proof) => {
+      if (err) return callback(null)
+      hashIdResult.proof = JSON.parse(proof)
+      callback(null)
+    })
+  }, (err) => {
+    if (err) return next(new restify.InternalError(err))
+    res.send(hashIdResults)
+    return next()
   })
 }
 
@@ -346,8 +364,7 @@ server.use(restify.bodyParser())
 
 // API RESOURCES
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
-server.post({ path: '/proofs', version: '1.0.0' }, getProofByIDV1)
-server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofByIDV1)
+server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofsByIDV1)
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // AMQP initialization
