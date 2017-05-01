@@ -9,8 +9,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "amqplib": "^0.5.1",
-    "async": "^2.3.0",
     "coin-ticker": "^1.2.2",
     "dotenv": "^4.0.0",
     "lodash": "^4.17.4",

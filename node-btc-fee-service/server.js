@@ -1,5 +1,3 @@
-const amqp = require('amqplib/callback_api')
-const async = require('async')
 const _ = require('lodash')
 const sb = require('satoshi-bitcoin')
 const coinTicker = require('coin-ticker')
@@ -12,15 +10,6 @@ const r = require('redis')
 // Setup requestify to use Redis caching layer.
 const requestify = require('requestify')
 let coreCacheTransporters = null // will be set once Redis connects
-
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for outgoing message to the btc tx service
-const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.btctx'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // API Docs : https://bitcoinfees.21.co/api
 const REC_FEES_URI = process.env.REC_FEES_URI || 'https://bitcoinfees.21.co/api/v1/fees/recommended'
@@ -35,34 +24,6 @@ const CACHE_TTL = 1000 * 60 * 10 // in ms, cache response for 10 min
 
 // The average size, in Bytes, for BTC transactions for anchoring
 const AVG_TX_BYTES = 235
-
-// The channel used for all amqp communication
-// This value is set once the connection has been established
-let amqpChannel = null
-
-// The redis connection used for all redis communication
-// This value is set once the connection has been established
-let redis = null
-
-/**
- * Opens a Redis connection
- *
- * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
- */
-function openRedisConnection (redisURI) {
-  redis = r.createClient(redisURI)
-  coreCacheTransporters = requestify.coreCacheTransporters
-  requestify.cacheTransporter(coreCacheTransporters.redis(redis))
-  redis.on('error', () => {
-    redis.quit()
-    redis = null
-    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
-    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
-  })
-  redis.on('ready', () => {
-    console.log('Redis connected')
-  })
-}
 
 // Periodically updated with most current data from Bitcoin Exchange
 let currentExchange = null
@@ -129,19 +90,6 @@ let getRecommendedFees = () => {
       // Publish the recommended transaction fee data in a well known
       // location for use by any service with access to Redis.
       redis.set(BTC_REC_FEE_KEY, JSON.stringify(feeRecObj))
-
-      // Also publish the recommended transaction fee data onto an RMQ
-      // route that can be consumed by any interested services.
-      amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(feeRecObj)), { persistent: true },
-        (err, ok) => {
-          if (err !== null) {
-            // An error as occurred publishing a message
-            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
-          } else {
-            // New message has been published
-            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
-          }
-        })
     } else {
       // Bail out and let the service get restarted
       console.error('unexpected return value : %s', JSON.stringify(responseBody))
@@ -153,54 +101,6 @@ let getRecommendedFees = () => {
     process.exit(1)
   })
 }
-
-/**
- * Opens an AMPQ connection and channel
- * Retry logic is included to handle losses of connection
- *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
- */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
-      // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
-      })
-    },
-    (conn, callback) => {
-      // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
-        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-        amqpChannel = null
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-      })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('Connection established')
-        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
-        amqpChannel = chan
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
-      // catch errors when attempting to establish connection
-      console.error('Cannot establish connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    }
-  })
-}
-
-// AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
-
-// REDIS initialization
-openRedisConnection(REDIS_CONNECT_URI)
 
 // get exchange rate at startup and periodically
 getCurrentExchange()
