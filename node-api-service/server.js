@@ -10,7 +10,6 @@ require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
 
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
@@ -40,6 +39,26 @@ const GET_PROOFS_MAX = process.env.GET_PROOFS_MAX || 250
 // This value is set once the connection has been established
 // API methods should return 502 when this value is null
 var amqpChannel = null
+
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
+/**
+ * Opens a Redis connection
+ *
+ * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
+ */
+function openRedisConnection (redisURI) {
+  redis = r.createClient(redisURI)
+  redis.on('error', () => {
+    redis.quit()
+    redis = null
+    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
+    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
+  })
+  console.log('Redis connected')
+}
 
 /**
  * Opens an AMPQ connection and channel
@@ -359,6 +378,9 @@ server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // AMQP initialization
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
+
+// REDIS initialization
+openRedisConnection(REDIS_CONNECT_URI)
 
 // SERVER
 server.listen(8080, () => {

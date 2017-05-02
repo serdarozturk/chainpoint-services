@@ -22,7 +22,7 @@ describe('Home Controller', () => {
             .and.to.equal('ImATeapotError')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('This is an API endpoint. Please consult https://www.chainpoint.org')
+            .and.to.equal('This is an API endpoint. Please consult https://chainpoint.org')
           done()
         })
     })
@@ -170,7 +170,7 @@ describe('Hashes Controller', () => {
 
     it('should return proper result with on valid call', (done) => {
       app.setAMQPChannel({
-        publish: function () { }
+        sendToQueue: function () { }
       })
       request(server)
         .post('/hashes')

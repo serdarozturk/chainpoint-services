@@ -7,7 +7,6 @@ require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify to use Redis caching layer.
@@ -41,6 +40,26 @@ const AVG_TX_BYTES = 235
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
+
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
+/**
+ * Opens a Redis connection
+ *
+ * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
+ */
+function openRedisConnection (redisURI) {
+  redis = r.createClient(redisURI)
+  redis.on('error', () => {
+    redis.quit()
+    redis = null
+    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
+    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
+  })
+  console.log('Redis connected')
+}
 
 // Periodically updated with most current data from Bitcoin Exchange
 let currentExchange = null
@@ -176,6 +195,9 @@ function amqpOpenConnection (connectionString) {
 
 // AMQP initialization
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
+
+// REDIS initialization
+openRedisConnection(REDIS_CONNECT_URI)
 
 // get exchange rate at startup and periodically
 getCurrentExchange()

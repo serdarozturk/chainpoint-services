@@ -3,9 +3,28 @@ require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
 
 const NIST_KEY_BASE = process.env.NIST_KEY_BASE || 'nist:'
+
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
+/**
+ * Opens a Redis connection
+ *
+ * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
+ */
+function openRedisConnection (redisURI) {
+  redis = r.createClient(redisURI)
+  redis.on('error', () => {
+    redis.quit()
+    redis = null
+    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
+    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
+  })
+  console.log('Redis connected')
+}
 
 let retrieveLatest = () => {
   beacon.last((err, res) => {
@@ -37,6 +56,9 @@ let retrieveLatest = () => {
 
 // run once when the service starts
 retrieveLatest()
+
+// REDIS initialization
+openRedisConnection(REDIS_CONNECT_URI)
 
 // Run every minute, at the top of the minute.
 setInterval(() => {

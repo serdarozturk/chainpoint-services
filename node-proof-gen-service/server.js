@@ -7,7 +7,6 @@ require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -27,6 +26,26 @@ const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
+
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
+/**
+ * Opens a Redis connection
+ *
+ * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
+ */
+function openRedisConnection (redisURI) {
+  redis = r.createClient(redisURI)
+  redis.on('error', () => {
+    redis.quit()
+    redis = null
+    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
+    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
+  })
+  console.log('Redis connected')
+}
 
 /**
  * Convert Date to ISO8601 string, stripping milliseconds
@@ -204,3 +223,6 @@ function amqpOpenConnection (connectionString) {
 
 // Open amqp connection
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
+
+// REDIS initialization
+openRedisConnection(REDIS_CONNECT_URI)
