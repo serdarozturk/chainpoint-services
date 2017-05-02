@@ -30,8 +30,140 @@ describe('Home Controller', () => {
 })
 
 describe('Proofs Controller', () => {
-  describe('GET /proofs/id', () => {
-    // TODO: Add tests when code is complete
+  describe('GET /proofs/hash_id', () => {
+    it('should return proper error with bad hash_id', (done) => {
+      request(server)
+        .get('/proofs/badid')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, bad hash_id')
+          done()
+        })
+    })
+
+    it('should return success with valid hash_id', (done) => {
+      app.setRedis({
+        get: (id, callback) => {
+          callback(null, '{ "chainpoint": "proof" }')
+        }
+      })
+      request(server)
+        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body.length).to.equal(1)
+          expect(res.body[0]).to.have.property('hash_id')
+            .and.to.be.a('string')
+            .and.to.equal('d4f0dc90-2f55-11e7-b598-41e628860234')
+          expect(res.body[0]).to.have.property('proof')
+          done()
+        })
+    })
+  })
+
+  describe('GET /proofs/', () => {
+    it('should return proper error with no hash_id', (done) => {
+      request(server)
+        .get('/proofs/')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, at least one hash id required')
+          done()
+        })
+    })
+
+    it('should return proper error with too many hash_ids', (done) => {
+      request(server)
+        .get('/proofs/')
+        .set('Content-type', 'text/plain')
+        .set('hash_ids', 'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, too many hash ids (250 max)')
+          done()
+        })
+    })
+
+    it('should return success with one valid hash_id', (done) => {
+      app.setRedis({
+        get: (id, callback) => {
+          callback(null, '{ "chainpoint": "proof" }')
+        }
+      })
+      request(server)
+        .get('/proofs/')
+        .set('Content-type', 'text/plain')
+        .set('hash_ids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body.length).to.equal(1)
+          expect(res.body[0]).to.have.property('hash_id')
+            .and.to.be.a('string')
+            .and.to.equal('d4f0dc90-2f55-11e7-b598-41e628860234')
+          expect(res.body[0]).to.have.property('proof')
+          done()
+        })
+    })
+
+    it('should return success with multiple valid hash_id', (done) => {
+      app.setRedis({
+        get: (id, callback) => {
+          callback(null, '{ "chainpoint": "proof" }')
+        }
+      })
+      request(server)
+        .get('/proofs/')
+        .set('Content-type', 'text/plain')
+        .set('hash_ids', 'd4f0dc90-2f55-11e7-b598-41e628860234, d4f0dc90-2f55-11e7-b598-41e628860234')
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body.length).to.equal(2)
+          expect(res.body[0]).to.have.property('hash_id')
+            .and.to.be.a('string')
+            .and.to.equal('d4f0dc90-2f55-11e7-b598-41e628860234')
+          expect(res.body[0]).to.have.property('proof')
+          expect(res.body[1]).to.have.property('hash_id')
+            .and.to.be.a('string')
+            .and.to.equal('d4f0dc90-2f55-11e7-b598-41e628860234')
+          expect(res.body[1]).to.have.property('proof')
+          done()
+        })
+    })
   })
 })
 

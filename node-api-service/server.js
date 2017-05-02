@@ -290,12 +290,18 @@ function getProofsByIDV1 (req, res, next) {
   let hashIdResults = []
   // check if hash_id parameter was included
   if (req.params && req.params.hash_id) {
-    // an hash_id was specified in the url, so use that hash_id only
+    // a hash_id was specified in the url, so use that hash_id only
+
+    if (!uuidValidate(req.params.hash_id, 1)) {
+      return next(new restify.InvalidArgumentError('invalid request, bad hash_id'))
+    }
+
     hashIdResults.push(req.params.hash_id)
-  } else if (req.headers && req.headers.hash_id) {
+  } else if (req.headers && req.headers.hash_ids) {
     // no hash_id was specified in url, read from headers.hash_ids
     hashIdResults = req.headers.hash_ids.split(',')
   }
+
   // ensure at least one hash_id was submitted
   if (hashIdResults.length === 0) {
     return next(new restify.InvalidArgumentError('invalid request, at least one hash id required'))
@@ -390,6 +396,7 @@ server.listen(8080, () => {
 // export these functions for testing purposes
 module.exports = {
   setAMQPChannel: (chan) => { amqpChannel = chan },
+  setRedis: (redisClient) => { redis = redisClient },
   server: server,
   generatePostHashesResponse: generatePostHashesResponse
 }
