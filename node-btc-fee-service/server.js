@@ -11,8 +11,7 @@ const r = require('redis')
 // See : https://github.com/ranm8/requestify
 // Setup requestify to use Redis caching layer.
 const requestify = require('requestify')
-const coreCacheTransporters = requestify.coreCacheTransporters
-requestify.cacheTransporter(coreCacheTransporters.redis(redis))
+let coreCacheTransporters = null // will be set once Redis connects
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -52,6 +51,8 @@ let redis = null
  */
 function openRedisConnection (redisURI) {
   redis = r.createClient(redisURI)
+  coreCacheTransporters = requestify.coreCacheTransporters
+  requestify.cacheTransporter(coreCacheTransporters.redis(redis))
   redis.on('error', () => {
     redis.quit()
     redis = null
