@@ -110,16 +110,6 @@ function processProofMessage (msg) {
 }
 
 /**
- * Test if a number is Even or Odd
- *
- * @param {number} n - The number to test
- * @returns {Boolean}
- */
-function isEven (n) {
-  return n === parseFloat(n) && !(n % 2)
-}
-
-/**
  * Add specified minutes to a Date object
  *
  * @param {Date} date - The starting date
@@ -235,13 +225,13 @@ function postHashesV1 (req, res, next) {
   }
 
   // validate hashes param Array is not larger than allowed max length
-  if (_.size(req.params.hashes) >= 1000) {
+  if (_.size(req.params.hashes) > 1000) {
     return next(new restify.InvalidArgumentError('invalid JSON body, hashes Array max size exceeded'))
   }
 
   // validate hashes are individually well formed
   let containsValidHashes = _.every(req.params.hashes, (hash) => {
-    return /^[a-fA-F0-9]{40,128}$/.test(hash) && isEven(hash.length)
+    return /^([a-fA-F0-9]{2}){20,64}$/.test(hash)
   })
 
   if (!containsValidHashes) {
