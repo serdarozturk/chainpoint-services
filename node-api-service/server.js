@@ -261,23 +261,23 @@ function postHashesV1 (req, res, next) {
 }
 
 /**
- * GET /proofs/:id handler
+ * GET /proofs/:hash_id handler
  *
- * Expects a query string Hash 'id' in the form of a Version 1 UUID
+ * Expects a query string 'hash_id' in the form of a Version 1 UUID
  *
  * Returns a chainpoint proof for the requested Hash ID
  */
 function getProofsByIDV1 (req, res, next) {
   let hashIdResults = []
-  // check if id parameter was included
-  if (req.params && req.params.id) {
-    // an id was specified in the url, so use that hash id only
-    hashIdResults.push(req.params.id)
-  } else if (req.headers && req.headers.ids) {
-    // no id was specified in url, read from headers.ids
-    hashIdResults = req.headers.ids.split(',')
+  // check if hash_id parameter was included
+  if (req.params && req.params.hash_id) {
+    // an hash_id was specified in the url, so use that hash_id only
+    hashIdResults.push(req.params.hash_id)
+  } else if (req.headers && req.headers.hash_id) {
+    // no hash_id was specified in url, read from headers.hash_ids
+    hashIdResults = req.headers.hash_ids.split(',')
   }
-  // ensure at least one hash id was submitted
+  // ensure at least one hash_id was submitted
   if (hashIdResults.length === 0) {
     return next(new restify.InvalidArgumentError('invalid request, at least one hash id required'))
   }
@@ -354,7 +354,7 @@ server.use(restify.bodyParser())
 
 // API RESOURCES
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
-server.get({ path: '/proofs/:id', version: '1.0.0' }, getProofsByIDV1)
+server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, getProofsByIDV1)
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // AMQP initialization

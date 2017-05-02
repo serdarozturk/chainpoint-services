@@ -1,0 +1,170 @@
+swagger: '2.0'
+info:
+  description: This is the primary API interface for the Chainpoint services.
+  version: 1.0.0
+  title: Chainpoint API Service
+  termsOfService: 'http://chainpoint.org/terms/'
+  contact:
+    email: updatethis@chainpoint.org
+  license:
+    name: MIT
+    url: 'https://tldrlegal.com/license/mit-license'
+host: chainpoint.org
+basePath: /v3
+tags:
+  - name: hashes
+    description: Your hashes to be anchored
+  - name: proofs
+    description: Your Chainpoint proofs created for each of your hashes
+schemes:
+  - http
+  - https
+paths:
+  /hashes:
+    post:
+      tags:
+        - hashes
+      summary: Submit one or more hashes for anchoring
+      description: ''
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          description: Array of one or more hashes to be anchored
+          required: true
+          schema:
+            $ref: '#/definitions/PostHashesRequest'
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/PostHashesResponse'
+        '409':
+          description: invalid argument in request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  '/proofs/{hash_id}':
+    get:
+      tags:
+        - proofs
+      summary: Retrieves a proof by hash_id
+      description: ''
+      produces:
+        - application/json
+      parameters:
+        - name: hash_id
+          in: path
+          required: true
+          description: The hash_id of the proof to retrieve
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/GetProofsResponse'
+        '409':
+          description: invalid argument in request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /proofs/:
+    get:
+      tags:
+        - proofs
+      summary: Retrieves one or more proofs by hash_ids supplied in header
+      description: ''
+      produces:
+        - application/json
+      parameters:
+        - name: hash_ids
+          in: header
+          required: true
+          description: Comma separated hash_id list of the proofs to retrieve
+          type: string
+      responses:
+        '200':
+          description: successful operation
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/GetProofsResponse'
+        '409':
+          description: invalid argument in request
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+definitions:
+  PostHashesRequest:
+    type: object
+    properties:
+      hashes:
+        type: array
+        items:
+          type: string
+          example: 1957db7fe23e4be1740ddeb941ddda7ae0a6b782e536a9e00b5aa82db1e84547
+          pattern: '^([a-fA-F0-9]{2}){20,64}$'
+          minLength: 40
+          maxLength: 128
+        minItems: 1
+        maxItems: 1000
+  PostHashesResponse:
+    type: object
+    properties:
+      meta:
+        type: object
+        properties:
+          submitted_at:
+            type: string
+            format: date-time
+            example: '2017-05-02T15:16:44Z'
+          processing_hints:
+            type: object
+            properties:
+              cal:
+                type: string
+                format: date-time
+                example: '2017-05-02T15:17:44Z'
+              eth:
+                type: string
+                format: date-time
+                example: '2017-05-02T15:27:44Z'
+              btc:
+                type: string
+                format: date-time
+                example: '2017-05-02T16:17:44Z'
+      hashes:
+        type: array
+        items:
+          type: object
+          properties:
+            hash_id:
+              type: string
+              example: 5a001650-2f4a-11e7-ad22-37b426116bc4
+            hash:
+              type: string
+              example: 1957db7fe23e4be1740ddeb941ddda7ae0a6b782e536a9e00b5aa82db1e84546
+  GetProofsRequest:
+    type: object
+  GetProofsResponse:
+    type: object
+    properties:
+      hash_id:
+        type: string
+        example: 1957db7fe23e4be1740ddeb941ddda7ae0a6b782e536a9e00b5aa82db1e84547
+      proof:
+        type: object
+  ErrorResponse:
+    type: object
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+externalDocs:
+  description: Find out more about Chainpoint
+  url: 'https://chainpoint.org'
