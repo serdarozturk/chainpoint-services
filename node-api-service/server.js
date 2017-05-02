@@ -288,6 +288,7 @@ function postHashesV1 (req, res, next) {
  */
 function getProofsByIDV1 (req, res, next) {
   let hashIdResults = []
+
   // check if hash_id parameter was included
   if (req.params && req.params.hash_id) {
     // a hash_id was specified in the url, so use that hash_id only
@@ -297,9 +298,9 @@ function getProofsByIDV1 (req, res, next) {
     }
 
     hashIdResults.push(req.params.hash_id)
-  } else if (req.headers && req.headers.hash_ids) {
-    // no hash_id was specified in url, read from headers.hash_ids
-    hashIdResults = req.headers.hash_ids.split(',')
+  } else if (req.headers && req.headers.hashids) {
+    // no hash_id was specified in url, read from headers.hashids
+    hashIdResults = req.headers.hashids.split(',')
   }
 
   // ensure at least one hash_id was submitted

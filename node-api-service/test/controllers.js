@@ -91,11 +91,11 @@ describe('Proofs Controller', () => {
         })
     })
 
-    it('should return proper error with too many hash_ids', (done) => {
+    it('should return proper error with too many hashids', (done) => {
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
-        .set('hash_ids', 'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
+        .set('hashids', 'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
@@ -115,7 +115,7 @@ describe('Proofs Controller', () => {
         })
     })
 
-    it('should return success with one valid hash_id', (done) => {
+    it('should return success with one valid hash_id in hashids', (done) => {
       app.setRedis({
         get: (id, callback) => {
           callback(null, '{ "chainpoint": "proof" }')
@@ -124,7 +124,7 @@ describe('Proofs Controller', () => {
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
-        .set('hash_ids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
+        .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
@@ -138,7 +138,7 @@ describe('Proofs Controller', () => {
         })
     })
 
-    it('should return success with multiple valid hash_id', (done) => {
+    it('should return success with multiple valid hash_ids in hashids', (done) => {
       app.setRedis({
         get: (id, callback) => {
           callback(null, '{ "chainpoint": "proof" }')
@@ -147,7 +147,7 @@ describe('Proofs Controller', () => {
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
-        .set('hash_ids', 'd4f0dc90-2f55-11e7-b598-41e628860234, d4f0dc90-2f55-11e7-b598-41e628860234')
+        .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234, d4f0dc90-2f55-11e7-b598-41e628860234')
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
