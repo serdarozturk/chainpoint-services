@@ -2,6 +2,7 @@ const amqp = require('amqplib/callback_api')
 const chainpointProofSchema = require('chainpoint-proof-json-schema')
 const async = require('async')
 const uuidTime = require('uuid-time')
+const chpBinary = require('chainpoint-binary')
 
 require('dotenv').config()
 
@@ -76,12 +77,17 @@ function generateCALProof (msg) {
     return
   }
 
-  var proofString = JSON.stringify(proof)
-
-  async.series([
-    // save proof to redis
+  async.waterfall([
+    // compress proof to binary format
     (callback) => {
-      redis.set(messageObj.hash_id, proofString, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
+      chpBinary.objectToBinary(proof, (err, proofBinary) => {
+        if (err) return callback(err)
+        return callback(null, proofBinary)
+      })
+    },
+    // save proof to redis
+    (proofBinary, callback) => {
+      redis.set(messageObj.hash_id, proofBinary, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
         if (err) return callback(err)
         return callback(null)
       })

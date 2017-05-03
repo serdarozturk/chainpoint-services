@@ -5,6 +5,8 @@ const corsMiddleware = require('restify-cors-middleware')
 const amqp = require('amqplib/callback_api')
 const async = require('async')
 const uuidTime = require('uuid-time')
+const webSocket = require('ws')
+const chpBinary = require('chainpoint-binary')
 
 require('dotenv').config()
 
@@ -50,12 +52,12 @@ let redis = null
  * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
  */
 function openRedisConnection (redisURI) {
-  redis = r.createClient(redisURI)
+  redis = r.createClient({ url: redisURI, return_buffers: true })
   redis.on('error', () => {
     redis.quit()
     redis = null
     console.error('Cannot connect to Redis. Attempting in 5 seconds...')
-    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
+    setTimeout(openRedisConnection.bind(null, { url: redisURI, return_buffers: true }), 5 * 1000)
   })
   console.log('Redis connected')
 }
@@ -116,15 +118,23 @@ function amqpOpenConnection (connectionString) {
 function processProofMessage (msg) {
   if (msg !== null) {
     let hashId = msg.content.toString()
-    redis.get(hashId, (err, res) => {
+    redis.get(hashId, (err, proofBinary) => {
       if (err) {
         console.log(err)
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       } else {
-        console.log(res)
+        chpBinary.binaryToObject(proofBinary, (err, proofObj) => {
+          if (err) {
+            console.log(err)
+          } else {
+            console.log(JSON.stringify(proofObj))
+          }
+          amqpChannel.ack(msg)
+          console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        })
       }
     })
-    amqpChannel.ack(msg)
-    console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
   }
 }
 
@@ -327,10 +337,13 @@ function getProofsByIDV1 (req, res, next) {
     let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
     if (uuidDiff > maxDiff) return callback(null)
     // retrieve proof fromn storage
-    redis.get(hashIdResult.hash_id, (err, proof) => {
+    redis.get(hashIdResult.hash_id, (err, proofBinary) => {
       if (err) return callback(null)
-      hashIdResult.proof = JSON.parse(proof)
-      callback(null)
+      chpBinary.binaryToObject(proofBinary, (err, proofObj) => {
+        if (err) return callback(null)
+        hashIdResult.proof = proofObj
+        callback(null)
+      })
     })
   }, (err) => {
     if (err) return next(new restify.InternalError(err))
@@ -352,6 +365,15 @@ function rootV1 (req, res, next) {
 // RESTIFY
 var server = restify.createServer({
   name: 'chainpoint'
+})
+
+// WebSocket (ws)
+var wss = new webSocket.Server({ server: server.server })
+wss.on('connection', function connection (ws) {
+  ws.on('message', function incoming (message) {
+    console.log('received: %s', message)
+  })
+  ws.send('something')
 })
 
 // CORS
