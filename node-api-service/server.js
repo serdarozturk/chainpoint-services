@@ -52,14 +52,17 @@ let redis = null
  * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
  */
 function openRedisConnection (redisURI) {
-  redis = r.createClient({ url: redisURI, return_buffers: true })
+  let options = { url: redisURI, return_buffers: true }
+  redis = r.createClient(options)
   redis.on('error', () => {
     redis.quit()
     redis = null
     console.error('Cannot connect to Redis. Attempting in 5 seconds...')
-    setTimeout(openRedisConnection.bind(null, { url: redisURI, return_buffers: true }), 5 * 1000)
+    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
   })
-  console.log('Redis connected')
+  redis.on('ready', () => {
+    console.log('Redis connected')
+  })
 }
 
 /**
@@ -370,10 +373,10 @@ var server = restify.createServer({
 // WebSocket (ws)
 var wss = new webSocket.Server({ server: server.server })
 wss.on('connection', function connection (ws) {
-  ws.on('message', function incoming (message) {
-    console.log('received: %s', message)
-  })
-  ws.send('something')
+  // ws.on('message', function incoming (message) {
+  //   console.log('received: %s', message)
+  // })
+  setInterval(() => { ws.send('test') }, 1000)
 })
 
 // CORS

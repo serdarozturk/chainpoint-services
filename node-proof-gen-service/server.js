@@ -45,7 +45,9 @@ function openRedisConnection (redisURI) {
     console.error('Cannot connect to Redis. Attempting in 5 seconds...')
     setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
   })
-  console.log('Redis connected')
+  redis.on('ready', () => {
+    console.log('Redis connected')
+  })
 }
 
 /**
