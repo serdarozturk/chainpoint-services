@@ -15,6 +15,9 @@ const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 // The queue name for message consumption originating from the proof state service
 const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.gen'
 
+// The exchange for publishing messages bound for API Service instances
+const RMQ_OUTGOING_EXCHANGE = process.env.RMQ_OUTGOING_EXCHANGE || 'exchange.headers'
+
 // The queue name for outgoing message to the api service
 const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.api'
 
@@ -80,23 +83,43 @@ function generateCALProof (msg) {
   }
 
   async.waterfall([
-    // compress proof to binary format
+    // compress proof to binary format Base64
     (callback) => {
-      chpBinary.objectToBinary(proof, (err, proofBinary) => {
+      chpBinary.objectToBase64(proof, (err, proofBase64) => {
         if (err) return callback(err)
-        return callback(null, proofBinary)
+        return callback(null, proofBase64)
       })
     },
     // save proof to redis
-    (proofBinary, callback) => {
-      redis.set(messageObj.hash_id, proofBinary, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
+    (proofBase64, callback) => {
+      redis.set(messageObj.hash_id, proofBase64, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
         if (err) return callback(err)
         return callback(null)
       })
     },
-    // publish 'ready' message for API service
     (callback) => {
-      amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(messageObj.hash_id), { persistent: true },
+      // check if a subscription for the hash exists
+      // Preface the sub key with 'sub:' so as not to conflict with the proof storage, which uses the plain hashId as the key already
+      let key = 'sub:' + messageObj.hash_id
+      redis.hgetall(key, (err, res) => {
+        if (err) return callback(err)
+        // if not subscription is found, return null to skip the rest of the process
+        if (res == null || !res.apiId || !res.cxId) return callback(null, null, null)
+        // a subscription with valid apiId and cxId has been found, return apiId and cxId to deliver the proof to
+        return callback(null, res.apiId, res.cxId)
+      })
+    },
+    // publish 'ready' message for API service if and only if a subscription exists for this hash
+    (APIServiceInstanceId, wsConnectionId, callback) => {
+      // no subcription fvor this hash, so skip publishing
+      if (APIServiceInstanceId == null || wsConnectionId == null) return callback(null)
+
+      let opts = { headers: { 'apiId': APIServiceInstanceId }, persistent: true }
+      let message = {
+        cxId: wsConnectionId,
+        hash_id: messageObj.hash_id
+      }
+      amqpChannel.publish(RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
@@ -210,7 +233,7 @@ function amqpOpenConnection (connectionString) {
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('Connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
+        chan.assertExchange(RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process

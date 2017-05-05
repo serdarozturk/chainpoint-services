@@ -22,6 +22,9 @@ const uuidValidate = require('uuid-validate')
 // The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
+// The exchange for receiving messages from proof gen service
+const RMQ_INCOMING_EXCHANGE = process.env.RMQ_INCOMING_EXCHANGE || 'exchange.headers'
+
 // The queue name for message consumption originating from proof gen service
 const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.api'
 
@@ -36,6 +39,13 @@ const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
 
 // The maximum number of proofs that can be requested in one GET /proofs request
 const GET_PROOFS_MAX = process.env.GET_PROOFS_MAX || 250
+
+// Set a unique identifier for this instance of API Service
+// This is used to associate API Service instances with websocket connections
+const APIServiceInstanceId = uuidv1()
+
+// Initial an object that will hold all open websocket connections
+let WebSocketConnections = {}
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -52,8 +62,7 @@ let redis = null
  * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
  */
 function openRedisConnection (redisURI) {
-  let options = { url: redisURI, return_buffers: true }
-  redis = r.createClient(options)
+  redis = r.createClient(redisURI)
   redis.on('error', () => {
     redis.quit()
     redis = null
@@ -93,13 +102,19 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('Connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
-        // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
-          processProofMessage(msg)
+
+        chan.assertExchange(RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
+        chan.assertQueue('', { durable: true }, (err, q) => {
+          if (err) return callback(err)
+          // Continuously load the HASHES from RMQ with proof ready hash objects to process)
+          let opts = { 'apiId': APIServiceInstanceId, 'x-match': 'all' }
+          chan.bindQueue(q.queue, RMQ_INCOMING_EXCHANGE, '', opts)
+          chan.consume(q.queue, (msg) => {
+            processProofMessage(msg)
+          })
         })
         return callback(null)
       })
@@ -120,22 +135,36 @@ function amqpOpenConnection (connectionString) {
 */
 function processProofMessage (msg) {
   if (msg !== null) {
-    let hashId = msg.content.toString()
-    redis.get(hashId, (err, proofBinary) => {
+    let proofReadyObj = JSON.parse(msg.content.toString())
+
+    async.waterfall([
+      (callback) => {
+        // get the target websocket if it is on this instance, otherwise null
+        let targetWebsocket = WebSocketConnections[proofReadyObj.cxId] || null
+        // if the target websocket is not on this instance, there is no work to do, return
+        if (targetWebsocket === null) return callback(null)
+        // get the proof for the given hashId
+        redis.get(proofReadyObj.hash_id, (err, proofBase64) => {
+          if (err) return callback(err)
+          // if proof is not found, return null to skip the rest of the process
+          if (proofBase64 == null) return callback(null)
+          // deliver proof over websocket if websocket was found on this instance
+          let proofResponse = {
+            hash_id: proofReadyObj.hash_id,
+            proof_b64: proofBase64
+          }
+          targetWebsocket.send(JSON.stringify(proofResponse))
+          return callback(null)
+        })
+      }
+    ], (err) => {
       if (err) {
         console.log(err)
         amqpChannel.ack(msg)
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       } else {
-        chpBinary.binaryToObject(proofBinary, (err, proofObj) => {
-          if (err) {
-            console.log(err)
-          } else {
-            console.log(JSON.stringify(proofObj))
-          }
-          amqpChannel.ack(msg)
-          console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
-        })
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
     })
   }
@@ -340,9 +369,9 @@ function getProofsByIDV1 (req, res, next) {
     let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
     if (uuidDiff > maxDiff) return callback(null)
     // retrieve proof fromn storage
-    redis.get(hashIdResult.hash_id, (err, proofBinary) => {
+    redis.get(hashIdResult.hash_id, (err, proofBase64) => {
       if (err) return callback(null)
-      chpBinary.binaryToObject(proofBinary, (err, proofObj) => {
+      chpBinary.binaryToObject(proofBase64, (err, proofObj) => {
         if (err) return callback(null)
         hashIdResult.proof = proofObj
         callback(null)
@@ -370,14 +399,85 @@ var server = restify.createServer({
   name: 'chainpoint'
 })
 
-// WebSocket (ws)
-var wss = new webSocket.Server({ server: server.server })
-wss.on('connection', function connection (ws) {
-  // ws.on('message', function incoming (message) {
-  //   console.log('received: %s', message)
-  // })
-  setInterval(() => { ws.send('test') }, 1000)
+// Create a WS server to run in association with the Restify server
+var webSocketServer = new webSocket.Server({ server: server.server })
+// Handle new web socket connections
+webSocketServer.on('connection', (ws) => {
+  // set up ping to keep connection open over long periods of inactivity
+  let pingInterval = setInterval(() => { ws.ping('ping') }, 1000 * 45)
+  // retrieve the unique identifier for this connection
+  let wsConnectionId = ws.upgradeReq.headers['sec-websocket-key']
+  // save this connection to the open connection registry
+  WebSocketConnections[wsConnectionId] = ws
+  // when a message is received, process it as a subscription request
+  ws.on('message', (hashId) => {
+    // validate id param is proper UUIDv1
+    let isValidUUID = uuidValidate(hashId, 1)
+    // validate uuid time is in in valid range
+    let uuidEpoch = uuidTime.v1(hashId)
+    var nowEpoch = new Date().getTime()
+    let uuidDiff = nowEpoch - uuidEpoch
+    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+    let uuidValidTime = (uuidDiff <= maxDiff)
+    if (isValidUUID && uuidValidTime) {
+      subscribeForProof(APIServiceInstanceId, wsConnectionId, hashId, (err, proofBase64) => {
+        if (err) {
+          console.error(err)
+        } else {
+          if (proofBase64 !== null) {
+            let proofResponse = {
+              hash_id: hashId,
+              proof_b64: proofBase64
+            }
+            ws.send(JSON.stringify(proofResponse))
+          }
+        }
+      })
+    }
+  })
+  // when a connection closes, remove it from the open connection registry
+  ws.on('close', () => {
+    // remove this connection from the open connections object
+    delete WebSocketConnections[wsConnectionId]
+    // remove ping interval
+    clearInterval(pingInterval)
+  })
+  ws.on('error', (e) => console.error(e))
 })
+
+function subscribeForProof (APIServiceInstanceId, wsConnectionId, hashId, callback) {
+  async.waterfall([
+    (wfCallback) => {
+      // create redis entry for hash subscription, storing the instance ID and ws connection id
+      // The id's reference the request's origin, and are used to target the response to the correct instance and connection
+      // Preface the sub key with 'sub:' so as not to conflict with the proof storage, which uses the plain hashId as the key already
+      let key = 'sub:' + hashId
+      redis.hmset(key, ['apiId', APIServiceInstanceId, 'cxId', wsConnectionId], (err, res) => {
+        if (err) return wfCallback(err)
+        return wfCallback(null, key)
+      })
+    },
+    (key, wfCallback) => {
+      // set the subscription to expire after 24 hours have passed
+      redis.expire(key, 24 * 60 * 60, (err, res) => {
+        if (err) return wfCallback(err)
+        return wfCallback(null)
+      })
+    },
+    (wfCallback) => {
+      // look up proof for given hashId and return if it exists
+      redis.get(hashId, (err, proofBase64) => {
+        if (err) return wfCallback(err)
+        // proofBase64 will either be a proof Base64 string or null
+        return wfCallback(null, proofBase64)
+      })
+    }
+  ],
+    (err, proofBase64) => {
+      if (err) return callback(err)
+      return callback(null, proofBase64)
+    })
+}
 
 // CORS
 // See : https://github.com/TabDigital/restify-cors-middleware

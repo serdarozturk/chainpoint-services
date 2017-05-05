@@ -31,9 +31,9 @@ buffer-more-ints@0.0.2:
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/buffer-more-ints/-/buffer-more-ints-0.0.2.tgz#26b3885d10fa13db7fc01aae3aab870199e0124c"
 
-chainpoint-binary@^3.0.1:
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/chainpoint-binary/-/chainpoint-binary-3.0.1.tgz#b0dffa3defb3bafac7ef1f6cb36465e42a95ba93"
+chainpoint-binary@^3.1.1:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/chainpoint-binary/-/chainpoint-binary-3.1.1.tgz#419f3b51987cf464701edba73866ccd44d2842c8"
   dependencies:
     chainpoint-proof-json-schema "^0.0.2"
     msgpack-lite "^0.1.26"
