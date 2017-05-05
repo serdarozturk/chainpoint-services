@@ -151,7 +151,7 @@ function processProofMessage (msg) {
           // deliver proof over websocket if websocket was found on this instance
           let proofResponse = {
             hash_id: proofReadyObj.hash_id,
-            proof_b64: proofBase64
+            proof: proofBase64
           }
           targetWebsocket.send(JSON.stringify(proofResponse))
           return callback(null)
@@ -427,7 +427,7 @@ webSocketServer.on('connection', (ws) => {
           if (proofBase64 !== null) {
             let proofResponse = {
               hash_id: hashId,
-              proof_b64: proofBase64
+              proof: proofBase64
             }
             ws.send(JSON.stringify(proofResponse))
           }
