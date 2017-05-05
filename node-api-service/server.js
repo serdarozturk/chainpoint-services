@@ -410,31 +410,7 @@ webSocketServer.on('connection', (ws) => {
   // save this connection to the open connection registry
   WebSocketConnections[wsConnectionId] = ws
   // when a message is received, process it as a subscription request
-  ws.on('message', (hashId) => {
-    // validate id param is proper UUIDv1
-    let isValidUUID = uuidValidate(hashId, 1)
-    // validate uuid time is in in valid range
-    let uuidEpoch = uuidTime.v1(hashId)
-    var nowEpoch = new Date().getTime()
-    let uuidDiff = nowEpoch - uuidEpoch
-    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
-    let uuidValidTime = (uuidDiff <= maxDiff)
-    if (isValidUUID && uuidValidTime) {
-      subscribeForProof(APIServiceInstanceId, wsConnectionId, hashId, (err, proofBase64) => {
-        if (err) {
-          console.error(err)
-        } else {
-          if (proofBase64 !== null) {
-            let proofResponse = {
-              hash_id: hashId,
-              proof: proofBase64
-            }
-            ws.send(JSON.stringify(proofResponse))
-          }
-        }
-      })
-    }
-  })
+  ws.on('message', (hashIds) => subscribeForProofs(ws, wsConnectionId, hashIds))
   // when a connection closes, remove it from the open connection registry
   ws.on('close', () => {
     // remove this connection from the open connections object
@@ -445,7 +421,39 @@ webSocketServer.on('connection', (ws) => {
   ws.on('error', (e) => console.error(e))
 })
 
-function subscribeForProof (APIServiceInstanceId, wsConnectionId, hashId, callback) {
+function subscribeForProofs (ws, wsConnectionId, hashIds) {
+  let hashIdResults = hashIds.split(',').slice(0, GET_PROOFS_MAX).map((hashId) => {
+    return { hash_id: hashId.trim(), proof: null }
+  })
+
+  async.eachLimit(hashIdResults, 50, (hashIdResult, callback) => {
+    // validate id param is proper UUIDv1
+    let isValidUUID = uuidValidate(hashIdResult.hash_id, 1)
+    // validate uuid time is in in valid range
+    let uuidEpoch = uuidTime.v1(hashIdResult.hash_id)
+    var nowEpoch = new Date().getTime()
+    let uuidDiff = nowEpoch - uuidEpoch
+    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+    let uuidValidTime = (uuidDiff <= maxDiff)
+    if (isValidUUID && uuidValidTime) {
+      createProofSubscription(APIServiceInstanceId, wsConnectionId, hashIdResult.hash_id, (err, proofBase64) => {
+        if (err) return callback(err)
+        if (proofBase64 !== null) {
+          let proofResponse = {
+            hash_id: hashIdResult.hash_id,
+            proof: proofBase64
+          }
+          ws.send(JSON.stringify(proofResponse))
+        }
+        callback(null)
+      })
+    }
+  }, (err) => {
+    if (err) console.error(err)
+  })
+}
+
+function createProofSubscription (APIServiceInstanceId, wsConnectionId, hashId, callback) {
   async.waterfall([
     (wfCallback) => {
       // create redis entry for hash subscription, storing the instance ID and ws connection id
