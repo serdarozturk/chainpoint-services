@@ -38,7 +38,10 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
 
 // The maximum number of proofs that can be requested in one GET /proofs request
-const GET_PROOFS_MAX = process.env.GET_PROOFS_MAX || 250
+const GET_PROOFS_MAX_REST = process.env.GET_PROOFS_MAX_REST || 250
+
+// The maximum number of proofs that can be requested/subscribed to in one call
+const GET_PROOFS_MAX_WS = process.env.GET_PROOFS_MAX_WS || 250
 
 // Set a unique identifier for this instance of API Service
 // This is used to associate API Service instances with websocket connections
@@ -350,8 +353,8 @@ function getProofsByIDV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid request, at least one hash id required'))
   }
   // ensure that the request count does not exceed the maximum setting
-  if (hashIdResults.length > GET_PROOFS_MAX) {
-    return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + GET_PROOFS_MAX + ' max)'))
+  if (hashIdResults.length > GET_PROOFS_MAX_REST) {
+    return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + GET_PROOFS_MAX_REST + ' max)'))
   }
 
   // prepare results array to hold proof results
@@ -422,7 +425,8 @@ webSocketServer.on('connection', (ws) => {
 })
 
 function subscribeForProofs (ws, wsConnectionId, hashIds) {
-  let hashIdResults = hashIds.split(',').slice(0, GET_PROOFS_MAX).map((hashId) => {
+  // build an array of hash_ids, ignoring any hash_ids above the GET_PROOFS_MAX_WS limit
+  let hashIdResults = hashIds.split(',').slice(0, GET_PROOFS_MAX_WS).map((hashId) => {
     return { hash_id: hashId.trim(), proof: null }
   })
 
