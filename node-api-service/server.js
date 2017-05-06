@@ -43,6 +43,12 @@ const GET_PROOFS_MAX_REST = process.env.GET_PROOFS_MAX_REST || 250
 // The maximum number of proofs that can be requested/subscribed to in one call
 const GET_PROOFS_MAX_WS = process.env.GET_PROOFS_MAX_WS || 250
 
+// The custom MIME type for JSON proof array results containing Base64 encoded proof data
+const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
+
+// The custom MIME type for JSON proof array results containing Base64 encoded proof data
+const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
+
 // Set a unique identifier for this instance of API Service
 // This is used to associate API Service instances with websocket connections
 const APIServiceInstanceId = uuidv1()
@@ -361,6 +367,8 @@ function getProofsByIDV1 (req, res, next) {
   hashIdResults = hashIdResults.map((hashId) => {
     return { hash_id: hashId.trim(), proof: null }
   })
+  let requestedType = req.accepts(JSONLD_MIME_TYPE) ? JSONLD_MIME_TYPE : BASE64_MIME_TYPE
+  console.log(req.accepts(requestedType))
 
   async.eachLimit(hashIdResults, 50, (hashIdResult, callback) => {
     // validate id param is proper UUIDv1
@@ -374,14 +382,20 @@ function getProofsByIDV1 (req, res, next) {
     // retrieve proof fromn storage
     redis.get(hashIdResult.hash_id, (err, proofBase64) => {
       if (err) return callback(null)
-      chpBinary.binaryToObject(proofBase64, (err, proofObj) => {
-        if (err) return callback(null)
-        hashIdResult.proof = proofObj
-        callback(null)
-      })
+      if (requestedType === BASE64_MIME_TYPE) {
+        hashIdResult.proof = proofBase64
+        return callback(null)
+      } else {
+        chpBinary.binaryToObject(proofBase64, (err, proofObj) => {
+          if (err) return callback(null)
+          hashIdResult.proof = proofObj
+          return callback(null)
+        })
+      }
     })
   }, (err) => {
     if (err) return next(new restify.InternalError(err))
+    res.contentType = 'json'
     res.send(hashIdResults)
     return next()
   })
