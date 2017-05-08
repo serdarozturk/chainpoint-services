@@ -395,7 +395,7 @@ function getProofsByIDV1 (req, res, next) {
     })
   }, (err) => {
     if (err) return next(new restify.InternalError(err))
-    res.contentType = 'json'
+    res.contentType = 'application/json'
     res.send(hashIdResults)
     return next()
   })
