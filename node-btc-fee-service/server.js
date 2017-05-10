@@ -5,11 +5,13 @@ require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
+const redis = r.createClient(REDIS_CONNECT_URI)
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify to use Redis caching layer.
 const requestify = require('requestify')
-let coreCacheTransporters = null // will be set once Redis connects
+const coreCacheTransporters = requestify.coreCacheTransporters
+requestify.cacheTransporter(coreCacheTransporters.redis(redis))
 
 // API Docs : https://bitcoinfees.21.co/api
 const REC_FEES_URI = process.env.REC_FEES_URI || 'https://bitcoinfees.21.co/api/v1/fees/recommended'
