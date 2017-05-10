@@ -102,7 +102,7 @@ let sendTxToBTC = () => {
   console.log('BTC TX...')
  /* Commenting this all out, it causes errors every 10 minutes
     much of this is likely to be discarded anyways in favor of a simpler solution
-    
+
   // FIXME : This will be injected into this service from RMQ. Hardcoded for initial test
   const merkleRoot = Buffer.from('1c8a5401bcfa516bc481728692b7498f4d379c9404a2b3ff98cd78de01ad6f0f')
 
@@ -200,7 +200,7 @@ function amqpOpenConnection (connectionString) {
 // Open amqp connection
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
-setInterval(() => sendTxToBTC(), 1000)// * 60 * 10) // 10 min
+setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
 
 // Refresh the BTCRecommendedFee object value every BTC_REC_FEE_REFRESH_INTERVAL seconds
 setInterval(() => refreshBTCRecommendedFee(), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
