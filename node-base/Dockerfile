@@ -7,7 +7,7 @@
 # see: https://github.com/nodejs/LTS
 # see: https://hub.docker.com/_/node/
 # see: https://alpinelinux.org/
-FROM node:7.9.0-alpine
+FROM node:7.10.0-alpine
 
 LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 
@@ -20,6 +20,9 @@ LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 #   see: https://github.com/ncopa/su-exec
 #
 RUN apk add --update tini su-exec
+
+# Common Dependencies
+RUN apk add htop curl wget jq --no-cache
 
 # The `node` user and its home dir is provided by
 # the base image. Create a subdir where the app code
