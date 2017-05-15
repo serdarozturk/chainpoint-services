@@ -1,7 +1,7 @@
 const amqp = require('amqplib/callback_api')
 const async = require('async')
 
-const storageClient = require('./storage-adapters/crate.js')
+const storageClient = require('./storage-adapters/postgres.js')
 
 require('dotenv').config()
 
@@ -184,18 +184,18 @@ function ConsumeProofReadyMessage (msg) {
       async.waterfall([
         (callback) => {
           // get the agg_state object for the hash_id
-          storageClient.getAggStateObjectByHashId(messageObj.hash_id, (err, rows) => {
+          storageClient.getAggStateObjectByHashId(messageObj.hash_id, (err, row) => {
             if (err) return callback(err)
-            if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching add_state data found')
-            return callback(null, rows[0])
+            if (!row) return callback(new Date().toISOString() + ' no matching agg_state data found')
+            return callback(null, row)
           })
         },
         (aggStateObj, callback) => {
           // get the cal_state object for the hash_id's agg_id
-          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, (err, rows) => {
+          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, (err, row) => {
             if (err) return callback(err)
-            if (rows.length !== 1) return callback(new Date().toISOString() + ' no matching cal_state data found')
-            return callback(null, aggStateObj, rows[0])
+            if (!row) return callback(new Date().toISOString() + ' no matching cal_state data found')
+            return callback(null, aggStateObj, row)
           })
         },
         (aggStateObj, calStateObj, callback) => {

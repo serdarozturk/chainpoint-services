@@ -11,10 +11,10 @@ The following is a description of methods that must be defined in a storage adap
 | openConnection(callback(err, success))       | opens the connection to the underlying storage provider | boolean indicating success |
 | getHashIdCountByAggId(aggId, callback(err, count))     | gets all count of hash objects for a given agg_id currently in the database | integer |
 | getHashIdsByAggId(aggId, callback(err, hashIds))     | gets all hash ids associated with an aggregation event | result array containing hash id objects |
-| getAggStateObjectByHashId(hashId, callback(err, stateObject))     | gets the agg state object for a given hash id | result array containing one agg state object |
-| getCalStateObjectByAggId(aggId, callback(err, stateObject))     | gets the cal state object for a given agg id | result array containing one cal state object |
-| getBTCTxStateObjectByCalId(calId, callback(err, stateObject))     | gets the btctx state object for a given cal id | result array containing one btctx state object |
-| getBTCHeadStateObjectByBTCTxId(btcTxId, callback(err, stateObject))     | gets the btchead state object for a given btctx id | result array containing one btchead state object |
+| getAggStateObjectByHashId(hashId, callback(err, stateObject))     | gets the agg state object for a given hash id | an agg state object |
+| getCalStateObjectByAggId(aggId, callback(err, stateObject))     | gets the cal state object for a given agg id | a cal state object |
+| getBTCTxStateObjectByCalId(calId, callback(err, stateObject))     | gets the btctx state object for a given cal id | abtctx state object |
+| getBTCHeadStateObjectByBTCTxId(btcTxId, callback(err, stateObject))     | gets the btchead state object for a given btctx id | a btchead state object |
 | getAggStateObjectsByAggId(aggId, callback(err, stateObjects))     | gets all agg state data for a given agg id | result array containing agg state objects |
 | getCalStateObjectsByCalId(calId, callback(err, stateObjects))     | gets all cal state data for a given cal id | result array containing cal state objects |
 | getBTCTxStateObjectsByBTCTxId(btcTxId, callback(err, stateObjects))     | gets all btctx state data for a given btctx id | result array containing btctx state objects |
@@ -29,14 +29,17 @@ The following is a description of methods that must be defined in a storage adap
 | logEthEventForHashId(hashId, callback(err, success))     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
 | logBtcEventForHashId(hashId, callback(err, success))     | log a btc event for the given hash id to the hash tracker | boolean indicating success |
 
-## Crate DB Adapter Configuration
+## PostregSQL Adapter Configuration
 Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
 
 The following are the descriptions of the configuration parameters:
 
 | Name           | Description  | Default |
 | :------------- |:-------------|:--------|
-| CRATE\_CONNECT\_PROTOCOL      | the CrateDB connection protocol | 'http:' |
-| CRATE\_CONNECT\_HOST       | the CrateDB connection hostname | 'crate' |
-| CRATE\_CONNECT\_PORT       | the CrateDB connection port | 4200 |
+| POSTGRES\_CONNECT\_PROTOCOL      | the PostgreSQL connection protocol | 'postgres:' |
+| POSTGRES\_CONNECT\_USER       | the PostgreSQL connection username | 'chainpoint' |
+| POSTGRES\_CONNECT\_PW       | the PostgreSQL connection password | 'chainpoint' |
+| POSTGRES\_CONNECT\_HOST      | the PostgreSQL connection hostname | 'postgres' |
+| POSTGRES\_CONNECT\_PORT       | the PostgreSQL connection port | 5432 |
+| POSTGRES\_CONNECT\_DB       | the PostgreSQL connection database name | 'chainpoint' |
 

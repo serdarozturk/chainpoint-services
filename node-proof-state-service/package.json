@@ -12,6 +12,8 @@
     "amqplib": "^0.5.1",
     "async": "^2.3.0",
     "dotenv": "^4.0.0",
-    "node-crate": "^2.0.1"
+    "pg": "^6.1.5",
+    "pg-hstore": "^2.3.2",
+    "sequelize": "^3.30.4"
   }
 }
