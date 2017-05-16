@@ -1,6 +1,39 @@
 version: '3'
 
+networks:
+  front-end:
+    driver: bridge
+  back-end:
+    driver: bridge
+
 services:
+
+  # NGINX Proxy
+  #
+  # An auto-scaling reverse proxy that reconfigures
+  # itself based on which API services are available
+  # for requests.
+  #
+  # See : https://github.com/jwilder/nginx-proxy
+  #
+  # SCALED : false
+  #
+  # PORTS:
+  # http : 80
+  #
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    environment:
+      DEFAULT_HOST: api.local
+    depends_on:
+      - api
+    networks:
+      - front-end
 
   # HTTP API
   # Restify Node public web API service.
@@ -24,15 +57,16 @@ services:
     build:
       context: ./node-api-service
     depends_on:
+      - redis
       - rabbitmq
+      - influxdb
     networks:
       - front-end
+      - back-end
     environment:
-      - VIRTUAL_HOST=api.local
+      VIRTUAL_HOST: api.local
 
   # Splitter
-  # Consume batches of incoming hashes from 'api' and re-queue them
-  # individually.
   #
   # SCALED: true
   # 
@@ -45,13 +79,11 @@ services:
       context: ./node-splitter-service
     depends_on:
       - rabbitmq
+      - influxdb
     networks:
       - back-end
 
   # Aggregator
-  # Aggregate individual hashes into a Merkle tree
-  # sending the Merkle root to the `calendar` service, and
-  # partial proof data to the `proof-state` service.
   #
   # SCALED: true
   #
@@ -64,6 +96,7 @@ services:
       context: ./node-aggregator-service
     depends_on:
       - rabbitmq
+      - influxdb
     networks:
       - back-end
 
@@ -82,6 +115,7 @@ services:
       context: ./node-nist-beacon-service
     depends_on:
       - redis
+      - influxdb
     networks:
       - back-end
 
@@ -102,25 +136,7 @@ services:
     depends_on:
       - rabbitmq
       - nist-beacon
-    networks:
-      - back-end
-
-  # Bitcoin Transmit
-  # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
-  # 
-  # SCALED: false
-  #
-  # PORTS : none
-  #
-  btc-tx:
-    restart: always
-    image: chainpoint/node-btc-tx-service
-    container_name: btc-tx
-    build:
-      context: ./node-btc-tx-service
-    depends_on:
-      - rabbitmq
-      - btc-fee
+      - influxdb
     networks:
       - back-end
 
@@ -139,16 +155,29 @@ services:
       context: ./node-btc-fee-service
     depends_on:
       - rabbitmq
+      - influxdb
+    networks:
+      - back-end
+
+  # Bitcoin Transmit
+  # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
+  # 
+  btc-tx:
+    restart: always
+    image: chainpoint/node-btc-tx-service
+    container_name: btc-tx
+    build:
+      context: ./node-btc-tx-service
+    depends_on:
+      - rabbitmq
+      - btc-fee
+      - influxdb
     networks:
       - back-end
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
   # 
-  # SCALED: false
-  #
-  # PORTS : none
-  #
   btc-mon:
     restart: always
     image: chainpoint/node-btc-mon-service
@@ -157,16 +186,13 @@ services:
       context: ./node-btc-mon-service
     depends_on:
       - rabbitmq
+      - influxdb
     networks:
       - back-end
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
   # 
-  # SCALED: true
-  #
-  # PORTS : none
-  #
   proof-state:
     restart: always
     image: chainpoint/node-proof-state-service
@@ -175,6 +201,7 @@ services:
     depends_on:
       - rabbitmq
       - postgres
+      - influxdb
     networks:
       - back-end
 
@@ -182,10 +209,6 @@ services:
   # Responsible for constructing, signing, and validating Chainpoint proofs
   # for Calendar, Bitcoin, and Ethereum attestation levels.
   # 
-  # SCALED : true
-  #
-  # PORTS : none
-  #
   proof-gen:
     restart: always
     image: chainpoint/node-proof-gen-service
@@ -193,6 +216,122 @@ services:
       context: ./node-proof-gen-service
     depends_on:
       - rabbitmq
+      - influxdb
+    networks:
+      - back-end
+
+  # InfluxDB Telegraf service
+  #
+  telegraf:
+    image: telegraf:1.1.2-alpine
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    ports:
+      - "8092:8092/udp"
+      - "8094:8094"
+      # - "8125:8125/udp"
+    depends_on:
+      - influxdb
+    networks:
+      - back-end
+
+  # InfluxDB Chronograf service (Visualization)
+  #
+  chronograf:
+    restart: always
+    image: chronograf:1.3.0-alpine
+    container_name: chronograf
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./data/chronograf:/var/lib/chronograf
+    environment:
+        INFLUXDB_URL: http://influxdb:8086
+        KAPACITOR_URL: http://kapacitor:9092
+    depends_on:
+      - influxdb
+    networks:
+      - back-end
+
+  # InfluxDB Kapacitor service (Alerting)
+  #
+  kapacitor:
+    image: kapacitor:1.2.1-alpine
+    environment:
+      KAPACITOR_HOSTNAME: kapacitor
+      KAPACITOR_INFLUXDB_0_URLS_0: http://influxdb:8086
+    volumes:
+      - ./data/kapacitor:/var/lib/kapacitor
+    ports:
+      - "9092:9092"
+    depends_on:
+      - influxdb
+    networks:
+      - back-end
+
+  # InfluxDB
+  #
+  influxdb:
+    restart: always
+    image: influxdb:1.1.5-alpine
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./data/influxdb:/var/lib/influxdb
+    networks:
+      - back-end
+
+  # InfluxDB CLI
+  #   docker-compose run influxdb-cli
+  #
+  influxdb-cli:
+    image: influxdb:1.1.5-alpine
+    entrypoint:
+      - influx
+      - -host
+      - influxdb
+    depends_on:
+      - influxdb
+    networks:
+      - back-end
+
+  # InfluxDB Kapacitor CLI
+  #   docker-compose run kapacitor-cli
+  #
+  kapacitor-cli:
+    image: kapacitor:1.2.1-alpine
+    entrypoint: ash
+    environment:
+      KAPACITOR_URL: http://kapacitor:9092
+    depends_on:
+      - influxdb
+      - kapacitor
+    networks:
+      - back-end
+
+  # Postgres
+  #
+  # See : https://hub.docker.com/_/postgres/
+  # Note: Connect locally on OS X:
+  #
+  # Installs local client 'psql'
+  #   brew install postgres
+  #
+  # Connect (uname/pass chainpoint/chainpoint):
+  #   psql -h 127.0.0.1 -U chainpoint
+  #
+  postgres:
+    restart: always
+    image: postgres:9.6.2-alpine
+    container_name: postgres
+    volumes:
+      - ./data/postgresql:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: chainpoint
+      POSTGRES_PASSWORD: chainpoint
+    ports:
+      - "5432:5432"
     networks:
       - back-end
 
@@ -214,38 +353,10 @@ services:
     - 5673:5672
     - 15673:15672
     environment:
-    - RABBITMQ_DEFAULT_USER=chainpoint
-    - RABBITMQ_DEFAULT_PASS=chainpoint
+      RABBITMQ_DEFAULT_USER: chainpoint
+      RABBITMQ_DEFAULT_PASS: chainpoint
     networks:
       - back-end
-      - front-end
-
-  # NGINX Proxy
-  #
-  # An auto-scaling reverse proxy that reconfigures
-  # itself based on which API services are available
-  # for requests.
-  #
-  # See : https://github.com/jwilder/nginx-proxy
-  #
-  # SCALED : false
-  #
-  # PORTS:
-  # http : 80
-  #
-  nginx-proxy:
-    image: jwilder/nginx-proxy
-    container_name: nginx-proxy
-    ports:
-      - "80:80"
-    volumes:
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-    environment:
-      - DEFAULT_HOST=api.local
-    depends_on:
-      - api
-    networks:
-      - front-end
 
   # Redis
   #
@@ -264,46 +375,3 @@ services:
       - ./data/redis:/data
     networks:
       - back-end
-      - front-end
-
-  # Postgres
-  #
-  # See : https://hub.docker.com/_/postgres/
-  # Note: Connect locally on OS X:
-  #
-  # Installs local client 'psql'
-  #   brew install postgres
-  #
-  # Connect (uname/pass chainpoint/chainpoint):
-  #   psql -h 127.0.0.1 -U chainpoint
-  #
-  # LOCAL PORTS:
-  # postgres : 5432
-  #
-  postgres:
-    restart: always
-    image: postgres:9.6.2-alpine
-    container_name: postgres
-    volumes:
-      - ./data/postgresql:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: chainpoint
-      POSTGRES_PASSWORD: chainpoint
-    ports:
-      - "5432:5432"
-    networks:
-      - back-end
-
-# Networks
-#
-# Front end network
-#   Shared by NGNINX Proxy, HTTP API, and RabbitMQ only.
-#
-# Back end network
-#   Available to all services except NGINX Proxy and HTTP API
-#
-networks:
-  front-end:
-    driver: bridge
-  back-end:
-    driver: bridge
