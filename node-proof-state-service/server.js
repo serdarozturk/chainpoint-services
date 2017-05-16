@@ -23,6 +23,9 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 // This value is set once the connection has been established
 var amqpChannel = null
 
+// The frequency, in minutes, that the proof state and hash tracker log tables have their old, unneeded data pruned
+const PRUNE_FREQUENCY_MINUTES = process.env.PRUNE_FREQUENCY_MINUTES || 1
+
 /**
 * Logs Splitter service event to hash tracker
 *
@@ -247,6 +250,63 @@ function ConsumeProofReadyMessage (msg) {
 }
 
 /**
+* Prunes proof state data and hash tracker logs
+* All hashb data that is logged as complete will be removed from all relevant tables
+* This is required to be run regularly in order to keep the proof state database from growing too large
+*
+*/
+function PruneStateData () {
+  async.waterfall([
+    (callback) => {
+      // remove all rows from agg_states that have been processed and from which proofs have been generated
+      storageClient.deleteProcessedHashesFromAggStates((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned agg_states - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // remove all rows from hash_tracker_logs for the hashes that have been processed and from which proofs have been generated
+      storageClient.deleteHashTrackerLogEntries((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned hash_tracker_logs - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // remove all rows from cal_states whose agg_states children have all been deleted
+      storageClient.deleteCalStatesWithNoRemainingAggStates((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned cal_states - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // remove all rows from btctx_states whose cal_states children have all been deleted
+      storageClient.deleteBtcTxStatesWithNoRemainingCalStates((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // remove all rows from btchead_states whose btctx_states children have all been deleted
+      storageClient.deleteBtcHeadStatesWithNoRemainingBtcTxStates((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned btcheadstates - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      console.error('error with pruning', err)
+    } else {
+      console.log('Pruning complete')
+    }
+  })
+}
+
+/**
 * Parses a message and performs the required work for that message
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
@@ -358,5 +418,7 @@ openStorageConnection((err, result) => {
     console.error(err)
   } else {
     amqpOpenConnection(RABBITMQ_CONNECT_URI)
+    // Define and start pruning cycle
+    setInterval(PruneStateData, PRUNE_FREQUENCY_MINUTES * 60 * 1000)
   }
 })

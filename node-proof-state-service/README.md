@@ -33,6 +33,7 @@ The following are the descriptions of the configuration parameters:
 | RMQ\_WORK\_OUT\_GEN\_QUEUE       | the queue name for outgoing message to the proof gen service | 
 | RMQ\_WORK\_OUT\_STATE\_QUEUE       | the queue name for outgoing message to the proof state service |
 | RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI |
+| PRUNE\_FREQUENCY\_MINUTES       | The frequency of proof state and hash tracker log data pruning |
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
@@ -43,6 +44,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | RMQ\_WORK\_OUT\_GEN\_QUEUE       | string      | 'work.gen' |  |  | 
 | RMQ\_WORK\_OUT\_STATE\_QUEUE       | string      | 'work.state' |  |  |   
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' | 
+| PRUNE\_FREQUENCY\_MINUTES       | integer      | 1 | 
 
 
 ## Data In

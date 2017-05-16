@@ -10,8 +10,12 @@ const POSTGRES_CONNECT_PW = process.env.POSTGRES_CONNECT_PW || 'chainpoint'
 const POSTGRES_CONNECT_HOST = process.env.POSTGRES_CONNECT_HOST || 'postgres'
 const POSTGRES_CONNECT_PORT = process.env.POSTGRES_CONNECT_PORT || 5432
 const POSTGRES_CONNECT_DB = process.env.POSTGRES_CONNECT_DB || 'chainpoint'
-const POSTGRES_CONNECT_URI = POSTGRES_CONNECT_PROTOCOL + '//' + POSTGRES_CONNECT_USER + ':' + POSTGRES_CONNECT_PW + '@' +
-  POSTGRES_CONNECT_HOST + ':' + POSTGRES_CONNECT_PORT + '/' + POSTGRES_CONNECT_DB
+const POSTGRES_CONNECT_URI = `${POSTGRES_CONNECT_PROTOCOL}//${POSTGRES_CONNECT_USER}:${POSTGRES_CONNECT_PW}@${POSTGRES_CONNECT_HOST}:${POSTGRES_CONNECT_PORT}/${POSTGRES_CONNECT_DB}`
+
+// Set the number of tracking log events to complete in order for the hash to be considered full processed
+// Currently, the value is set as 3 to represent splitter, aggregator, and calendar events
+// This number will increase as additional anchor services are added
+const PROOF_STEP_COUNT = 3
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
@@ -347,6 +351,59 @@ function logBtcEventForHashId (hashId, callback) {
   })
 }
 
+function deleteProcessedHashesFromAggStates (callback) {
+  sequelize.query(`DELETE FROM agg_states WHERE hash_id IN
+    (SELECT hash_id FROM hash_tracker_logs GROUP BY hash_id
+    HAVING COUNT(hash_id) >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
+function deleteHashTrackerLogEntries (callback) {
+  sequelize.query(`DELETE FROM hash_tracker_logs WHERE hash_id IN
+    (SELECT hash_id FROM hash_tracker_logs GROUP BY hash_id
+    HAVING COUNT(hash_id) >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
+function deleteCalStatesWithNoRemainingAggStates (callback) {
+  sequelize.query(`DELETE FROM cal_states WHERE agg_id IN
+    (SELECT c.agg_id FROM cal_states c
+    LEFT JOIN agg_states a ON c.agg_id = a.agg_id
+    GROUP BY c.agg_id HAVING COUNT(a.agg_id) = 0)`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
+function deleteBtcTxStatesWithNoRemainingCalStates (callback) {
+  sequelize.query(`DELETE FROM btctx_states WHERE cal_id IN
+    (SELECT btctx.cal_id FROM btctx_states btctx
+    LEFT JOIN cal_states c ON btctx.cal_id = c.cal_id
+    GROUP BY btctx.cal_id HAVING COUNT(c.cal_id) = 0)`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
+function deleteBtcHeadStatesWithNoRemainingBtcTxStates (callback) {
+  sequelize.query(`DELETE FROM btchead_states WHERE btctx_id IN
+    (SELECT btchead.btctx_id FROM btchead_states btchead
+    LEFT JOIN btctx_states btctx ON btchead.btctx_id = btctx.btctx_id
+    GROUP BY btchead.btctx_id HAVING COUNT(btctx.btctx_id) = 0)`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
 module.exports = {
   openConnection: openConnection,
   getHashIdCountByAggId: getHashIdCountByAggId,
@@ -367,5 +424,10 @@ module.exports = {
   logAggregatorEventForHashId: logAggregatorEventForHashId,
   logCalendarEventForHashId: logCalendarEventForHashId,
   logEthEventForHashId: logEthEventForHashId,
-  logBtcEventForHashId: logBtcEventForHashId
+  logBtcEventForHashId: logBtcEventForHashId,
+  deleteProcessedHashesFromAggStates: deleteProcessedHashesFromAggStates,
+  deleteHashTrackerLogEntries: deleteHashTrackerLogEntries,
+  deleteCalStatesWithNoRemainingAggStates: deleteCalStatesWithNoRemainingAggStates,
+  deleteBtcTxStatesWithNoRemainingCalStates: deleteBtcTxStatesWithNoRemainingCalStates,
+  deleteBtcHeadStatesWithNoRemainingBtcTxStates: deleteBtcHeadStatesWithNoRemainingBtcTxStates
 }
