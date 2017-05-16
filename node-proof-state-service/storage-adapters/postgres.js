@@ -72,19 +72,26 @@ var BtcHeadStates = sequelize.define('btchead_states', {
   timestamps: false
 })
 
-var HashTrackerLog = sequelize.define('hash_tracker_log', {
-  log_id: { type: Sequelize.BIGINT, autoIncrement: true, primaryKey: true },
-  hash_id: { type: Sequelize.UUID },
+sequelize.define('hash_tracker_log', {
+  hash_id: { type: Sequelize.UUID, primaryKey: true },
   hash: { type: Sequelize.STRING },
-  event: { type: Sequelize.TEXT }
+  splitter_at: { type: Sequelize.DATE },
+  aggregator_at: { type: Sequelize.DATE },
+  calendar_at: { type: Sequelize.DATE },
+  btc_tx_at: { type: Sequelize.DATE },
+  btc_head_at: { type: Sequelize.DATE },
+  steps_complete: { type: Sequelize.INTEGER }
 }, {
   indexes: [
     {
-      fields: ['hash_id']
+      fields: ['steps_complete']
+    },
+    {
+      name: 'hash_id_and_steps_complete',
+      fields: ['hash_id', 'steps_complete']
     }
   ],
-  timestamps: true,
-  updatedAt: false
+  timestamps: false
 })
 
 function openConnection (callback) {
@@ -286,75 +293,69 @@ function writeBTCHeadStateObject (stateObject, callback) {
 }
 
 function logSplitterEventForHashId (hashId, hash, callback) {
-  HashTrackerLog.create({
-    hash_id: hashId,
-    hash: hash,
-    event: 'splitter'
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, splitter_at, steps_complete)
+    VALUES ('${hashId}', '${hash}', clock_timestamp(), 1)
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (splitter_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function logAggregatorEventForHashId (hashId, callback) {
-  HashTrackerLog.create({
-    hash_id: hashId,
-    event: 'aggregator'
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, aggregator_at, steps_complete)
+    VALUES ('${hashId}', clock_timestamp(), 1)
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (aggregator_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function logCalendarEventForHashId (hashId, callback) {
-  HashTrackerLog.create({
-    hash_id: hashId,
-    event: 'calendar'
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, calendar_at, steps_complete)
+    VALUES ('${hashId}', clock_timestamp(), 1)
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (calendar_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
-function logEthEventForHashId (hashId, callback) {
-  HashTrackerLog.create({
-    hash_id: hashId,
-    event: 'eth'
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+function logBtcTxEventForHashId (hashId, callback) {
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_tx_at, steps_complete)
+    VALUES ('${hashId}', clock_timestamp(), 1)
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (btc_tx_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
-function logBtcEventForHashId (hashId, callback) {
-  HashTrackerLog.create({
-    hash_id: hashId,
-    event: 'btc'
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+function logBtcHeadEventForHashId (hashId, callback) {
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_head_at, steps_complete)
+    VALUES ('${hashId}', clock_timestamp(), 1)
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (btc_head_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function deleteProcessedHashesFromAggStates (callback) {
   sequelize.query(`DELETE FROM agg_states WHERE hash_id IN
-    (SELECT hash_id FROM hash_tracker_logs GROUP BY hash_id
-    HAVING COUNT(hash_id) >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
+    (SELECT hash_id FROM hash_tracker_logs 
+    WHERE steps_complete >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
       return callback(null, meta.rowCount)
     }).catch((err) => {
       return callback(err)
@@ -362,13 +363,11 @@ function deleteProcessedHashesFromAggStates (callback) {
 }
 
 function deleteHashTrackerLogEntries (callback) {
-  sequelize.query(`DELETE FROM hash_tracker_logs WHERE hash_id IN
-    (SELECT hash_id FROM hash_tracker_logs GROUP BY hash_id
-    HAVING COUNT(hash_id) >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+  sequelize.query(`DELETE FROM hash_tracker_logs WHERE steps_complete >= ${PROOF_STEP_COUNT}`).spread((results, meta) => {
+    return callback(null, meta.rowCount)
+  }).catch((err) => {
+    return callback(err)
+  })
 }
 
 function deleteCalStatesWithNoRemainingAggStates (callback) {
@@ -423,8 +422,8 @@ module.exports = {
   logSplitterEventForHashId: logSplitterEventForHashId,
   logAggregatorEventForHashId: logAggregatorEventForHashId,
   logCalendarEventForHashId: logCalendarEventForHashId,
-  logEthEventForHashId: logEthEventForHashId,
-  logBtcEventForHashId: logBtcEventForHashId,
+  logBtcTxEventForHashId: logBtcTxEventForHashId,
+  logBtcHeadEventForHashId: logBtcHeadEventForHashId,
   deleteProcessedHashesFromAggStates: deleteProcessedHashesFromAggStates,
   deleteHashTrackerLogEntries: deleteHashTrackerLogEntries,
   deleteCalStatesWithNoRemainingAggStates: deleteCalStatesWithNoRemainingAggStates,
