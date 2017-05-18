@@ -31,6 +31,16 @@ const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'btc_rec_fee'
 // The interval, in seconds, that the local BTCRecommendedFee variable is refreshed from BTC_REC_FEE_KEY
 const BTC_REC_FEE_REFRESH_INTERVAL = process.env.BTC_REC_FEE_REFRESH_INTERVAL || 60
 
+// The mamimum recFeeInSatPerByte value accepted.
+// This is to safeguard against the service returning a very high value in error
+// and to impose a common sense limit on the highest fee per byte to allow.
+// MAX BTC to spend = AverageTxSizeBytes * BTC_MAX_FEE_SAT_PER_BYTE / 100000000
+// If we are to limit the maximum fee per transaction to 0.01 BTC, then
+// 0.01 = 235 * BTC_MAX_FEE_SAT_PER_BYTE / 100000000
+// BTC_MAX_FEE_SAT_PER_BYTE = 0.01 *  100000000 / 235
+// BTC_MAX_FEE_SAT_PER_BYTE = 4255
+const BTC_MAX_FEE_SAT_PER_BYTE = process.env.BTC_MAX_FEE_SAT_PER_BYTE || 4255
+
 // BCOIN REST API
 // These values are private and are accessed from environment variables only
 const BCOIN_API_BASE_URI = process.env.BCOIN_API_URI
@@ -72,6 +82,11 @@ const genTxScript = (hash) => {
 * @param {string} hash - The hash to embed in an OP_RETURN
 */
 const genTxBody = (fee, hash) => {
+  // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
+  if (fee > BTC_MAX_FEE_SAT_PER_BYTE) {
+    console.error(`Fee of ${fee} per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${BTC_MAX_FEE_SAT_PER_BYTE}`)
+    fee = BTC_MAX_FEE_SAT_PER_BYTE
+  }
   let body = {
     token: BCOIN_API_WALLET_TOKEN,
     rate: fee,
