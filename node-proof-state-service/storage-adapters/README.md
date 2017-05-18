@@ -28,6 +28,11 @@ The following is a description of methods that must be defined in a storage adap
 | logCalendarEventForHashId(hashId, callback(err, success))     | log a calendar event for the given hash id to the hash tracker | boolean indicating success |
 | logEthEventForHashId(hashId, callback(err, success))     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
 | logBtcEventForHashId(hashId, callback(err, success))     | log a btc event for the given hash id to the hash tracker | boolean indicating success |
+| deleteProcessedHashesFromAggStates(callback(err, rowCount))     | prune records from agg\_states table | integer |
+| deleteHashTrackerLogEntries(callback(err, rowCount))     | prune records from hash\_tracker\_logs table | integer |
+| deleteCalStatesWithNoRemainingAggStates(callback(err, rowCount))     | prune records from cal\_states table | integer |
+| deleteBtcTxStatesWithNoRemainingCalStates(callback(err, rowCount))     | prune records from btctx\_states table | integer |
+| deleteBtcHeadStatesWithNoRemainingBtcTxStates(callback(err, rowCount))     | prune records from btchead\_states table | integer |
 
 ## PostregSQL Adapter Configuration
 Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
