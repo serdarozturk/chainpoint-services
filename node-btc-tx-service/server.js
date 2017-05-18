@@ -1,7 +1,7 @@
 const amqp = require('amqplib/callback_api')
 const async = require('async')
-const _ = require('lodash')
 const bcoin = require('bcoin')
+const request = require('request')
 require('dotenv').config()
 
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
@@ -28,24 +28,102 @@ const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'btc_rec_fee'
 // The interval, in seconds, that the local BTCRecommendedFee variable is refreshed from BTC_REC_FEE_KEY
 const BTC_REC_FEE_REFRESH_INTERVAL = process.env.BTC_REC_FEE_REFRESH_INTERVAL || 60
 
+// BCOIN REST API
+// These values are private and are accessed from environment variables only
+const BCOIN_API_BASE_URI = process.env.BCOIN_API_URI
+const BCOIN_API_WALLET_ID = process.env.BCOIN_API_WALLET_ID
+const BCOIN_API_WALLET_TOKEN = process.env.BCOIN_API_WALLET_TOKEN
+const BCOIN_API_USERNAME = process.env.BCOIN_API_BASIC_AUTH_USERNAME
+const BCOIN_API_PASS = process.env.BCOIN_API_BASIC_AUTH_PASS
+
 // The local variable holding the Bitcoin recommended fee value, from Redis in BTC_REC_FEE_KEY,
 // refreshed at the interval specified in BTC_REC_FEE_REFRESH_INTERVAL
 // Sample BTCRecommendedFee Object ->
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
-var BTCRecommendedFee
+let recFee = null
 
-let sendTxToBTC = () => {
-  console.log('BTC TX...')
+// FIXME : Add etcd server, node client, and leader election and abort the periodic run of this service if not the leader.
+// FIXME : Add bcoin server and send raw tx to bcoin server directly w/ https://bitcoinjs.org/ ?
+// FIXME : Wallet? https://github.com/bitcoinjs/bip32-utils
+// FIXME : Wut? Is this stealth code? https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/test/integration/stealth.js
+
+/**
+* Convert string into compiled bcoin TX value for a null data OP_RETURN
+*
+* @param {string} hash - The hash to embed in an OP_RETURN
+*/
+const genTxScript = (hash) => {
+  const opcodes = bcoin.script.opcodes
+  const script = new bcoin.script()
+  script.push(opcodes.OP_RETURN)
+  script.push(hash)
+  script.compile()
+
+  return script.toJSON()
 }
 
-let refreshBTCRecommendedFee = () => {
-  redis.get(BTC_REC_FEE_KEY, (err, res) => {
-    if (err) {
-      console.error(err)
-    } else {
-      BTCRecommendedFee = res
-      console.log('BTCRecommendedFee refreshed - ', JSON.stringify(res))
+/**
+* Generate a POST body suitable for submission to bcoin REST API
+*
+* @param {string} fee - The miners fee for this TX in Satoshi's per byte
+* @param {string} hash - The hash to embed in an OP_RETURN
+*/
+const genTxBody = (fee, hash) => {
+  let body = {
+    token: BCOIN_API_WALLET_TOKEN,
+    rate: fee,
+    outputs: [{
+      script: genTxScript(hash)
+    }]
+  }
+
+  console.log(body)
+  return body
+}
+
+/**
+* Send a POST request to /wallet/:id/send with a POST body
+* containing an OP_RETURN TX
+*
+* @param {string} hash - The hash to embed in an OP_RETURN
+*/
+const sendTxToBTC = (hash) => {
+  let body = genTxBody(recFee.recFeeInSatPerByte, hash)
+  console.log(body)
+
+  let options = {
+    method: 'POST',
+    uri: BCOIN_API_BASE_URI + '/wallet/' + BCOIN_API_WALLET_ID + '/send',
+    body: JSON.stringify(body),
+    json: true,
+    gzip: true,
+    auth: {
+      user: BCOIN_API_USERNAME,
+      pass: BCOIN_API_PASS
     }
+  }
+
+  console.log('sending')
+  request(options, function (err, response, body) {
+    if (!err && response.statusCode === 200) {
+      // FIXME : data about the successful TX needs to be sent to the monitoring service
+      // so it can watch for 6 confirmations
+      console.log('success tx')
+      console.log(body)
+    } else {
+      // FIXME : what do we do if the POST fails?
+      // fallback to a secondary server?
+      // make an API call to a 3rd party?
+      console.log('fail tx')
+      console.log(err)
+    }
+  })
+}
+
+const refreshRecFee = (callback) => {
+  redis.get(BTC_REC_FEE_KEY, (err, res) => {
+    if (err) return callback(err)
+    return callback(null, res)
   })
 }
 
@@ -114,9 +192,32 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
-// Open amqp connection
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+// setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
+// let hash = '407ba568d471e708b6a4b312cfe57e9a525bea684d075c0fb0ce23feb32f57b6'
+// setInterval(() => sendTxToBTC(hash), 15000)
 
-setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
+/**
+ * Initializes RecFee
+ **/
+function initializeRecFee (callback) {
+  // refresh on script startup, and periodically afterwards
+  refreshRecFee((err, result) => {
+    if (err) {
+      setTimeout(initializeRecFee.bind(null, callback), 5 * 1000)
+      return callback('Cannot initialize RecFee. Attempting in 5 seconds...')
+    } else {
+      // RecFee initialized, now refresh every BTC_REC_FEE_REFRESH_INTERVAL seconds
+      setInterval(() => initializeRecFee.bind(null, callback), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
+      return callback(null, true)
+    }
+  })
+}
 
-setInterval(() => refreshBTCRecommendedFee(), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
+// Initializes RecFee and then amqp connection
+initializeRecFee((err, result) => {
+  if (err) {
+    console.error(err)
+  } else {
+    amqpOpenConnection(RABBITMQ_CONNECT_URI)
+  }
+})
