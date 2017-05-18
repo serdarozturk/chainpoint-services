@@ -11,8 +11,11 @@ const redis = r.createClient(REDIS_CONNECT_URI)
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// The queue name for message consumption originating from the proof state service
+// The queue name for message consumption originating from the calendar service
 const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.btctx'
+
+// The queue name for outgoing message to the calendar service
+const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.cal'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -38,7 +41,7 @@ const BCOIN_API_PASS = process.env.BCOIN_API_BASIC_AUTH_PASS
 
 // The local variable holding the Bitcoin recommended fee value, from Redis in BTC_REC_FEE_KEY,
 // refreshed at the interval specified in BTC_REC_FEE_REFRESH_INTERVAL
-// Sample BTCRecommendedFee Object ->
+// Sample recFee Object ->
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
 let recFee = null
 
@@ -123,7 +126,10 @@ const sendTxToBTC = (hash) => {
 const refreshRecFee = (callback) => {
   redis.get(BTC_REC_FEE_KEY, (err, res) => {
     if (err) return callback(err)
-    return callback(null, res)
+    // save received recFee object
+    recFee = res
+    console.log(recFee)
+    return callback(null)
   })
 }
 
@@ -135,8 +141,10 @@ const refreshRecFee = (callback) => {
 function processIncomingAnchorJob (msg) {
   if (msg !== null) {
     let messageObj = JSON.parse(msg.content.toString())
-    // TODO: messageObj will contain, at minimum, the value to be anchored, likely a merkle root hex string, messageObj.data
-    // TODO: create the transaction using the value to be anchored
+    // the value to be anchored, likely a merkle root hex string
+    let anchorData = messageObj.data
+    // create the transaction using the current RecFee and the value to be anchored
+    let btcTxBody = genTxBody(recFee, anchorData)
     // TODO: publish the transaction
     // TODO: if the publish was successful, then
     amqpChannel.ack(msg)
@@ -174,6 +182,7 @@ function amqpOpenConnection (connectionString) {
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('Connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
@@ -192,22 +201,19 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
-// setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
-// let hash = '407ba568d471e708b6a4b312cfe57e9a525bea684d075c0fb0ce23feb32f57b6'
-// setInterval(() => sendTxToBTC(hash), 15000)
-
 /**
  * Initializes RecFee
  **/
 function initializeRecFee (callback) {
   // refresh on script startup, and periodically afterwards
-  refreshRecFee((err, result) => {
+  refreshRecFee((err) => {
     if (err) {
       setTimeout(initializeRecFee.bind(null, callback), 5 * 1000)
       return callback('Cannot initialize RecFee. Attempting in 5 seconds...')
     } else {
       // RecFee initialized, now refresh every BTC_REC_FEE_REFRESH_INTERVAL seconds
-      setInterval(() => initializeRecFee.bind(null, callback), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
+      console.log('RecFee initialized')
+      setInterval(() => refreshRecFee((err) => { if (err) console.error(err) }), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
       return callback(null, true)
     }
   })
@@ -221,3 +227,7 @@ initializeRecFee((err, result) => {
     amqpOpenConnection(RABBITMQ_CONNECT_URI)
   }
 })
+
+// setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
+// let hash = '407ba568d471e708b6a4b312cfe57e9a525bea684d075c0fb0ce23feb32f57b6'
+// setInterval(() => sendTxToBTC(hash), 15000)
