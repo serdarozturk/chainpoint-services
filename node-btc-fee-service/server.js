@@ -8,9 +8,14 @@ const INFLUXDB_HOST = process.env.INFLUXDB_HOST || 'influxdb'
 const INFLUXDB_PORT = process.env.INFLUXDB_PORT || 8086
 const INFLUXDB_DB = process.env.INFLUXDB_DB || 'chainpoint_fees'
 
+// FIXME : Get rid of caching for http call so we can get rid of redis here?
 const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
 const redis = r.createClient(REDIS_CONNECT_URI)
+
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify to use Redis caching layer.
@@ -23,7 +28,7 @@ const REC_FEES_URI = process.env.REC_FEES_URI || 'https://bitcoinfees.21.co/api/
 
 // The published key location where recommended fee will be stored
 // for use by other services.
-const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'btc_rec_fee'
+const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'service/btc-fee/recommendation'
 
 // How long, in milliseconds, should cached values be kept for
 // until a new HTTP GET is issued?
@@ -178,8 +183,10 @@ let getRecommendedFees = () => {
       influxLogFeeRec(feeRecObj)
 
       // Publish the recommended transaction fee data in a well known
-      // location for use by any service with access to Redis.
-      redis.set(BTC_REC_FEE_KEY, JSON.stringify(feeRecObj))
+      // location for use by any service with access to consul.
+      consul.kv.set(BTC_REC_FEE_KEY, JSON.stringify(feeRecObj), function (err, result) {
+        if (err) throw err
+      })
     } else {
       // Bail out and let the service get restarted
       console.error('unexpected return value : %s', JSON.stringify(responseBody))

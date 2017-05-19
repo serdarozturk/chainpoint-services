@@ -4,9 +4,9 @@ const _ = require('lodash')
 const bcoin = require('bcoin')
 require('dotenv').config()
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
-const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -21,32 +21,14 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 // This value is set once the connection has been established
 let amqpChannel = null
 
-// The published key location where recommended fee is stored
-// for use by other services.
-const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'btc_rec_fee'
+// The consul key to watch to receive updated fee object
+const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'service/btc-fee/recommendation'
 
-// The interval, in seconds, that the local BTCRecommendedFee variable is refreshed from BTC_REC_FEE_KEY
-const BTC_REC_FEE_REFRESH_INTERVAL = process.env.BTC_REC_FEE_REFRESH_INTERVAL || 60
-
-// The local variable holding the Bitcoin recommended fee value, from Redis in BTC_REC_FEE_KEY,
-// refreshed at the interval specified in BTC_REC_FEE_REFRESH_INTERVAL
-// Sample BTCRecommendedFee Object ->
-// {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
-var BTCRecommendedFee
+// locally store the fee object here when updated
+var BTCRecommendedFee = null
 
 let sendTxToBTC = () => {
   console.log('BTC TX...')
-}
-
-let refreshBTCRecommendedFee = () => {
-  redis.get(BTC_REC_FEE_KEY, (err, res) => {
-    if (err) {
-      console.error(err)
-    } else {
-      BTCRecommendedFee = res
-      console.log('BTCRecommendedFee refreshed - ', JSON.stringify(res))
-    }
-  })
 }
 
 /**
@@ -119,4 +101,18 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
 
-setInterval(() => refreshBTCRecommendedFee(), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
+// Continuous watch on the consul key holding the fee object.
+var watch = consul.watch({method: consul.kv.get, options: { key: BTC_REC_FEE_KEY }})
+
+// Store the updated fee object on change
+watch.on('change', function (data, res) {
+  // console.log('data:', data)
+  BTCRecommendedFee = JSON.parse(data.Value)
+  console.log(BTCRecommendedFee)
+})
+
+// Oops, something is wrong with consul
+// or the fee service key
+watch.on('error', function (err) {
+  console.error('error:', err)
+})

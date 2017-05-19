@@ -375,3 +375,20 @@ services:
       - ./data/redis:/data
     networks:
       - back-end
+
+  # Consul
+  #
+  # Consul Admin UI: http://127.0.0,1:8500
+  #
+  consul:
+    restart: always
+    image: consul:0.8.3
+    container_name: consul
+    ports:
+      - "8300:8300"
+      - "8400:8400"
+      - "8500:8500"
+    volumes:
+      - ./data/consul:/consul/data
+    networks:
+      - back-end

@@ -18,6 +18,12 @@ coin-ticker@^1.2.2:
   dependencies:
     axios "^0.15.3"
 
+consul@^0.29.0:
+  version "0.29.0"
+  resolved "https://registry.yarnpkg.com/consul/-/consul-0.29.0.tgz#b1d8748700ca84e6d86d7ddf28d263a7ce808181"
+  dependencies:
+    papi "^0.27.0"
+
 debug@^2.2.0:
   version "2.6.6"
   resolved "https://registry.yarnpkg.com/debug/-/debug-2.6.6.tgz#a9fa6fbe9ca43cf1e79f73b75c0189cbb7d6db5a"
@@ -53,6 +59,10 @@ lodash@^4.17.4:
 ms@0.7.3:
   version "0.7.3"
   resolved "https://registry.yarnpkg.com/ms/-/ms-0.7.3.tgz#708155a5e44e33f5fd0fc53e81d0d40a91be1fff"
+
+papi@^0.27.0:
+  version "0.27.0"
+  resolved "https://registry.yarnpkg.com/papi/-/papi-0.27.0.tgz#7392a38ebefa7fb67e98b363bca3d136827caf28"
 
 q@^0.9.7:
   version "0.9.7"
