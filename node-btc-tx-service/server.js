@@ -6,7 +6,7 @@ require('dotenv').config()
 
 const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
 const CONSUL_PORT = process.env.CONSUL_PORT || 8500
-const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
+const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -15,7 +15,7 @@ const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.btctx'
 
 // The queue name for outgoing message to the calendar service
-const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.cal'
+const RMQ_WORK_OUT_CAL_QUEUE = process.env.RMQ_WORK_OUT_CAL_QUEUE || 'work.cal'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -50,11 +50,6 @@ const BCOIN_API_PASS = process.env.BCOIN_API_PASS
 // Sample BTCRecommendedFee Object ->
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
 var BTCRecommendedFee = null
-
-// FIXME : Add etcd server, node client, and leader election and abort the periodic run of this service if not the leader.
-// FIXME : Add bcoin server and send raw tx to bcoin server directly w/ https://bitcoinjs.org/ ?
-// FIXME : Wallet? https://github.com/bitcoinjs/bip32-utils
-// FIXME : Wut? Is this stealth code? https://github.com/bitcoinjs/bitcoinjs-lib/blob/master/test/integration/stealth.js
 
 /**
 * Convert string into compiled bcoin TX value for a null data OP_RETURN
@@ -121,9 +116,7 @@ const sendTxToBTC = (hash, callback) => {
   }
   request(options, function (err, response, body) {
     if (err || response.statusCode !== 200) {
-      // FIXME : what do we do if the POST fails?
-      // fallback to a secondary server?
-      // make an API call to a 3rd party?
+      // TODO: Implement alternative if POST fails
       if (!err) err = `POST failed with status code ${response.statusCode}`
       return callback(err)
     }
@@ -143,16 +136,42 @@ function processIncomingAnchorJob (msg) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
     let anchorData = messageObj.data
-    // create and publish the transaction
-    sendTxToBTC(anchorData, (err, body) => {
+    async.waterfall([
+      (callback) => {
+        // create and publish the transaction
+        sendTxToBTC(anchorData, (err, body) => {
+          if (err) return callback(err)
+          return callback(null, body)
+        })
+      },
+      (body, callback) => {
+        // queue return message for calendar containing the new transaction information
+        console.log(body)
+        let txInfo = {
+          id: body.hash,
+          body: body.tx
+        }
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(txInfo)), { persistent: true, type: 'btctx' },
+          (err, ok) => {
+            if (err !== null) {
+              console.error(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
+              return callback(err)
+            } else {
+              console.log(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+              return callback(null)
+            }
+          })
+      }
+    ], function (err) {
       if (err) {
         // An error has occurred publishing the transaction, nack consumption of message
-        console.error(err)
-        amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        console.error('error publishing transaction', err)
+        // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
+        setTimeout(() => {
+          amqpChannel.nack(msg)
+          console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        }, 30000)
       } else {
-        // TODO: and record/queue the transaction/publish results somewhere
-        console.log(body)
         amqpChannel.ack(msg)
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
@@ -189,7 +208,7 @@ function amqpOpenConnection (connectionString) {
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('Connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
@@ -213,7 +232,7 @@ function amqpOpenConnection (connectionString) {
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Continuous watch on the consul key holding the fee object.
-var watch = consul.watch({method: consul.kv.get, options: { key: BTC_REC_FEE_KEY }})
+var watch = consul.watch({ method: consul.kv.get, options: { key: BTC_REC_FEE_KEY } })
 
 // Store the updated fee object on change
 watch.on('change', function (data, res) {
@@ -227,4 +246,3 @@ watch.on('change', function (data, res) {
 watch.on('error', function (err) {
   console.error('error:', err)
 })
-
