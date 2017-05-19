@@ -85,9 +85,9 @@ function amqpOpenConnection (connectionString) {
         chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
-        // Continuously load the AGGREGATION_ROOTS from RMQ with root objects to process
+
         chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
-          consumeAggRootMessage(msg)
+          processMessage(msg)
         })
         return callback(null)
       })
@@ -101,6 +101,29 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
+/**
+* Parses a message and performs the required work for that message
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function processMessage (msg) {
+  if (msg !== null) {
+    // determine the source of the message and handle appropriately
+    switch (msg.properties.type) {
+      case 'aggregator':
+        consumeAggRootMessage(msg)
+        break
+      case 'btctx':
+        // Consumes a tx  message from the btctx service
+        consumeBtcTxMessage(msg)
+        break
+      default:
+        // This is an unknown state type
+        console.error('Unknown state type', msg.properties.type)
+    }
+  }
+}
+
 function consumeAggRootMessage (msg) {
   if (msg !== null) {
     let rootObj = JSON.parse(msg.content.toString())
@@ -108,6 +131,13 @@ function consumeAggRootMessage (msg) {
     // add msg to the root object so that we can ack it during the finalize process for this root object
     rootObj.msg = msg
     AGGREGATION_ROOTS.push(rootObj)
+  }
+}
+
+function consumeBtcTxMessage (msg) {
+  if (msg !== null) {
+    let txObj = JSON.parse(msg.content.toString())
+    console.log(txObj)
   }
 }
 
@@ -139,7 +169,7 @@ function formatAsChainpointV3Ops (proof, op) {
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Take work off of the AGGREGATION_ROOTS array and build Merkle tree
-let generateCalendar = () => {
+let generateCalendarBlock = () => {
   let rootsForTree = AGGREGATION_ROOTS.splice(0)
 
   // create merkle tree only if there is at least one root to process
@@ -279,7 +309,7 @@ let aggregateAndAnchor = () => {
     })
 }
 
-setInterval(() => generateCalendar(), CALENDAR_INTERVAL_MS)
+setInterval(() => generateCalendarBlock(), CALENDAR_INTERVAL_MS)
 
 setInterval(() => finalize(), FINALIZATION_INTERVAL_MS)
 
