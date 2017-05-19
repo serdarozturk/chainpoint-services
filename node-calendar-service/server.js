@@ -7,10 +7,13 @@ const uuidv1 = require('uuid/v1')
 require('dotenv').config()
 
 // The frequency to generate new calendar trees
-const CALENDAR_INTERVAL = process.env.CALENDAR_INTERVAL || 1000
+const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 1000
 
 // How often should calendar trees be finalized
-const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
+const FINALIZATION_INTERVAL_MS = process.env.FINALIZATION_INTERVAL_MS || 250
+
+// How often blocks on calendar should be aggregated and anchored
+const ANCHOR_AGG_INTERVAL_SECONDS = process.env.ANCHOR_AGG_INTERVAL_SECONDS || 600
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -263,11 +266,8 @@ let finalize = () => {
   })
 }
 
-setInterval(() => generateCalendar(), CALENDAR_INTERVAL)
-
-setInterval(() => finalize(), FINALIZATION_INTERVAL)
-
-setTimeout(() => {
+// Aggregate all block hashes on chain since last aggregation, anchor root
+let aggregateAndAnchor = () => {
   // Send this test hash to the btc tx service
   amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify({ data: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11' })), { persistent: true },
     (err, ok) => {
@@ -277,4 +277,10 @@ setTimeout(() => {
         console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
       }
     })
-}, 500000)
+}
+
+setInterval(() => generateCalendar(), CALENDAR_INTERVAL_MS)
+
+setInterval(() => finalize(), FINALIZATION_INTERVAL_MS)
+
+setInterval(() => aggregateAndAnchor(), ANCHOR_AGG_INTERVAL_SECONDS * 1000)
