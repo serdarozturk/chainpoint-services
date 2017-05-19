@@ -25,5 +25,5 @@ Login
 (`ctl-d` to exit)
 
 ```
-docker run -it chainpoint/node-base /bin/ash
+docker run -it chainpoint/node-base /bin/bash
 ```

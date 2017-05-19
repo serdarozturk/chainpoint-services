@@ -19,10 +19,14 @@ LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 #   A tool to switch user and group id and exec
 #   see: https://github.com/ncopa/su-exec
 #
-RUN apk add --update tini su-exec
+RUN apk add --update tini su-exec --no-cache
 
 # Common Dependencies
-RUN apk add htop curl wget jq --no-cache
+RUN apk add bash nano vim htop curl wget jq --no-cache
+
+# Needed to load native node modules
+# See : https://github.com/grpc/grpc/issues/8528
+RUN apk add libc6-compat --no-cache
 
 # The `node` user and its home dir is provided by
 # the base image. Create a subdir where the app code

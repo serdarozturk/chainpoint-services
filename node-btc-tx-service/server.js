@@ -4,9 +4,9 @@ const bcoin = require('bcoin')
 const request = require('request')
 require('dotenv').config()
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
-const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -24,12 +24,8 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 // This value is set once the connection has been established
 let amqpChannel = null
 
-// The published key location where recommended fee is stored
-// for use by other services.
-const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'btc_rec_fee'
-
-// The interval, in seconds, that the local BTCRecommendedFee variable is refreshed from BTC_REC_FEE_KEY
-const BTC_REC_FEE_REFRESH_INTERVAL = process.env.BTC_REC_FEE_REFRESH_INTERVAL || 60
+// The consul key to watch to receive updated fee object
+const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'service/btc-fee/recommendation'
 
 // The mamimum recFeeInSatPerByte value accepted.
 // This is to safeguard against the service returning a very high value in error
@@ -43,17 +39,17 @@ const BTC_MAX_FEE_SAT_PER_BYTE = process.env.BTC_MAX_FEE_SAT_PER_BYTE || 4255
 
 // BCOIN REST API
 // These values are private and are accessed from environment variables only
-const BCOIN_API_BASE_URI = process.env.BCOIN_API_URI
+const BCOIN_API_BASE_URI = process.env.BCOIN_API_BASE_URI
 const BCOIN_API_WALLET_ID = process.env.BCOIN_API_WALLET_ID
 const BCOIN_API_WALLET_TOKEN = process.env.BCOIN_API_WALLET_TOKEN
-const BCOIN_API_USERNAME = process.env.BCOIN_API_BASIC_AUTH_USERNAME
-const BCOIN_API_PASS = process.env.BCOIN_API_BASIC_AUTH_PASS
+const BCOIN_API_USERNAME = process.env.BCOIN_API_USERNAME
+const BCOIN_API_PASS = process.env.BCOIN_API_PASS
 
-// The local variable holding the Bitcoin recommended fee value, from Redis in BTC_REC_FEE_KEY,
-// refreshed at the interval specified in BTC_REC_FEE_REFRESH_INTERVAL
-// Sample recFee Object ->
+// The local variable holding the Bitcoin recommended fee value, from Consul at key BTC_REC_FEE_KEY,
+// pushed from consul and refreshed automatically when any update in value is made
+// Sample BTCRecommendedFee Object ->
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
-let recFee = null
+var BTCRecommendedFee = null
 
 // FIXME : Add etcd server, node client, and leader election and abort the periodic run of this service if not the leader.
 // FIXME : Add bcoin server and send raw tx to bcoin server directly w/ https://bitcoinjs.org/ ?
@@ -94,8 +90,6 @@ const genTxBody = (fee, hash) => {
       script: genTxScript(hash)
     }]
   }
-
-  console.log(body)
   return body
 }
 
@@ -105,14 +99,19 @@ const genTxBody = (fee, hash) => {
 *
 * @param {string} hash - The hash to embed in an OP_RETURN
 */
-const sendTxToBTC = (hash) => {
-  let body = genTxBody(recFee.recFeeInSatPerByte, hash)
-  console.log(body)
+const sendTxToBTC = (hash, callback) => {
+  let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
 
   let options = {
+    headers: [
+      {
+        name: 'Content-Type',
+        value: 'application/json'
+      }
+    ],
     method: 'POST',
     uri: BCOIN_API_BASE_URI + '/wallet/' + BCOIN_API_WALLET_ID + '/send',
-    body: JSON.stringify(body),
+    body: body,
     json: true,
     gzip: true,
     auth: {
@@ -120,31 +119,17 @@ const sendTxToBTC = (hash) => {
       pass: BCOIN_API_PASS
     }
   }
-
-  console.log('sending')
   request(options, function (err, response, body) {
-    if (!err && response.statusCode === 200) {
-      // FIXME : data about the successful TX needs to be sent to the monitoring service
-      // so it can watch for 6 confirmations
-      console.log('success tx')
-      console.log(body)
-    } else {
+    if (err || response.statusCode !== 200) {
       // FIXME : what do we do if the POST fails?
       // fallback to a secondary server?
       // make an API call to a 3rd party?
-      console.log('fail tx')
-      console.log(err)
+      if (!err) err = `POST failed with status code ${response.statusCode}`
+      return callback(err)
     }
-  })
-}
-
-const refreshRecFee = (callback) => {
-  redis.get(BTC_REC_FEE_KEY, (err, res) => {
-    if (err) return callback(err)
-    // save received recFee object
-    recFee = res
-    console.log(recFee)
-    return callback(null)
+    // FIXME : data about the successful TX needs to be sent to the monitoring service
+    // so it can watch for 6 confirmations
+    return callback(null, body)
   })
 }
 
@@ -158,13 +143,20 @@ function processIncomingAnchorJob (msg) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
     let anchorData = messageObj.data
-    // create the transaction using the current RecFee and the value to be anchored
-    let btcTxBody = genTxBody(recFee, anchorData)
-    // TODO: publish the transaction
-    // TODO: if the publish was successful, then
-    amqpChannel.ack(msg)
-    // TODO: and record/queue the transaction/publish results somewhere
-    // otherwise, amqpChannel.nack(msg)
+    // create and publish the transaction
+    sendTxToBTC(anchorData, (err, body) => {
+      if (err) {
+        // An error has occurred publishing the transaction, nack consumption of message
+        console.error(err)
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+      } else {
+        // TODO: and record/queue the transaction/publish results somewhere
+        console.log(body)
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+      }
+    })
   }
 }
 
@@ -202,6 +194,7 @@ function amqpOpenConnection (connectionString) {
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
         chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+          console.log('processing incoming message')
           processIncomingAnchorJob(msg)
         })
         return callback(null)
@@ -216,33 +209,22 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
-/**
- * Initializes RecFee
- **/
-function initializeRecFee (callback) {
-  // refresh on script startup, and periodically afterwards
-  refreshRecFee((err) => {
-    if (err) {
-      setTimeout(initializeRecFee.bind(null, callback), 5 * 1000)
-      return callback('Cannot initialize RecFee. Attempting in 5 seconds...')
-    } else {
-      // RecFee initialized, now refresh every BTC_REC_FEE_REFRESH_INTERVAL seconds
-      console.log('RecFee initialized')
-      setInterval(() => refreshRecFee((err) => { if (err) console.error(err) }), 1000 * BTC_REC_FEE_REFRESH_INTERVAL)
-      return callback(null, true)
-    }
-  })
-}
+// Initialize amqp connection
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
-// Initializes RecFee and then amqp connection
-initializeRecFee((err, result) => {
-  if (err) {
-    console.error(err)
-  } else {
-    amqpOpenConnection(RABBITMQ_CONNECT_URI)
-  }
+// Continuous watch on the consul key holding the fee object.
+var watch = consul.watch({method: consul.kv.get, options: { key: BTC_REC_FEE_KEY }})
+
+// Store the updated fee object on change
+watch.on('change', function (data, res) {
+  // console.log('data:', data)
+  BTCRecommendedFee = JSON.parse(data.Value)
+  console.log(BTCRecommendedFee)
 })
 
-// setInterval(() => sendTxToBTC(), 1000 * 60 * 10) // 10 min
-// let hash = '407ba568d471e708b6a4b312cfe57e9a525bea684d075c0fb0ce23feb32f57b6'
-// setInterval(() => sendTxToBTC(hash), 15000)
+// Oops, something is wrong with consul
+// or the fee service key
+watch.on('error', function (err) {
+  console.error('error:', err)
+})
+

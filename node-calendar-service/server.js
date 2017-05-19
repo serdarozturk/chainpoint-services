@@ -21,6 +21,9 @@ const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.cal'
 // The queue name for outgoing message to the proof state service
 const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
 
+// The queue name for outgoing message to the btc tx service
+const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.btctx'
+
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
@@ -76,6 +79,7 @@ function amqpOpenConnection (connectionString) {
         console.log('Connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the AGGREGATION_ROOTS from RMQ with root objects to process
@@ -262,3 +266,15 @@ let finalize = () => {
 setInterval(() => generateCalendar(), CALENDAR_INTERVAL)
 
 setInterval(() => finalize(), FINALIZATION_INTERVAL)
+
+setTimeout(() => {
+  // Send this test hash to the btc tx service
+  amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify({ data: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11' })), { persistent: true },
+    (err, ok) => {
+      if (err !== null) {
+        console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
+      } else {
+        console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+      }
+    })
+}, 500000)

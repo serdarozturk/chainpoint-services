@@ -135,6 +135,9 @@ services:
     build:
       context: ./node-calendar-service
     depends_on:
+      - roach1
+      - roach2
+      - roach3
       - rabbitmq
       - influxdb
     networks:
@@ -154,6 +157,7 @@ services:
     build:
       context: ./node-btc-fee-service
     depends_on:
+      - consul
       - rabbitmq
       - influxdb
     networks:
@@ -169,6 +173,7 @@ services:
     build:
       context: ./node-btc-tx-service
     depends_on:
+      - consul
       - rabbitmq
       - btc-fee
       - influxdb
@@ -373,5 +378,73 @@ services:
       - "6380:6379"
     volumes:
       - ./data/redis:/data
+    networks:
+      - back-end
+
+  # Consul
+  #
+  # Consul Admin UI: http://127.0.0.1:8500
+  #
+  consul:
+    restart: always
+    image: consul:0.8.3
+    container_name: consul
+    ports:
+      - "8300:8300"
+      - "8400:8400"
+      - "8500:8500"
+    volumes:
+      - ./data/consul:/consul/data
+    networks:
+      - back-end
+
+  # CockroachDB
+  #
+  # CockroachDB Admin UI: http://127.0.0.1:8080
+  #
+  roach1:
+    restart: always
+    image: cockroachdb/cockroach:v1.0
+    container_name: roach1
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - ./data/roach1:/cockroach/cockroach-data
+    command:
+      - start
+      - --insecure
+    networks:
+      - back-end
+
+  roach2:
+    restart: always
+    image: cockroachdb/cockroach:v1.0
+    container_name: roach2
+    ports:
+      - 26257
+    volumes:
+      - ./data/roach2:/cockroach/cockroach-data
+    command:
+      - start
+      - --insecure
+      - --join
+      - roach1
+    networks:
+      - back-end
+
+  roach3:
+    restart: always
+    image: cockroachdb/cockroach:v1.0
+    container_name: roach3
+    ports:
+      - 26257
+    volumes:
+      - ./data/roach3:/cockroach/cockroach-data
+    command:
+      - start
+      - --insecure
+      - --join
+      - roach1
     networks:
       - back-end
