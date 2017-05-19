@@ -25,6 +25,14 @@ function openRedisConnection (redisURI) {
   })
   redis.on('ready', () => {
     console.log('Redis connected')
+
+    // run once when redis connection is established
+    retrieveLatest()
+
+    // Run every minute, at the top of the minute.
+    setInterval(() => {
+      if (new Date().getSeconds() === 0) retrieveLatest()
+    }, 1000)
   })
 }
 
@@ -56,13 +64,5 @@ let retrieveLatest = () => {
   })
 }
 
-// run once when the service starts
-retrieveLatest()
-
 // REDIS initialization
 openRedisConnection(REDIS_CONNECT_URI)
-
-// Run every minute, at the top of the minute.
-setInterval(() => {
-  if (new Date().getSeconds() === 0) retrieveLatest()
-}, 1000)

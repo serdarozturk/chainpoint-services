@@ -97,6 +97,7 @@ services:
     depends_on:
       - rabbitmq
       - influxdb
+      - nist-beacon
     networks:
       - back-end
 
@@ -135,7 +136,6 @@ services:
       context: ./node-calendar-service
     depends_on:
       - rabbitmq
-      - nist-beacon
       - influxdb
     networks:
       - back-end

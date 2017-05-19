@@ -7,6 +7,10 @@ const uuidv1 = require('uuid/v1')
 
 require('dotenv').config()
 
+const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
+const r = require('redis')
+const redis = r.createClient(REDIS_CONNECT_URI)
+
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
 let HASHES = []
@@ -56,6 +60,11 @@ const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.s
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
+const NIST_KEY_LAST = process.env.NIST_KEY_BASE || 'nist:last'
+
+// The local variable holding the NIST Beacon data, from Redis in NIST_KEY_LAST, refreshed every minute
+let nistLastData = null
 
 // Validate env variables and exit if values are out of bounds
 var envErrors = []
@@ -115,6 +124,16 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
+const refreshNistData = (callback) => {
+  redis.get(NIST_KEY_LAST, (err, res) => {
+    if (err) return callback(err)
+    // save received nistData object
+    nistLastData = JSON.parse(res)
+    if (!nistLastData) return callback('NIST data is null')
+    return callback(null)
+  })
+}
+
 function consumeHashMessage (msg) {
   if (msg !== null) {
     let hashObj = JSON.parse(msg.content.toString())
@@ -149,12 +168,40 @@ function formatAsChainpointV3Ops (proof, op) {
   return ChainpointV3Ops
 }
 
-// AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+/**
+ * Initializes NistData
+ **/
+function initializeNistData (callback) {
+  // refresh on script startup, and periodically afterwards
+  refreshNistData((err) => {
+    if (err) {
+      setTimeout(initializeNistData.bind(null, callback), 5 * 1000)
+      return callback('Cannot initialize NistData. Attempting in 5 seconds...')
+    } else {
+      // NistData initialized, now refresh every 60 seconds
+      console.log('NistData initialized')
+      setInterval(() => refreshNistData((err) => { if (err) console.error(err) }), 1000 * 60)
+      return callback(null, true)
+    }
+  })
+}
+
+// Initializes nistData and then amqp connection
+initializeNistData((err, result) => {
+  if (err) {
+    console.error(err)
+  } else {
+    // AMQP initialization
+    amqpOpenConnection(RABBITMQ_CONNECT_URI)
+  }
+})
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = () => {
   let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
+
+  let nistDataString = (nistLastData.timeStamp + ':' + nistLastData.seedValue).toLowerCase()
+  let nistDataBuffer = Buffer.from(nistDataString, 'utf8')
 
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
@@ -165,7 +212,8 @@ let aggregate = () => {
     let leaves = hashesForTree.map((hashObj) => {
       let hashIdBuffer = Buffer.from(hashObj.hash_id, 'utf8')
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
-      return crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest('hex')
+      let concatAndHashBuffer = crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest()
+      return crypto.createHash('sha256').update(Buffer.concat([nistDataBuffer, concatAndHashBuffer])).digest('hex')
     })
 
     // Add every hash in hashesForTree to new Merkle tree
@@ -188,6 +236,7 @@ let aggregate = () => {
       proofDataItem.hash = hashesForTree[x].hash
       proofDataItem.hash_msg = hashesForTree[x].msg
       let proof = merkleTools.getProof(x)
+      proof.unshift({ left: nistDataString })
       proof.unshift({ left: hashesForTree[x].hash_id })
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
