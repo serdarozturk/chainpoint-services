@@ -306,7 +306,7 @@ let aggregateAndAnchor = () => {
   let anchorData = {
     anchor_agg_id: '6db13e20-3cbc-11e7-8009-a17539d2d289',
     anchor_agg_root: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11',
-    anchor_agg_count: 100
+    anchor_agg_cal_record_count: 100
   }
   // Send this test data to the btc tx service
   amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
