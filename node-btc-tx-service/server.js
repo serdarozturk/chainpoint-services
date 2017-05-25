@@ -135,7 +135,7 @@ function processIncomingAnchorJob (msg) {
   if (msg !== null) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
-    let anchorData = messageObj.data
+    let anchorData = messageObj.anchor_agg_root
     async.waterfall([
       (callback) => {
         // create and publish the transaction
@@ -147,11 +147,10 @@ function processIncomingAnchorJob (msg) {
       (body, callback) => {
         // queue return message for calendar containing the new transaction information
         console.log(body)
-        let txInfo = {
-          id: body.hash,
-          body: body.tx
-        }
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(txInfo)), { persistent: true, type: 'btctx' },
+        // adding btc transaction id and full transaction body to original message and returning
+        messageObj.btctx_id = body.hash
+        messageObj.btctx_body = body.tx
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
           (err, ok) => {
             if (err !== null) {
               console.error(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
