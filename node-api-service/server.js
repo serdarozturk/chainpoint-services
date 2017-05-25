@@ -149,7 +149,7 @@ function processProofMessage (msg) {
     async.waterfall([
       (callback) => {
         // get the target websocket if it is on this instance, otherwise null
-        let targetWebsocket = WebSocketConnections[proofReadyObj.cxId] || null
+        let targetWebsocket = WebSocketConnections[proofReadyObj.cx_id] || null
         // if the target websocket is not on this instance, there is no work to do, return
         if (targetWebsocket === null) return callback(null)
         // get the proof for the given hashId
@@ -478,7 +478,7 @@ function createProofSubscription (APIServiceInstanceId, wsConnectionId, hashId, 
       // The id's reference the request's origin, and are used to target the response to the correct instance and connection
       // Preface the sub key with 'sub:' so as not to conflict with the proof storage, which uses the plain hashId as the key already
       let key = 'sub:' + hashId
-      redis.hmset(key, ['apiId', APIServiceInstanceId, 'cxId', wsConnectionId], (err, res) => {
+      redis.hmset(key, ['apiId', APIServiceInstanceId, 'cx_id', wsConnectionId], (err, res) => {
         if (err) return wfCallback(err)
         return wfCallback(null, key)
       })

@@ -104,9 +104,9 @@ function generateCALProof (msg) {
       redis.hgetall(key, (err, res) => {
         if (err) return callback(err)
         // if not subscription is found, return null to skip the rest of the process
-        if (res == null || !res.apiId || !res.cxId) return callback(null, null, null)
-        // a subscription with valid apiId and cxId has been found, return apiId and cxId to deliver the proof to
-        return callback(null, res.apiId, res.cxId)
+        if (res == null || !res.apiId || !res.cx_id) return callback(null, null, null)
+        // a subscription with valid apiId and cx_id has been found, return apiId and cx_id to deliver the proof to
+        return callback(null, res.apiId, res.cx_id)
       })
     },
     // publish 'ready' message for API service if and only if a subscription exists for this hash
@@ -116,7 +116,7 @@ function generateCALProof (msg) {
 
       let opts = { headers: { 'apiId': APIServiceInstanceId }, persistent: true }
       let message = {
-        cxId: wsConnectionId,
+        cx_id: wsConnectionId,
         hash_id: messageObj.hash_id
       }
       amqpChannel.publish(RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
