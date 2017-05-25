@@ -296,10 +296,20 @@ let finalize = () => {
   })
 }
 
-// Aggregate all block hashes on chain since last aggregation, anchor root
+// Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
 let aggregateAndAnchor = () => {
-  // Send this test hash to the btc tx service
-  amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify({ data: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11' })), { persistent: true },
+  // TODO: Collect calendar block since last anchor block (inclusive?, lock db?)
+  // TODO: Build merkle tree with block hashes
+  // TODO: Create/store new anchor block with resulting tree root (release lock?)
+  // TODO: For each block in the tree, add proof state item containing proof ops from cal_root to anchor_agg_root
+  // TODO: Update this with real generated data
+  let anchorData = {
+    anchor_agg_id: '6db13e20-3cbc-11e7-8009-a17539d2d289',
+    anchor_agg_root: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11',
+    anchor_agg_count: 100
+  }
+  // Send this test data to the btc tx service
+  amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
     (err, ok) => {
       if (err !== null) {
         console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
