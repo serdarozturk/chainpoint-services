@@ -104,9 +104,9 @@ function generateCALProof (msg) {
       redis.hgetall(key, (err, res) => {
         if (err) return callback(err)
         // if not subscription is found, return null to skip the rest of the process
-        if (res == null || !res.apiId || !res.cx_id) return callback(null, null, null)
-        // a subscription with valid apiId and cx_id has been found, return apiId and cx_id to deliver the proof to
-        return callback(null, res.apiId, res.cx_id)
+        if (res == null || !res.api_id || !res.cx_id) return callback(null, null, null)
+        // a subscription with valid api_id and cx_id has been found, return api_id and cx_id to deliver the proof to
+        return callback(null, res.api_id, res.cx_id)
       })
     },
     // publish 'ready' message for API service if and only if a subscription exists for this hash
@@ -114,7 +114,7 @@ function generateCALProof (msg) {
       // no subcription fvor this hash, so skip publishing
       if (APIServiceInstanceId == null || wsConnectionId == null) return callback(null)
 
-      let opts = { headers: { 'apiId': APIServiceInstanceId }, persistent: true }
+      let opts = { headers: { 'api_id': APIServiceInstanceId }, persistent: true }
       let message = {
         cx_id: wsConnectionId,
         hash_id: messageObj.hash_id

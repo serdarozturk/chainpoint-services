@@ -119,7 +119,7 @@ function amqpOpenConnection (connectionString) {
         chan.assertQueue('', { durable: true }, (err, q) => {
           if (err) return callback(err)
           // Continuously load the HASHES from RMQ with proof ready hash objects to process)
-          let opts = { 'apiId': APIServiceInstanceId, 'x-match': 'all' }
+          let opts = { 'api_id': APIServiceInstanceId, 'x-match': 'all' }
           chan.bindQueue(q.queue, RMQ_INCOMING_EXCHANGE, '', opts)
           chan.consume(q.queue, (msg) => {
             processProofMessage(msg)
@@ -478,7 +478,7 @@ function createProofSubscription (APIServiceInstanceId, wsConnectionId, hashId, 
       // The id's reference the request's origin, and are used to target the response to the correct instance and connection
       // Preface the sub key with 'sub:' so as not to conflict with the proof storage, which uses the plain hashId as the key already
       let key = 'sub:' + hashId
-      redis.hmset(key, ['apiId', APIServiceInstanceId, 'cx_id', wsConnectionId], (err, res) => {
+      redis.hmset(key, ['api_id', APIServiceInstanceId, 'cx_id', wsConnectionId], (err, res) => {
         if (err) return wfCallback(err)
         return wfCallback(null, key)
       })
