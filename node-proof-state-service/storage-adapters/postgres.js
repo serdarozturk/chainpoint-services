@@ -323,7 +323,7 @@ function writeAnchorAggStateObject (stateObject, callback) {
 function writeBTCTxStateObject (stateObject, callback) {
   BtcTxStates.create({
     anchor_agg_id: stateObject.anchor_agg_id,
-    btctx_id: stateObject.btctx_state,
+    btctx_id: stateObject.btctx_id,
     btctx_state: JSON.stringify(stateObject.btctx_state)
   }, {
     returning: false

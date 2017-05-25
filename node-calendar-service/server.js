@@ -136,9 +136,50 @@ function consumeAggRootMessage (msg) {
 
 function consumeBtcTxMessage (msg) {
   if (msg !== null) {
-    // TODO: Anchoring has completed successfully, add proof states, inform btc-mon of new tx_id to watch
-    let messageObj = JSON.parse(msg.content.toString())
-    console.log(messageObj)
+    let btcTxObj = JSON.parse(msg.content.toString())
+
+    async.series([
+      (callback) => {
+        // queue up message containing updated proof state bound for proof state service
+        let stateObj = {}
+        stateObj.anchor_agg_id = btcTxObj.anchor_agg_id
+        stateObj.btctx_id = btcTxObj.btctx_id
+        let anchorAggRoot = btcTxObj.anchor_agg_root
+        let btctxBody = btcTxObj.btctx_body
+        let prefix = btctxBody.substr(0, btctxBody.indexOf(anchorAggRoot))
+        let suffix = btctxBody.substr(btctxBody.indexOf(anchorAggRoot) + anchorAggRoot.length)
+        stateObj.btctx_state = {}
+        stateObj.btctx_state.ops = [
+          { l: prefix },
+          { r: suffix }
+        ]
+
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btctx' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message nacked')
+              return callback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message acked')
+              return callback(null)
+            }
+          })
+      },
+      // TODO: inform btc-mon of new tx_id to watch, queue up message bound for btc mon
+      (callback) => {
+        return callback(null)
+      }
+    ], (err, results) => {
+      if (err) {
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_QUEUE, '[btctx] consume message nacked')
+      } else {
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, '[btctx] consume message acked')
+      }
+    })
   }
 }
 
@@ -282,7 +323,7 @@ let finalize = () => {
           // nack consumption of all original hash messages part of this aggregation event
           if (message !== null) {
             amqpChannel.nack(message)
-            console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+            console.error(RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
           }
         })
       } else {
@@ -290,7 +331,7 @@ let finalize = () => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+            console.log(RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
           }
         })
       }

@@ -54,11 +54,9 @@ function ConsumeSplitterMessage (msg) {
 function ConsumeAggregationMessage (msg) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
-  stateObj.type = 'agg'
   stateObj.hash_id = messageObj.hash_id
   stateObj.hash = messageObj.hash
   stateObj.agg_id = messageObj.agg_id
-  stateObj.agg_root = messageObj.agg_root
   stateObj.agg_state = messageObj.agg_state
 
   async.series([
@@ -96,12 +94,8 @@ function ConsumeAggregationMessage (msg) {
 function ConsumeCalendarMessage (msg) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
-  stateObj.type = 'cal'
   stateObj.agg_id = messageObj.agg_id
-  stateObj.agg_root = messageObj.agg_root
-  stateObj.agg_hash_count = messageObj.agg_hash_count
   stateObj.cal_id = messageObj.cal_id
-  stateObj.cal_root = messageObj.cal_root
   stateObj.cal_state = messageObj.cal_state
 
   async.waterfall([
@@ -109,7 +103,7 @@ function ConsumeCalendarMessage (msg) {
       // get hash id count for a given agg_id
       storageClient.getHashIdCountByAggId(stateObj.agg_id, (err, count) => {
         if (err) return callback(err)
-        if (count < stateObj.agg_hash_count) return callback('unable to read all hash data')
+        if (count < messageObj.agg_hash_count) return callback('unable to read all hash data')
         return callback(null)
       })
     },
@@ -182,17 +176,46 @@ function ConsumeCalendarMessage (msg) {
 function ConsumeAnchorAggMessage (msg) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
-  stateObj.type = 'anchor_agg'
   stateObj.cal_id = messageObj.cal_id
-  stateObj.cal_block_hash = messageObj.cal_block_hash
   stateObj.anchor_agg_id = messageObj.anchor_agg_id
-  stateObj.anchor_agg_root = messageObj.anchor_agg_root
   stateObj.anchor_agg_state = messageObj.anchor_agg_state
 
   async.series([
     (callback) => {
       // Store this state information
       storageClient.writeAnchorAggStateObject(stateObj, (err, success) => {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      amqpChannel.nack(msg)
+      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
+    } else {
+      // New message has been published and event logged, ack consumption of original message
+      amqpChannel.ack(msg)
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    }
+  })
+}
+
+/**
+* Writes the state data to persistent storage
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function ConsumeBtcTxMessage (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+  let stateObj = {}
+  stateObj.anchor_agg_id = messageObj.anchor_agg_id
+  stateObj.btctx_id = messageObj.btctx_id
+  stateObj.btctx_state = messageObj.btctx_state
+
+  async.series([
+    (callback) => {
+      // Store this state information
+      storageClient.writeBTCTxStateObject(stateObj, (err, success) => {
         if (err) return callback(err)
         return callback(null)
       })
@@ -377,6 +400,11 @@ function processMessage (msg) {
         // Consumes a anchor aggregation state message from the Calendar service
         // Stores state information for anchor agregation events
         ConsumeAnchorAggMessage(msg)
+        break
+      case 'btctx':
+        // Consumes a btctx state message from the Calendar service
+        // Stores state information for btctx events
+        ConsumeBtcTxMessage(msg)
         break
       case 'state':
         // Consumes a proof ready message from the proof state service
