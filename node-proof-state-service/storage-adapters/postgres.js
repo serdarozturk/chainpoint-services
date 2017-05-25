@@ -13,12 +13,13 @@ const POSTGRES_CONNECT_DB = process.env.POSTGRES_CONNECT_DB || 'chainpoint'
 const POSTGRES_CONNECT_URI = `${POSTGRES_CONNECT_PROTOCOL}//${POSTGRES_CONNECT_USER}:${POSTGRES_CONNECT_PW}@${POSTGRES_CONNECT_HOST}:${POSTGRES_CONNECT_PORT}/${POSTGRES_CONNECT_DB}`
 
 // Set the number of tracking log events to complete in order for the hash to be considered full processed
-// Currently, the value is set as 3 to represent splitter, aggregator, and calendar events
+// Currently, the value is set as 4 to represent splitter, aggregator, and calendar, and btc events
 // This number will increase as additional anchor services are added
-const PROOF_STEP_COUNT = 3
+const PROOF_STEP_COUNT = 4
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
+// table for state data connecting individual hashes to aggregation roots
 var AggStates = sequelize.define('agg_states', {
   hash_id: { type: Sequelize.UUID, primaryKey: true },
   hash: { type: Sequelize.STRING },
@@ -33,6 +34,7 @@ var AggStates = sequelize.define('agg_states', {
   timestamps: false
 })
 
+// table for state data connecting aggregation roots to calendar block hashes
 var CalStates = sequelize.define('cal_states', {
   agg_id: { type: Sequelize.UUID, primaryKey: true },
   cal_id: { type: Sequelize.UUID },
@@ -46,8 +48,23 @@ var CalStates = sequelize.define('cal_states', {
   timestamps: false
 })
 
-var BtcTxStates = sequelize.define('btctx_states', {
+// table for state data connecting calendar block hashes to anchor_agg_root
+var AnchorAggStates = sequelize.define('anchor_agg_states', {
   cal_id: { type: Sequelize.UUID, primaryKey: true },
+  anchor_agg_id: { type: Sequelize.UUID },
+  anchor_agg_state: { type: Sequelize.TEXT }
+}, {
+  indexes: [
+    {
+      fields: ['anchor_agg_id']
+    }
+  ],
+  timestamps: false
+})
+
+// table for state data connecting one anchor_agg_root to one btctx_id
+var BtcTxStates = sequelize.define('btctx_states', {
+  anchor_agg_id: { type: Sequelize.UUID, primaryKey: true },
   btctx_id: { type: Sequelize.STRING },
   btctx_state: { type: Sequelize.TEXT }
 }, {
@@ -59,6 +76,7 @@ var BtcTxStates = sequelize.define('btctx_states', {
   timestamps: false
 })
 
+// table for state data connecting one one btctx_id to one btchead root value at height btchead_height
 var BtcHeadStates = sequelize.define('btchead_states', {
   btctx_id: { type: Sequelize.STRING, primaryKey: true },
   btchead_height: { type: Sequelize.INTEGER },
@@ -78,8 +96,8 @@ sequelize.define('hash_tracker_log', {
   splitter_at: { type: Sequelize.DATE },
   aggregator_at: { type: Sequelize.DATE },
   calendar_at: { type: Sequelize.DATE },
-  btc_tx_at: { type: Sequelize.DATE },
-  btc_head_at: { type: Sequelize.DATE },
+  btc_at: { type: Sequelize.DATE },
+  eth_at: { type: Sequelize.DATE },
   steps_complete: { type: Sequelize.INTEGER }
 }, {
   indexes: [
@@ -163,10 +181,22 @@ function getCalStateObjectByAggId (aggId, callback) {
   })
 }
 
-function getBTCTxStateObjectByCalId (calId, callback) {
-  BtcTxStates.findOne({
+function getAnchorAggStateObjectByCalId (calId, callback) {
+  AnchorAggStates.findOne({
     where: {
       cal_id: calId
+    }
+  }).then((result) => {
+    return callback(null, result)
+  }).catch((err) => {
+    return callback(err)
+  })
+}
+
+function getBTCTxStateObjectByAnchorAggId (anchorAggId, callback) {
+  BtcTxStates.findOne({
+    where: {
+      anchor_agg_id: anchorAggId
     }
   }).then((result) => {
     return callback(null, result)
@@ -203,6 +233,18 @@ function getCalStateObjectsByCalId (calId, callback) {
   CalStates.findAll({
     where: {
       cal_id: calId
+    }
+  }).then((results) => {
+    return callback(null, results)
+  }).catch((err) => {
+    return callback(err)
+  })
+}
+
+function getAnchorAggStateObjectsByAnchorAggId (anchorAggId, callback) {
+  CalStates.findAll({
+    where: {
+      anchor_agg_id: anchorAggId
     }
   }).then((results) => {
     return callback(null, results)
@@ -264,9 +306,23 @@ function writeCalStateObject (stateObject, callback) {
   })
 }
 
+function writeAnchorAggStateObject (stateObject, callback) {
+  AnchorAggStates.create({
+    cal_id: stateObject.cal_id,
+    anchor_agg_id: stateObject.anchor_agg_id,
+    anchor_agg_state: JSON.stringify(stateObject.anchor_agg_state)
+  }, {
+    returning: false
+  }).then((res) => {
+    return callback(null, true)
+  }).catch((err) => {
+    return callback(err, false)
+  })
+}
+
 function writeBTCTxStateObject (stateObject, callback) {
   BtcTxStates.create({
-    cal_id: stateObject.cal_id,
+    anchor_agg_id: stateObject.anchor_agg_id,
     btctx_id: stateObject.btctx_state,
     btctx_state: JSON.stringify(stateObject.btctx_state)
   }, {
@@ -328,11 +384,11 @@ function logCalendarEventForHashId (hashId, callback) {
     })
 }
 
-function logBtcTxEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_tx_at, steps_complete)
+function logBtcEventForHashId (hashId, callback) {
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
-    DO UPDATE SET (btc_tx_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (btc_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
     WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
       return callback(null, true)
     }).catch((err) => {
@@ -340,11 +396,11 @@ function logBtcTxEventForHashId (hashId, callback) {
     })
 }
 
-function logBtcHeadEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_head_at, steps_complete)
+function logEthEventForHashId (hashId, callback) {
+  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, eth_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
-    DO UPDATE SET (btc_head_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (eth_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
     WHERE hash_tracker_logs.hash_id = '${hashId}'`).then((results) => {
       return callback(null, true)
     }).catch((err) => {
@@ -381,11 +437,22 @@ function deleteCalStatesWithNoRemainingAggStates (callback) {
     })
 }
 
-function deleteBtcTxStatesWithNoRemainingCalStates (callback) {
-  sequelize.query(`DELETE FROM btctx_states WHERE cal_id IN
-    (SELECT btctx.cal_id FROM btctx_states btctx
-    LEFT JOIN cal_states c ON btctx.cal_id = c.cal_id
-    GROUP BY btctx.cal_id HAVING COUNT(c.cal_id) = 0)`).spread((results, meta) => {
+function deleteAnchorAggStatesWithNoRemainingCalStates (callback) {
+  sequelize.query(`DELETE FROM anchor_agg_states WHERE cal_id IN
+    (SELECT a.cal_id FROM anchor_agg_states a
+    LEFT JOIN cal_states c ON a.cal_id = c.cal_id
+    GROUP BY a.cal_id HAVING COUNT(c.cal_id) = 0)`).spread((results, meta) => {
+      return callback(null, meta.rowCount)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
+function deleteBtcTxStatesWithNoRemainingAnchorAggStates (callback) {
+  sequelize.query(`DELETE FROM btctx_states WHERE anchor_agg_id IN
+    (SELECT b.anchor_agg_id FROM btctx_states b
+    LEFT JOIN anchor_agg_states a ON b.anchor_agg_id = a.anchor_agg_id
+    GROUP BY b.anchor_agg_id HAVING COUNT(a.anchor_agg_id) = 0)`).spread((results, meta) => {
       return callback(null, meta.rowCount)
     }).catch((err) => {
       return callback(err)
@@ -409,24 +476,28 @@ module.exports = {
   getHashIdsByAggId: getHashIdsByAggId,
   getAggStateObjectByHashId: getAggStateObjectByHashId,
   getCalStateObjectByAggId: getCalStateObjectByAggId,
-  getBTCTxStateObjectByCalId: getBTCTxStateObjectByCalId,
+  getAnchorAggStateObjectByCalId: getAnchorAggStateObjectByCalId,
+  getBTCTxStateObjectByAnchorAggId: getBTCTxStateObjectByAnchorAggId,
   getBTCHeadStateObjectByBTCTxId: getBTCHeadStateObjectByBTCTxId,
   getAggStateObjectsByAggId: getAggStateObjectsByAggId,
   getCalStateObjectsByCalId: getCalStateObjectsByCalId,
+  getAnchorAggStateObjectsByAnchorAggId: getAnchorAggStateObjectsByAnchorAggId,
   getBTCTxStateObjectsByBTCTxId: getBTCTxStateObjectsByBTCTxId,
   getBTCHeadStateObjectsByBTCHeadId: getBTCHeadStateObjectsByBTCHeadId,
   writeAggStateObject: writeAggStateObject,
   writeCalStateObject: writeCalStateObject,
+  writeAnchorAggStateObject: writeAnchorAggStateObject,
   writeBTCTxStateObject: writeBTCTxStateObject,
   writeBTCHeadStateObject: writeBTCHeadStateObject,
   logSplitterEventForHashId: logSplitterEventForHashId,
   logAggregatorEventForHashId: logAggregatorEventForHashId,
   logCalendarEventForHashId: logCalendarEventForHashId,
-  logBtcTxEventForHashId: logBtcTxEventForHashId,
-  logBtcHeadEventForHashId: logBtcHeadEventForHashId,
+  logBtcEventForHashId: logBtcEventForHashId,
+  logEthEventForHashId: logEthEventForHashId,
   deleteProcessedHashesFromAggStates: deleteProcessedHashesFromAggStates,
   deleteHashTrackerLogEntries: deleteHashTrackerLogEntries,
   deleteCalStatesWithNoRemainingAggStates: deleteCalStatesWithNoRemainingAggStates,
-  deleteBtcTxStatesWithNoRemainingCalStates: deleteBtcTxStatesWithNoRemainingCalStates,
+  deleteAnchorAggStatesWithNoRemainingCalStates: deleteAnchorAggStatesWithNoRemainingCalStates,
+  deleteBtcTxStatesWithNoRemainingAnchorAggStates: deleteBtcTxStatesWithNoRemainingAnchorAggStates,
   deleteBtcHeadStatesWithNoRemainingBtcTxStates: deleteBtcHeadStatesWithNoRemainingBtcTxStates
 }

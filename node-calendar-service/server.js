@@ -136,8 +136,9 @@ function consumeAggRootMessage (msg) {
 
 function consumeBtcTxMessage (msg) {
   if (msg !== null) {
-    let txObj = JSON.parse(msg.content.toString())
-    console.log(txObj)
+    // TODO: Anchoring has completed successfully, add proof states, inform btc-mon of new tx_id to watch
+    let messageObj = JSON.parse(msg.content.toString())
+    console.log(messageObj)
   }
 }
 
@@ -236,6 +237,7 @@ let finalize = () => {
           stateObj.cal_id = treeDataObj.cal_id
           stateObj.cal_root = treeDataObj.cal_root
           stateObj.cal_state = {}
+          // TODO: add ops extending proof path beyond cal_root to calendar block's block_hash
           stateObj.cal_state.ops = proofDataItem.proof
 
           // TODO update this temp anchor data when we start generating real values
@@ -298,25 +300,120 @@ let finalize = () => {
 
 // Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
 let aggregateAndAnchor = () => {
-  // TODO: Collect calendar block since last anchor block (inclusive?, lock db?)
-  // TODO: Build merkle tree with block hashes
-  // TODO: Create/store new anchor block with resulting tree root (release lock?)
-  // TODO: For each block in the tree, add proof state item containing proof ops from cal_root to anchor_agg_root
-  // TODO: Update this with real generated data
-  let anchorData = {
-    anchor_agg_id: '6db13e20-3cbc-11e7-8009-a17539d2d289',
-    anchor_agg_root: '44ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11',
-    anchor_agg_cal_record_count: 100
+  // TODO: Retrieve calendar blocks since last anchor block (inclusive?, lock db?)
+  // TODO: Remove this below / faking it until we're making it / field count/names not entirely accurate
+  let blocks = [
+    { cal_id: uuidv1(), type: 'btc_anchor', block_hash: '18ee24150dcb1d96752a4d6dd0f20dfd8ba8c38527e40aa8509b7adecf78f9c6' },
+    { cal_id: uuidv1(), type: 'cal_record', block_hash: '1bf4f3dabb60e9b25f9b4fb7b7a4a4ef184c3179e44877e8b9168572fc2001e8' },
+    { cal_id: uuidv1(), type: 'cal_record', block_hash: '5dff3544e177054cc9b9009db4dc9f6ea0f91c69fc36e5f4323c3d78796decbb' },
+    { cal_id: uuidv1(), type: 'cal_record', block_hash: 'b2d0f0e6a67b7a7c75db24137775b31ad542d2cc1f1b1d6ec991ee221ac4b66a' }
+  ]
+
+  // Build merkle tree with block hashes
+  let leaves = blocks.map((blockObj) => {
+    return blockObj.block_hash
+  })
+
+  // clear the merkleTools instance to prepare for a new tree
+  merkleTools.resetTree()
+
+  // Add every blockHash in blocks to new Merkle tree
+  merkleTools.addLeaves(leaves)
+  merkleTools.makeTree()
+
+  // get the total count of leaves in this aggregation
+  let treeSize = merkleTools.getLeafCount()
+
+  let treeData = {}
+  treeData.anchor_agg_id = uuidv1()
+  treeData.anchor_agg_root = merkleTools.getMerkleRoot().toString('hex')
+
+  let proofData = []
+  for (let x = 0; x < treeSize; x++) {
+    // for calendar records only, push the cal_id and corresponding proof onto the array
+    if (blocks[x].type === 'cal_record') {
+      let proofDataItem = {}
+      proofDataItem.cal_id = blocks[x].cal_id
+      proofDataItem.cal_block_hash = blocks[x].block_hash
+      let proof = merkleTools.getProof(x)
+      proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
+      proofData.push(proofDataItem)
+    }
   }
-  // Send this test data to the btc tx service
-  amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
-    (err, ok) => {
-      if (err !== null) {
-        console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
-      } else {
-        console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+  treeData.proofData = proofData
+
+  console.log('blocks length : %s', blocks.length)
+
+  // TODO: Create/store new anchor block with resulting tree root (release lock?)
+
+  // For each calendar record block in the tree, add proof state item containing proof ops from block_hash to anchor_agg_root
+  async.series([
+    (callback) => {
+      // for each calendar block hash, queue up message containing updated proof state bound for proof state service
+      async.each(treeData.proofData, (proofDataItem, eachCallback) => {
+        let stateObj = {}
+        stateObj.cal_id = proofDataItem.cal_id
+        stateObj.cal_block_hash = proofDataItem.cal_block_hash
+        stateObj.anchor_agg_id = treeData.anchor_agg_id
+        stateObj.anchor_agg_root = treeData.anchor_agg_root
+        stateObj.anchor_agg_state = {}
+        stateObj.anchor_agg_state.ops = proofDataItem.proof
+
+        // TODO update this temp anchor data when we start generating real values
+        stateObj.anchor_agg_state.anchor = {
+          anchor_id: '1027',
+          uris: [
+            'http://a.cal.chainpoint.org/1027/root',
+            'http://b.cal.chainpoint.org/1027/root'
+          ]
+        }
+
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_agg' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message nacked')
+              return eachCallback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message acked')
+              return eachCallback(null)
+            }
+          })
+      }, (err) => {
+        if (err) {
+          console.error('Anchor aggregation had errors.')
+          return callback(err)
+        } else {
+          console.log('Anchor aggregation complete')
+          return callback(null)
+        }
+      })
+    },
+    (callback) => {
+      // Create anchor_agg message data object for anchoring service(s)
+      let anchorData = {
+        anchor_agg_id: treeData.anchor_agg_id,
+        anchor_agg_root: treeData.anchor_agg_root
       }
-    })
+
+      // Send anchorData to the btc tx service
+      amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
+        (err, ok) => {
+          if (err !== null) {
+            console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
+          } else {
+            console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+          }
+        })
+    }
+  ], (err) => {
+    if (err) {
+      console.error(err)
+    } else {
+      console.error('aggregateAndAnchor process complete.')
+    }
+  })
 }
 
 setInterval(() => generateCalendarBlock(), CALENDAR_INTERVAL_MS)

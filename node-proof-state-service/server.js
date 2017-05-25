@@ -175,6 +175,41 @@ function ConsumeCalendarMessage (msg) {
 }
 
 /**
+* Writes the state data to persistent storage
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function ConsumeAnchorAggMessage (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+  let stateObj = {}
+  stateObj.type = 'anchor_agg'
+  stateObj.cal_id = messageObj.cal_id
+  stateObj.cal_block_hash = messageObj.cal_block_hash
+  stateObj.anchor_agg_id = messageObj.anchor_agg_id
+  stateObj.anchor_agg_root = messageObj.anchor_agg_root
+  stateObj.anchor_agg_state = messageObj.anchor_agg_state
+
+  async.series([
+    (callback) => {
+      // Store this state information
+      storageClient.writeAnchorAggStateObject(stateObj, (err, success) => {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      amqpChannel.nack(msg)
+      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
+    } else {
+      // New message has been published and event logged, ack consumption of original message
+      amqpChannel.ack(msg)
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    }
+  })
+}
+
+/**
 * Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
@@ -256,7 +291,7 @@ function ConsumeProofReadyMessage (msg) {
 *
 */
 function PruneStateData () {
-  async.waterfall([
+  async.series([
     (callback) => {
       // remove all rows from agg_states that have been processed and from which proofs have been generated
       storageClient.deleteProcessedHashesFromAggStates((err, rowCount) => {
@@ -282,8 +317,16 @@ function PruneStateData () {
       })
     },
     (callback) => {
-      // remove all rows from btctx_states whose cal_states children have all been deleted
-      storageClient.deleteBtcTxStatesWithNoRemainingCalStates((err, rowCount) => {
+      // remove all rows from anchor_agg_states whose cal_states children have all been deleted
+      storageClient.deleteAnchorAggStatesWithNoRemainingCalStates((err, rowCount) => {
+        if (err) return callback(err)
+        console.log(`Pruned anchor_agg_states - ${rowCount} row(s) deleted`)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // remove all rows from btctx_states whose anchor_agg_states children have all been deleted
+      storageClient.deleteBtcTxStatesWithNoRemainingAnchorAggStates((err, rowCount) => {
         if (err) return callback(err)
         console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
         return callback(null)
@@ -326,9 +369,14 @@ function processMessage (msg) {
         ConsumeAggregationMessage(msg)
         break
       case 'cal':
-        // Consumes a state message from the Calendar service
+        // Consumes a calendar state message from the Calendar service
         // Stores state information and publishes proof ready messages bound for the proof state service
         ConsumeCalendarMessage(msg)
+        break
+      case 'anchor_agg':
+        // Consumes a anchor aggregation state message from the Calendar service
+        // Stores state information for anchor agregation events
+        ConsumeAnchorAggMessage(msg)
         break
       case 'state':
         // Consumes a proof ready message from the proof state service
