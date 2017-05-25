@@ -60,7 +60,8 @@ const genTxScript = (hash) => {
   const opcodes = bcoin.script.opcodes
   const script = new bcoin.script()
   script.push(opcodes.OP_RETURN)
-  script.push(hash)
+  // hash must be Buffer to avoid extra string to buffer conversion
+  script.push(Buffer.from(hash, 'hex'))
   script.compile()
 
   return script.toJSON()
