@@ -269,7 +269,6 @@ let finalize = () => {
           stateObj.hash_id = proofDataItem.hash_id
           stateObj.hash = proofDataItem.hash
           stateObj.agg_id = treeDataObj.agg_id
-          stateObj.agg_root = treeDataObj.agg_root
           stateObj.agg_state = {}
           stateObj.agg_state.ops = proofDataItem.proof
 

@@ -231,7 +231,6 @@ let generateCalendarBlock = () => {
     // Collect and store the calendar id, Merkle root, and proofs in an array where finalize() can find it
     let treeData = {}
     treeData.cal_id = uuidv1()
-    treeData.cal_root = merkleTools.getMerkleRoot().toString('hex')
 
     let treeSize = merkleTools.getLeafCount()
     let proofData = []
@@ -239,7 +238,6 @@ let generateCalendarBlock = () => {
       // push the agg_id and corresponding proof onto the array
       let proofDataItem = {}
       proofDataItem.agg_id = rootsForTree[x].agg_id
-      proofDataItem.agg_root = rootsForTree[x].agg_root
       proofDataItem.agg_msg = rootsForTree[x].msg
       proofDataItem.agg_hash_count = rootsForTree[x].agg_hash_count
       let proof = merkleTools.getProof(x)
@@ -273,10 +271,8 @@ let finalize = () => {
         async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
           let stateObj = {}
           stateObj.agg_id = proofDataItem.agg_id
-          stateObj.agg_root = proofDataItem.agg_root
           stateObj.agg_hash_count = proofDataItem.agg_hash_count
           stateObj.cal_id = treeDataObj.cal_id
-          stateObj.cal_root = treeDataObj.cal_root
           stateObj.cal_state = {}
           // TODO: add ops extending proof path beyond cal_root to calendar block's block_hash
           stateObj.cal_state.ops = proofDataItem.proof
@@ -375,7 +371,6 @@ let aggregateAndAnchor = () => {
     if (blocks[x].type === 'cal_record') {
       let proofDataItem = {}
       proofDataItem.cal_id = blocks[x].cal_id
-      proofDataItem.cal_block_hash = blocks[x].block_hash
       let proof = merkleTools.getProof(x)
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
@@ -394,9 +389,7 @@ let aggregateAndAnchor = () => {
       async.each(treeData.proofData, (proofDataItem, eachCallback) => {
         let stateObj = {}
         stateObj.cal_id = proofDataItem.cal_id
-        stateObj.cal_block_hash = proofDataItem.cal_block_hash
         stateObj.anchor_agg_id = treeData.anchor_agg_id
-        stateObj.anchor_agg_root = treeData.anchor_agg_root
         stateObj.anchor_agg_state = {}
         stateObj.anchor_agg_state.ops = proofDataItem.proof
 
@@ -438,7 +431,7 @@ let aggregateAndAnchor = () => {
         anchor_agg_root: treeData.anchor_agg_root
       }
 
-      // Send anchorData to the btc tx service
+      // Send anchorData to the btc tx service for anchoring
       amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
         (err, ok) => {
           if (err !== null) {
