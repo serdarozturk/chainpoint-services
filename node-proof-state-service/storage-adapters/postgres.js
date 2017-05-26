@@ -278,74 +278,68 @@ function getBTCHeadStateObjectsByBTCHeadId (btcHeadId, callback) {
 }
 
 function writeAggStateObject (stateObject, callback) {
-  AggStates.create({
-    hash_id: stateObject.hash_id,
-    hash: stateObject.hash,
-    agg_id: stateObject.agg_id,
-    agg_state: JSON.stringify(stateObject.agg_state)
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  let stateString = JSON.stringify(stateObject.agg_state)
+  sequelize.query(`INSERT INTO agg_states (hash_id, hash, agg_id, agg_state)
+    VALUES ('${stateObject.hash_id}', '${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
+    ON CONFLICT (hash_id)
+    DO UPDATE SET (hash, agg_id, agg_state) = ('${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
+    WHERE agg_states.hash_id = '${stateObject.hash_id}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function writeCalStateObject (stateObject, callback) {
-  CalStates.create({
-    agg_id: stateObject.agg_id,
-    cal_id: stateObject.cal_id,
-    cal_state: JSON.stringify(stateObject.cal_state)
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  let stateString = JSON.stringify(stateObject.cal_state)
+  sequelize.query(`INSERT INTO cal_states (agg_id, cal_id, cal_state)
+    VALUES ('${stateObject.agg_id}', '${stateObject.cal_id}', '${stateString}')
+    ON CONFLICT (agg_id)
+    DO UPDATE SET (cal_id, cal_state) = ('${stateObject.cal_id}', '${stateString}')
+    WHERE cal_states.agg_id = '${stateObject.agg_id}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function writeAnchorAggStateObject (stateObject, callback) {
-  AnchorAggStates.create({
-    cal_id: stateObject.cal_id,
-    anchor_agg_id: stateObject.anchor_agg_id,
-    anchor_agg_state: JSON.stringify(stateObject.anchor_agg_state)
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  let stateString = JSON.stringify(stateObject.anchor_agg_state)
+  sequelize.query(`INSERT INTO anchor_agg_states (cal_id, anchor_agg_id, anchor_agg_state)
+    VALUES ('${stateObject.cal_id}', '${stateObject.anchor_agg_id}', '${stateString}')
+    ON CONFLICT (cal_id)
+    DO UPDATE SET (anchor_agg_id, anchor_agg_state) = ('${stateObject.anchor_agg_id}', '${stateString}')
+    WHERE anchor_agg_states.cal_id = '${stateObject.cal_id}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function writeBTCTxStateObject (stateObject, callback) {
-  BtcTxStates.create({
-    anchor_agg_id: stateObject.anchor_agg_id,
-    btctx_id: stateObject.btctx_id,
-    btctx_state: JSON.stringify(stateObject.btctx_state)
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  let stateString = JSON.stringify(stateObject.btctx_state)
+  sequelize.query(`INSERT INTO btctx_states (anchor_agg_id, btctx_id, btctx_state)
+    VALUES ('${stateObject.anchor_agg_id}', '${stateObject.btctx_id}', '${stateString}')
+    ON CONFLICT (anchor_agg_id)
+    DO UPDATE SET (btctx_id, btctx_state) = ('${stateObject.btctx_id}', '${stateString}')
+    WHERE btctx_states.anchor_agg_id = '${stateObject.anchor_agg_id}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function writeBTCHeadStateObject (stateObject, callback) {
-  BtcHeadStates.create({
-    btctx_id: stateObject.btctx_id,
-    btchead_height: stateObject.btchead_height,
-    btchead_state: JSON.stringify(stateObject.btchead_state)
-  }, {
-    returning: false
-  }).then((res) => {
-    return callback(null, true)
-  }).catch((err) => {
-    return callback(err, false)
-  })
+  let stateString = JSON.stringify(stateObject.btchead_state)
+  sequelize.query(`INSERT INTO btchead_states (btctx_id, btchead_height, btchead_state)
+    VALUES ('${stateObject.btctx_id}', '${stateObject.btchead_height}', '${stateString}')
+    ON CONFLICT (btctx_id)
+    DO UPDATE SET (btchead_height, btchead_state) = ('${stateObject.btchead_height}', '${stateString}')
+    WHERE btchead_states.btctx_id = '${stateObject.btctx_id}'`).then((results) => {
+      return callback(null, true)
+    }).catch((err) => {
+      return callback(err, false)
+    })
 }
 
 function logSplitterEventForHashId (hashId, hash, callback) {

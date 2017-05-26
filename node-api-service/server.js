@@ -168,7 +168,7 @@ function processProofMessage (msg) {
       }
     ], (err) => {
       if (err) {
-        console.log(err)
+        console.error(err)
         amqpChannel.ack(msg)
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       } else {
