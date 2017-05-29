@@ -404,7 +404,7 @@ services:
   #
   roach1:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach1
     ports:
       - "26257:26257"
@@ -419,7 +419,7 @@ services:
 
   roach2:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach2
     ports:
       - 26257
@@ -435,7 +435,7 @@ services:
 
   roach3:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach3
     ports:
       - 26257
