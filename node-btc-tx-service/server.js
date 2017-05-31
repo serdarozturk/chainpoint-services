@@ -81,7 +81,7 @@ const genTxBody = (fee, hash) => {
   }
   let body = {
     token: BCOIN_API_WALLET_TOKEN,
-    rate: fee,
+    rate: fee * 1024, // bcoin wants the rate in satoshi per kb, not bytes
     outputs: [{
       script: genTxScript(hash)
     }]
@@ -97,6 +97,8 @@ const genTxBody = (fee, hash) => {
 */
 const sendTxToBTC = (hash, callback) => {
   let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
+  console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
+  console.log(body)
 
   let options = {
     headers: [
