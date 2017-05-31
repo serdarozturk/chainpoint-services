@@ -151,7 +151,8 @@ function consumeBtcTxMessage (msg) {
         stateObj.btctx_state = {}
         stateObj.btctx_state.ops = [
           { l: prefix },
-          { r: suffix }
+          { r: suffix },
+          { op: 'sha-256-x2' }
         ]
 
         amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btctx' },
