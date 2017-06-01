@@ -196,11 +196,11 @@ let monitorTransactions = () => {
   let btcTxIdsToMonitor = BTCTXIDS.splice(0)
   console.log(`Btc Tx montoring process starting for ${btcTxIdsToMonitor.length} transaction(s)`)
   async.eachSeries(btcTxIdsToMonitor, (btcTxIdObj, eachCallback) => {
-    console.log(`Checking btc tx id = ${btcTxIdObj.txId} started`)
+    console.log(`Checking btc tx id = ${btcTxIdObj.tx_id} started`)
     async.waterfall([
       (wfCallback) => {
         // get confirmation count for tx
-        getBTCTxById(btcTxIdObj.txId, (err, tx) => {
+        getBTCTxById(btcTxIdObj.tx_id, (err, tx) => {
           if (err) return wfCallback(err)
           let confirmCount = tx.confirmations || 0
           let blockHash = tx.block
@@ -210,7 +210,7 @@ let monitorTransactions = () => {
       },
       (confirmCount, blockHash, blockHeight, wfCallback) => {
         // if confirmation count < MIN_BTC_CONFIRMS, this transaction is not ready
-        if (confirmCount < MIN_BTC_CONFIRMS) return wfCallback(btcTxIdObj.txId + ' not ready')
+        if (confirmCount < MIN_BTC_CONFIRMS) return wfCallback(btcTxIdObj.tx_id + ' not ready')
         // retrieve btc block transactions ids and build state data object
         getBlockInfoForBlockHash(blockHash, (err, blockInfo) => {
           if (err) return wfCallback(err)
@@ -218,8 +218,8 @@ let monitorTransactions = () => {
         })
       },
       (txIds, blockRoot, blockHeight, wfCallback) => {
-        // find index of current txId in txIds array
-        let txIndex = txIds.indexOf(btcTxIdObj.txId)
+        // find index of current tx_id in txIds array
+        let txIndex = txIds.indexOf(btcTxIdObj.tx_id)
         if (txIndex === -1) return wfCallback('transaction id not found in block transaction array')
         // adjust for endieness, reverse txids for further processing
         for (let x = 0; x < txIds.length; x++) {
@@ -237,9 +237,8 @@ let monitorTransactions = () => {
         let proofPath = merkleTools.getProof(txIndex)
         // send data back to calendar
         let messageObj = {}
-        messageObj.btctx_id = btcTxIdObj.txId
+        messageObj.btctx_id = btcTxIdObj.tx_id
         messageObj.btchead_height = blockHeight
-        messageObj.tx_ids = txIds
         messageObj.path = proofPath
         amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btchead' },
           (err, ok) => {
@@ -261,7 +260,7 @@ let monitorTransactions = () => {
       } else {
         // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
         amqpChannel.ack(btcTxIdObj.msg)
-        console.log(btcTxIdObj.txId + ' confirmed and processed')
+        console.log(btcTxIdObj.tx_id + ' confirmed and processed')
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
       return eachCallback(null)
