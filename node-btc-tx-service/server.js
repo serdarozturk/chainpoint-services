@@ -79,9 +79,11 @@ const genTxBody = (fee, hash) => {
     console.error(`Fee of ${fee} per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${BTC_MAX_FEE_SAT_PER_BYTE}`)
     fee = BTC_MAX_FEE_SAT_PER_BYTE
   }
+  // bcoin wants the rate as a string representing btc per kb
+  let rateString = (fee * 1024 / 100000000).toString()
   let body = {
     token: BCOIN_API_WALLET_TOKEN,
-    rate: fee * 1024, // bcoin wants the rate in satoshi per kb, not bytes
+    rate: rateString,
     outputs: [{
       script: genTxScript(hash)
     }]
