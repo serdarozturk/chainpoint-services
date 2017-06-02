@@ -144,6 +144,8 @@ function processIncomingAnchorJob (msg) {
     let anchorData = messageObj.anchor_agg_root
     async.waterfall([
       (callback) => {
+        // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
+        if (!amqpChannel) return callback('no amqpConnection available')
         // create and publish the transaction
         sendTxToBTC(anchorData, (err, body) => {
           if (err) return callback(err)
