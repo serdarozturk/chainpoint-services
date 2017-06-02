@@ -142,7 +142,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       comment: 'Block type.',
       type: Sequelize.STRING,
       validate: {
-        isIn: [['gen', 'cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c']]
+        isIn: [['cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c']]
       },
       allowNull: false
     },
@@ -226,7 +226,7 @@ let createGenesisBlock = () => {
   b.id = 0
   b.time = new Date().getTime()
   b.version = 1
-  b.type = 'gen'
+  b.type = 'cal'
   b.data = zeroStr
   b.prevHash = zeroStr
 
