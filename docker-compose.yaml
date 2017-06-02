@@ -134,6 +134,8 @@ services:
     container_name: calendar
     build:
       context: ./node-calendar-service
+    environment:
+      NACL_KEYPAIR_SEED: '+zy90opG2vQIUOL1rI6Ja3tN26QtE6AC5F5bP1j+NgM='
     depends_on:
       - roach1
       - roach2
@@ -404,7 +406,7 @@ services:
   #
   roach1:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach1
     ports:
       - "26257:26257"
@@ -419,8 +421,10 @@ services:
 
   roach2:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach2
+    depends_on:
+      - roach1
     ports:
       - 26257
     volumes:
@@ -435,8 +439,11 @@ services:
 
   roach3:
     restart: always
-    image: cockroachdb/cockroach:v1.0
+    image: cockroachdb/cockroach:v1.0.1
     container_name: roach3
+    depends_on:
+      - roach1
+      - roach2
     ports:
       - 26257
     volumes:
