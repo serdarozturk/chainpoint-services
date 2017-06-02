@@ -201,6 +201,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
   }
 )
 
+// FIXME : do our own hashing the 'chainpoint' way. and store data somewhere?
 // Calculate a deterministic block hash from a whitelist of
 // properties to hash, and canonicalize with objectHash.
 let calcBlockHash = (block) => {
@@ -670,6 +671,8 @@ let aggregateAndAnchorBTC = () => {
       }
 
       // Send anchorData to the btc tx service for anchoring
+      // FIXME : Jason says there should be a return callback that directs things to the final callback.
+      // FIXME : Note, CRITICAL to always release lock no matter what goes wrong.
       amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
         (err, ok) => {
           if (err !== null) {
@@ -879,4 +882,9 @@ setInterval(() => aggregateAndAnchorETH(), ANCHOR_ETH_INTERVAL_MS)
 
 // Add all block hashes back to the previous BTC anchor to a Merkle
 // tree and send to BTC TX
+// FIXME : change ANCHOR_BTC_INTERVAL_MS to a one second tick interval
+// FIXME : don't call aggregateAndAnchorBTC() directly, instead, acquire a btcAnchorLock
+// FIXME : In the btcAnchorLock .on('acquire) handler, call aggregateAndAnchorBTC()
+// FIXME : aggregateAndAnchorBTC() checks if the last anchor block is equal or older to some new val (10 min)
+// FIXME : Only if last anchor was older/equal to 10 min, do we write a new anchor and do the work of that function. Otherwise immediate release lock.
 setInterval(() => aggregateAndAnchorBTC(), ANCHOR_BTC_INTERVAL_MS)
