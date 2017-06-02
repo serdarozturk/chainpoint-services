@@ -9,6 +9,9 @@
 # WARNING : RUNNING THIS WILL DESTROY ALL LOCAL DATA FOR THIS APP
 #################################################################
 
+# NOTE : This expects that both docker-compose and `cockroach` are
+# already installed. Do `brew install cockroach` to get it on macOS.
+
 docker-compose down
 
 sleep 30
