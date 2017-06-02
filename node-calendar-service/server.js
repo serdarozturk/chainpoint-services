@@ -6,14 +6,27 @@ const uuidv1 = require('uuid/v1')
 
 require('dotenv').config()
 
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
+
+// The consul key to hold for calendar blockchain DB locks
+const CALENDAR_LOCK = process.env.CALENDAR_LOCK || 'service/calendar/blockchain/lock'
+
+// Deterministic object hashing for signatures
+// see: https://github.com/emschwartz/objecthash-js
+// see: https://github.com/benlaurie/objecthash
+const objectHash = require('objecthash')
+
 // The frequency to generate new calendar trees
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 1000
 
-// How often should calendar trees be finalized
-const FINALIZATION_INTERVAL_MS = process.env.FINALIZATION_INTERVAL_MS || 250
+// How often should calendar trees be persisted
+const TREE_PERSIST_INTERVAL_MS = process.env.TREE_PERSIST_INTERVAL_MS || 250
 
 // How often blocks on calendar should be aggregated and anchored
-const ANCHOR_AGG_INTERVAL_SECONDS = process.env.ANCHOR_AGG_INTERVAL_SECONDS || 600
+const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 60000 // 1 min
+const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 600000 // 10 min
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
@@ -30,7 +43,28 @@ const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.b
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-// TODO: Validate env variables and exit if values are out of bounds
+// TweetNaCl.js
+// see: http://ed25519.cr.yp.to
+// see: https://github.com/dchest/tweetnacl-js#signatures
+const nacl = require('tweetnacl')
+nacl.util = require('tweetnacl-util')
+
+// Instantiate signing keypair from a 32 byte random hex secret
+// passed in via env var. The Base64 encoded random seed can be
+// created with:
+//   nacl.util.encodeBase64(nacl.randomBytes(32))
+//
+let naclKeypairSeed = null
+if (process.env.NACL_KEYPAIR_SEED) {
+  naclKeypairSeed = nacl.util.decodeBase64(process.env.NACL_KEYPAIR_SEED)
+} else {
+  console.error('Missing NACL_KEYPAIR_SEED environment variable')
+  process.exit(1)
+}
+
+const signingKeypair = nacl.sign.keyPair.fromSeed(naclKeypairSeed)
+
+const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -49,6 +83,202 @@ let TREES = []
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
+
+// CockroachDB Sequelize ORM
+let Sequelize = require('sequelize-cockroachdb')
+
+const COCKROACH_HOST = process.env.COCKROACH_HOST || 'roach1'
+const COCKROACH_PORT = process.env.COCKROACH_PORT || 26257
+const COCKROACH_DB_NAME = process.env.COCKROACH_DB_NAME || 'chainpoint'
+const COCKROACH_DB_USER = process.env.COCKROACH_DB_USER || 'chainpoint'
+const COCKROACH_DB_PASS = process.env.COCKROACH_DB_PASS || ''
+const COCKROACH_TABLE_NAME = process.env.COCKROACH_TABLE_NAME || 'chainpoint_calendar_blockchain'
+
+// Connect to CockroachDB through Sequelize.
+// Setup: See the setup instructions in the README.md file
+// for important database and user creation statements.
+let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
+  dialect: 'postgres',
+  host: COCKROACH_HOST,
+  port: COCKROACH_PORT
+})
+
+// Define the model and the table it will be stored in.
+// See : Why don't we auto increment primary key automatically:
+//   https://www.cockroachlabs.com/docs/serial.html
+var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
+  {
+    id: {
+      comment: 'Sequential monotonically incrementing Integer ID representing block height.',
+      primaryKey: true,
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      allowNull: false,
+      unique: true
+    },
+    time: {
+      comment: 'Block creation time in milliseconds since unix epoch',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      allowNull: false,
+      unique: true
+    },
+    version: {
+      comment: 'Block version number, for future use.',
+      type: Sequelize.INTEGER,
+      defaultValue: function () {
+        return 1
+      },
+      validate: {
+        isInt: true
+      },
+      allowNull: false
+    },
+    type: {
+      comment: 'Block type.',
+      type: Sequelize.STRING,
+      validate: {
+        isIn: [['gen', 'cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c']]
+      },
+      allowNull: false
+    },
+    data: {
+      comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-f0-9]{1,255}$', 'i']
+      },
+      allowNull: false,
+      unique: true
+    },
+    prevHash: {
+      comment: 'Block hash of previous block ID',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-f0-9]{64}$', 'i']
+      },
+      field: 'prev_hash',
+      allowNull: false,
+      unique: true
+    },
+    hash: {
+      comment: 'Hex encoded SHA-256 over canonical values',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-f0-9]{64}$', 'i']
+      },
+      allowNull: false,
+      unique: true
+    },
+    sig: {
+      comment: 'Base64 encoded signature over block hash',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-zA-Z0-9\=\+\/]{1,255}$', 'i']
+      },
+      allowNull: false,
+      unique: true
+    }
+  },
+  {
+    // no automatic timestamp fields, we add our own 'timestamp' so it is
+    // known prior to save so it can be included in the block signature.
+    timestamps: false,
+    // disable the modification of table names; By default, sequelize will automatically
+    // transform all passed model names (first parameter of define) into plural.
+    // if you don't want that, set the following
+    freezeTableName: true,
+    // setup object lifecycle hooks
+    hooks: {
+      // beforeValidate: function (block, options) {
+      //   console.log(block.get({plain: true}))
+      // }
+    }
+  }
+)
+
+// Calculate a deterministic block hash from a whitelist of
+// properties to hash, and canonicalize with objectHash.
+let calcBlockHash = (block) => {
+  let b = _.pick(block, [
+    'id',
+    'time',
+    'version',
+    'type',
+    'data',
+    'prevHash'])
+
+  return objectHash(b)
+}
+
+// Calculate a base64 encoded signature over the block hash
+let calcBlockHashSig = (bh) => {
+  return nacl.util.encodeBase64(nacl.sign(bh, signingKeypair.secretKey))
+}
+
+let createGenesisBlock = () => {
+  let b = {}
+  b.id = 0
+  b.time = new Date().getTime()
+  b.version = 1
+  b.type = 'gen'
+  b.data = zeroStr
+  b.prevHash = zeroStr
+
+  let bh = calcBlockHash(b)
+  b.hash = bh.toString('hex')
+  b.sig = calcBlockHashSig(bh)
+
+  CalendarBlock.create(b)
+  .then((block) => {
+    console.log('createGenesisBlock : new genesis block created!')
+    console.log(block.get({plain: true}))
+  })
+  .catch(err => {
+    console.error('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
+  })
+  .then(() => {
+    // always release the lock, whether success or failure
+    genesisLock.release()
+  })
+}
+
+let createCalendarBlock = (data) => {
+  // Find the last block written so we can incorporate its hash as prevHash
+  // in the new block and increment its block ID by 1.
+  CalendarBlock.findOne({attributes: ['id', 'hash'], order: 'id DESC'}).then(prevBlock => {
+    if (prevBlock) {
+      let b = {}
+      b.id = parseInt(prevBlock.id, 10) + 1
+      b.time = new Date().getTime()
+      b.version = 1
+      b.type = 'cal'
+      b.data = data
+      b.prevHash = prevBlock.hash
+
+      let bh = calcBlockHash(b)
+      b.hash = bh.toString('hex')
+      b.sig = calcBlockHashSig(bh)
+
+      CalendarBlock.create(b)
+      .then((block) => {
+        console.log('createCalendarBlock : new calendar block created!')
+        console.log(block.get({plain: true}))
+      })
+      .catch(err => {
+        console.error('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
+      })
+      .then(() => {
+        // always release the lock, whether success or failure
+        calendarLock.release()
+      })
+    }
+  })
+}
 
 /**
  * Opens an AMPQ connection and channel
@@ -79,7 +309,7 @@ function amqpOpenConnection (connectionString) {
         if (err) return callback(err)
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
-        console.log('Connection established')
+        console.log('amqpChannel connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
@@ -208,11 +438,8 @@ function formatAsChainpointV3Ops (proof, op) {
   return ChainpointV3Ops
 }
 
-// AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
-
 // Take work off of the AGGREGATION_ROOTS array and build Merkle tree
-let generateCalendarBlock = () => {
+let generateCalendarTree = () => {
   let rootsForTree = AGGREGATION_ROOTS.splice(0)
 
   // create merkle tree only if there is at least one root to process
@@ -229,7 +456,8 @@ let generateCalendarBlock = () => {
     merkleTools.addLeaves(leaves)
     merkleTools.makeTree()
 
-    // Collect and store the calendar id, Merkle root, and proofs in an array where finalize() can find it
+    // Collect and store the calendar id, Merkle root,
+    // and proofs in an array where finalize() can find it
     let treeData = {}
     treeData.cal_id = uuidv1()
 
@@ -252,15 +480,18 @@ let generateCalendarBlock = () => {
   }
 }
 
-// Temp/incomplete finalize function for writing to proof state service only, no calendar functions yet
-let finalize = () => {
-  // if the amqp channel is null (closed), processing should not continue, defer to next finalize call
+// FIXME : REFACTOR TO SPLIT BLOCKCHAIN WRITE AND RMQ TO DIFF FUNCTIONS
+// Write in-memory trees to calendar block DB and
+// also to proof state service via RMQ
+let persistCalendarTrees = () => {
+  // if the amqp channel is null (closed), processing
+  // should not continue, defer to next persistCalendarTrees call
   if (amqpChannel === null) return
 
   // process each set of tree data
-  let treesToFinalize = TREES.splice(0)
-  _.forEach(treesToFinalize, (treeDataObj) => {
-    console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
+  let treesToPersist = TREES.splice(0)
+  _.forEach(treesToPersist, (treeDataObj) => {
+    console.log('Processing tree', treesToPersist.indexOf(treeDataObj) + 1, 'of', treesToPersist.length)
 
     // TODO store Merkle root of calendar in DB and chain to previous calendar entries
     console.log('calendar write')
@@ -268,7 +499,8 @@ let finalize = () => {
     // queue proof state messages for each aggregation root in the tree
     async.series([
       (callback) => {
-        // for each aggregation root, queue up message containing updated proof state bound for proof state service
+        // for each aggregation root, queue up message containing
+        // updated proof state bound for proof state service
         async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
           let stateObj = {}
           stateObj.agg_id = proofDataItem.agg_id
@@ -301,10 +533,10 @@ let finalize = () => {
             })
         }, (err) => {
           if (err) {
-            console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
+            console.error('Processing of tree', treesToPersist.indexOf(treeDataObj) + 1, 'had errors.')
             return callback(err)
           } else {
-            console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+            console.log('Processing of tree', treesToPersist.indexOf(treeDataObj) + 1, 'complete')
             // pass all the agg_msg objects to the series() callback
             let messages = treeDataObj.proofData.map((proofDataItem) => {
               return proofDataItem.agg_msg
@@ -336,8 +568,13 @@ let finalize = () => {
   })
 }
 
+let aggregateAndAnchorETH = () => {
+  // TODO
+  console.log('TODO aggregateAndAnchorETH()')
+}
+
 // Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
-let aggregateAndAnchor = () => {
+let aggregateAndAnchorBTC = () => {
   // TODO: Retrieve calendar blocks since last anchor block (inclusive?, lock db?)
   // TODO: Remove this below / faking it until we're making it / field count/names not entirely accurate
   let blocks = [
@@ -446,13 +683,200 @@ let aggregateAndAnchor = () => {
     if (err) {
       console.error(err)
     } else {
-      console.error('aggregateAndAnchor process complete.')
+      console.error('aggregateAndAnchorBTC process complete.')
     }
   })
 }
 
-setInterval(() => generateCalendarBlock(), CALENDAR_INTERVAL_MS)
+// SERVICE SETUP : AMQP initialization
+amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
-setInterval(() => finalize(), FINALIZATION_INTERVAL_MS)
+// Each of these locks must be defined up front since event handlers
+// need to connect to each. They are all effectively locking the same
+// resource though since they share the same key. The value is
+// purely informational and allows you to see which entity is currently
+// holding a lock in the Consul admin web app.
+var genesisLock = consul.lock({ key: CALENDAR_LOCK, value: 'genesis' })
+var calendarLock = consul.lock({ key: CALENDAR_LOCK, value: 'calendar' })
+var nistLock = consul.lock({ key: CALENDAR_LOCK, value: 'nist' })
+var btcAnchorLock = consul.lock({ key: CALENDAR_LOCK, value: 'btc-anchor' })
+var btcConfirmLock = consul.lock({ key: CALENDAR_LOCK, value: 'btc-confirm' })
+var ethAnchorLock = consul.lock({ key: CALENDAR_LOCK, value: 'eth-anchor' })
+var ethConfirmLock = consul.lock({ key: CALENDAR_LOCK, value: 'eth-confirm' })
 
-setInterval(() => aggregateAndAnchor(), ANCHOR_AGG_INTERVAL_SECONDS * 1000)
+// Sync models to DB tables and trigger check
+// if a new genesis block is needed.
+// sequelize.sync({ force: true, logging: console.log })
+sequelize.sync({ logging: console.log })
+  .then(() => {
+    console.log('CalendarBlock sequelize database synchronized')
+  })
+  .then(() => {
+    // trigger creation of the genesis block
+    genesisLock.acquire()
+  })
+  .catch((err) => {
+    console.error('sequelize.sync() error: ' + err.stack)
+    process.exit(1)
+  })
+
+// LOCK HANDLERS : genesis
+
+genesisLock.on('acquire', () => {
+  console.log('genesisLock acquired')
+  // The value of the lock determines what function it triggers
+  // Is a genesis block needed? If not release lock and move on.
+  CalendarBlock.count().then(c => {
+    if (c === 0) {
+      createGenesisBlock()
+    } else {
+      genesisLock.release()
+      console.log('No genesis block needed : ' + c + ' blocks found.')
+    }
+  })
+})
+
+genesisLock.on('release', function () {
+  console.log('genesisLock released')
+})
+
+genesisLock.on('error', function (err) {
+  console.log('genesisLock error:', err)
+})
+
+genesisLock.on('end', function () {
+  // console.log('genesisLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : calendar
+
+calendarLock.on('acquire', () => {
+  console.log('calendarLock acquired')
+
+  // FIXME : fakeData hash being inserted now just for testing.
+  let fakeData = objectHash({time: new Date().getTime()}).toString('hex')
+  createCalendarBlock(fakeData)
+})
+
+calendarLock.on('release', function () {
+  console.log('calendarLock released')
+})
+
+calendarLock.on('error', function (err) {
+  console.log('calendarLock error:', err)
+})
+
+calendarLock.on('end', function () {
+  // console.log('calendarLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : nist
+
+nistLock.on('acquire', () => {
+  console.log('nistLock acquired')
+})
+
+nistLock.on('release', function () {
+  console.log('nistLock released')
+})
+
+nistLock.on('error', function (err) {
+  console.log('nistLock error:', err)
+})
+
+nistLock.on('end', function () {
+  // console.log('nistLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : btc-anchor
+
+btcAnchorLock.on('acquire', () => {
+  console.log('btcAnchorLock acquired')
+})
+
+btcAnchorLock.on('release', function () {
+  console.log('btcAnchorLock released')
+})
+
+btcAnchorLock.on('error', function (err) {
+  console.log('btcAnchorLock error:', err)
+})
+
+btcAnchorLock.on('end', function () {
+  // console.log('btcAnchorLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : btc-confirm
+
+btcConfirmLock.on('acquire', () => {
+  console.log('btcConfirmLock acquired')
+})
+
+btcConfirmLock.on('release', function () {
+  console.log('btcConfirmLock released')
+})
+
+btcConfirmLock.on('error', function (err) {
+  console.log('btcConfirmLock error:', err)
+})
+
+btcConfirmLock.on('end', function () {
+  // console.log('btcConfirmLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : eth-anchor
+
+ethAnchorLock.on('acquire', () => {
+  console.log('ethAnchorLock acquired')
+})
+
+ethAnchorLock.on('release', function () {
+  console.log('ethAnchorLock released')
+})
+
+ethAnchorLock.on('error', function (err) {
+  console.log('ethAnchorLock error:', err)
+})
+
+ethAnchorLock.on('end', function () {
+  // console.log('ethAnchorLock released or there was a permanent failure')
+})
+
+// LOCK HANDLERS : eth-confirm
+
+ethConfirmLock.on('acquire', () => {
+  console.log('ethConfirmLock acquired')
+})
+
+ethConfirmLock.on('release', function () {
+  console.log('ethConfirmLock released')
+})
+
+ethConfirmLock.on('error', function (err) {
+  console.log('ethConfirmLock error:', err)
+})
+
+ethConfirmLock.on('end', function () {
+  // console.log('ethConfirmLock released or there was a permanent failure')
+})
+
+// PERIODIC TIMERS
+
+// Write a new calendar block
+setInterval(() => calendarLock.acquire(), CALENDAR_INTERVAL_MS)
+
+// generate in-memory trees and proofs : every 1000ms
+setInterval(() => generateCalendarTree(), CALENDAR_INTERVAL_MS)
+
+// FIXME : Should this be periodic? Or triggered by lockCalendarBlock()
+// put this in the lock block and call the createCalendarBlock from within this function instead of directly in the event block as it is now.
+// persist in-memory trees to calendar block and PSS every 250ms
+setInterval(() => persistCalendarTrees(), TREE_PERSIST_INTERVAL_MS)
+
+// Add all block hashes back to the previous ETH anchor to a Merkle
+// tree and send to ETH TX
+setInterval(() => aggregateAndAnchorETH(), ANCHOR_ETH_INTERVAL_MS)
+
+// Add all block hashes back to the previous BTC anchor to a Merkle
+// tree and send to BTC TX
+setInterval(() => aggregateAndAnchorBTC(), ANCHOR_BTC_INTERVAL_MS)
