@@ -115,11 +115,11 @@ function consumeBtcTxIdMessage (msg) {
 }
 
 /**
-* Send a GET request to /tx/:id with a :id parameter
-* containing the id of the transaction to retrieve
-*
-* @param {string} id - The bitcoin transaction id of the transaction to retrieve
-*/
+ * Send a GET request to /tx/:id with a :id parameter
+ * containing the id of the transaction to retrieve
+ *
+ * @param {string} id - The bitcoin transaction id of the transaction to retrieve
+ */
 const getBTCTxById = (id, callback) => {
   let options = {
     headers: [
@@ -147,12 +147,10 @@ const getBTCTxById = (id, callback) => {
 }
 
 /**
-* Send a GET request to /block/:block with a :block parameter
-* containing the block hash of the block for which we want to retrieve the transaction ids
-*
-* @param {string} blockHash - The blockHash of the bitcoin block
-*/
-const getBlockInfoForBlockHash = (blockHash, callback) => {
+ * Send a GET request to /
+ *
+ */
+const getChainState = (callback) => {
   let options = {
     headers: [
       {
@@ -161,7 +159,43 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
       }
     ],
     method: 'GET',
-    uri: BCOIN_API_BASE_URI + '/block/' + blockHash,
+    uri: BCOIN_API_BASE_URI + '/',
+    json: true,
+    gzip: true,
+    auth: {
+      user: BCOIN_API_USERNAME,
+      pass: BCOIN_API_PASS
+    }
+  }
+  request(options, function (err, response, body) {
+    if (err || response.statusCode !== 200) {
+      if (!err) err = `GET failed with status code ${response.statusCode}`
+      return callback(err)
+    }
+    return callback(null, body)
+  })
+}
+
+/**
+ * Send a GET request to /block/:block with a :block parameter
+ * containing the block hash of the block for which we want to retrieve the transaction ids
+ *
+ * @param {string} blockHash - The blockHash of the bitcoin block
+ */
+const getBlockInfoForBlockHash = (blockHash, callback) => {
+  let options = {
+    headers: [
+      {
+        name: 'Content-Type',
+        value: 'application/json'
+      }
+    ],
+    method: 'POST',
+    uri: BCOIN_API_BASE_URI + '/',
+    body: {
+      method: 'getblock',
+      params: [blockHash]
+    },
     json: true,
     gzip: true,
     auth: {
@@ -174,10 +208,7 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
       if (!err || !body.tx) err = `GET failed with status code ${response.statusCode}`
       return callback(err)
     }
-    let result = {}
-    result.txIds = body.tx
-    result.merkleRoot = body.merkleroot
-    return callback(null, result)
+    return callback(null, body)
   })
 }
 
@@ -199,35 +230,48 @@ let monitorTransactions = () => {
     console.log(`Checking btc tx id = ${btcTxIdObj.tx_id} started`)
     async.waterfall([
       (wfCallback) => {
-        // get confirmation count for tx
+        // get tx information
         getBTCTxById(btcTxIdObj.tx_id, (err, tx) => {
           if (err) return wfCallback(err)
-          let confirmCount = tx.confirmations || 0
+          // if transaction is not part of a block yet, return transaction is not ready
+          if (tx.height === -1) return wfCallback(btcTxIdObj.tx_id + ' not ready')
+          // otherwise, pass along relevant transaction information
           let blockHash = tx.block
           let blockHeight = tx.height
-          return wfCallback(null, confirmCount, blockHash, blockHeight)
+          let txIndex = tx.index
+          return wfCallback(null, blockHash, blockHeight, txIndex)
         })
       },
-      (confirmCount, blockHash, blockHeight, wfCallback) => {
+      (blockHash, blockHeight, txIndex, wfCallback) => {
+        // get current chain state
+        // TODO: Move this out any only call once at the start for the entire batch?
+        getChainState((err, chainInfo) => {
+          if (err) return wfCallback(err)
+          let chainHeight = chainInfo.chain.height
+          return wfCallback(null, blockHash, blockHeight, txIndex, chainHeight)
+        })
+      },
+      (blockHash, blockHeight, txIndex, chainHeight, wfCallback) => {
+        // calculate confirmations
+        let confirmCount = chainHeight - blockHeight + 1
         // if confirmation count < MIN_BTC_CONFIRMS, this transaction is not ready
         if (confirmCount < MIN_BTC_CONFIRMS) return wfCallback(btcTxIdObj.tx_id + ' not ready')
         // retrieve btc block transactions ids and build state data object
         getBlockInfoForBlockHash(blockHash, (err, blockInfo) => {
           if (err) return wfCallback(err)
-          return wfCallback(null, blockInfo.txIds, blockInfo.merkleRoot, blockHeight)
+          let blockTxIds = blockInfo.tx
+          let blockRoot = blockInfo.merkleroot
+          return wfCallback(null, blockTxIds, txIndex, blockRoot, blockHeight)
         })
       },
-      (txIds, blockRoot, blockHeight, wfCallback) => {
-        // find index of current tx_id in txIds array
-        let txIndex = txIds.indexOf(btcTxIdObj.tx_id)
-        if (txIndex === -1) return wfCallback('transaction id not found in block transaction array')
+      (blockTxIds, txIndex, blockRoot, blockHeight, wfCallback) => {
         // adjust for endieness, reverse txids for further processing
-        for (let x = 0; x < txIds.length; x++) {
-          txIds[x] = txIds[x].match(/.{2}/g).reverse().join('')
+        for (let x = 0; x < blockTxIds.length; x++) {
+          blockTxIds[x] = blockTxIds[x].match(/.{2}/g).reverse().join('')
         }
         // build BTC merkle tree with txIds
         merkleTools.resetTree()
-        merkleTools.addLeaves(txIds)
+        merkleTools.addLeaves(blockTxIds)
         merkleTools.makeBTCTree(true)
         let rootValueBuffer = merkleTools.getMerkleRoot()
         // re-adjust for endieness, reverse and convert back to hex
@@ -240,7 +284,7 @@ let monitorTransactions = () => {
         messageObj.btctx_id = btcTxIdObj.tx_id
         messageObj.btchead_height = blockHeight
         messageObj.path = proofPath
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btchead' },
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' },
           (err, ok) => {
             if (err !== null) {
               console.error(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
