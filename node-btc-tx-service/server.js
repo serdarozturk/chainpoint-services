@@ -42,7 +42,6 @@ const BTC_MAX_FEE_SAT_PER_BYTE = process.env.BTC_MAX_FEE_SAT_PER_BYTE || 4255
 // These values are private and are accessed from environment variables only
 const BCOIN_API_BASE_URI = process.env.BCOIN_API_BASE_URI
 const BCOIN_API_WALLET_ID = process.env.BCOIN_API_WALLET_ID
-const BCOIN_API_WALLET_TOKEN = process.env.BCOIN_API_WALLET_TOKEN
 const BCOIN_API_USERNAME = process.env.BCOIN_API_USERNAME
 const BCOIN_API_PASS = process.env.BCOIN_API_PASS
 
@@ -85,7 +84,6 @@ const genTxBody = (feeSatPerByte, hash) => {
   let feeBtcPerKilobyte = feeBtcPerByte * 1024
   let rateString = feeBtcPerKilobyte.toString()
   let body = {
-    token: BCOIN_API_WALLET_TOKEN,
     rate: rateString,
     outputs: [{
       script: genTxScript(hash)
