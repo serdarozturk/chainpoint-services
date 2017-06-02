@@ -126,8 +126,6 @@ const sendTxToBTC = (hash, callback) => {
       if (!err) err = `POST failed with status code ${response.statusCode}`
       return callback(err)
     }
-    // FIXME : data about the successful TX needs to be sent to the monitoring service
-    // so it can watch for 6 confirmations
     return callback(null, body)
   })
 }
