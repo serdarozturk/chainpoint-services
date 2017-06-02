@@ -2,6 +2,7 @@ const amqp = require('amqplib/callback_api')
 const async = require('async')
 const bcoin = require('bcoin')
 const request = require('request')
+const sb = require('satoshi-bitcoin')
 require('dotenv').config()
 
 const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
@@ -73,15 +74,19 @@ const genTxScript = (hash) => {
 * @param {string} fee - The miners fee for this TX in Satoshi's per byte
 * @param {string} hash - The hash to embed in an OP_RETURN
 */
-const genTxBody = (fee, hash) => {
+const genTxBody = (feeSatPerByte, hash) => {
   // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
-  if (fee > BTC_MAX_FEE_SAT_PER_BYTE) {
-    console.error(`Fee of ${fee} per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${BTC_MAX_FEE_SAT_PER_BYTE}`)
-    fee = BTC_MAX_FEE_SAT_PER_BYTE
+  if (feeSatPerByte > BTC_MAX_FEE_SAT_PER_BYTE) {
+    console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${BTC_MAX_FEE_SAT_PER_BYTE}`)
+    feeSatPerByte = BTC_MAX_FEE_SAT_PER_BYTE
   }
+  // bcoin wants the rate as a string representing btc per kb
+  let feeBtcPerByte = sb.toBitcoin(feeSatPerByte)
+  let feeBtcPerKilobyte = feeBtcPerByte * 1024
+  let rateString = feeBtcPerKilobyte.toString()
   let body = {
     token: BCOIN_API_WALLET_TOKEN,
-    rate: fee,
+    rate: rateString,
     outputs: [{
       script: genTxScript(hash)
     }]
@@ -97,6 +102,8 @@ const genTxBody = (fee, hash) => {
 */
 const sendTxToBTC = (hash, callback) => {
   let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
+  console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
+  console.log(body)
 
   let options = {
     headers: [

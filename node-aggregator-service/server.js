@@ -200,8 +200,12 @@ initializeNistData((err, result) => {
 let aggregate = () => {
   let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
 
-  let nistDataString = (nistLastData.timeStamp + ':' + nistLastData.seedValue).toLowerCase()
-  let nistDataBuffer = Buffer.from(nistDataString, 'utf8')
+  // get snapshot of last NIST data and determine if it is valid and available to use for this aggregation
+  let nistObj = nistLastData
+  let nistDataAvailable = nistObj !== null
+
+  let nistDataString = nistDataAvailable ? (nistObj.timeStamp + ':' + nistObj.seedValue).toLowerCase() : null
+  let nistDataBuffer = nistDataAvailable ? Buffer.from(nistDataString, 'utf8') : null
 
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
@@ -213,7 +217,12 @@ let aggregate = () => {
       let hashIdBuffer = Buffer.from(hashObj.hash_id, 'utf8')
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
       let concatAndHashBuffer = crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest()
-      return crypto.createHash('sha256').update(Buffer.concat([nistDataBuffer, concatAndHashBuffer])).digest('hex')
+
+      if (!nistDataAvailable) { // no NIST data is available, return only the addition of the hashId
+        return concatAndHashBuffer
+      } else { // add a concat and hash operation embedding NIST data into proof path
+        return crypto.createHash('sha256').update(Buffer.concat([nistDataBuffer, concatAndHashBuffer])).digest('hex')
+      }
     })
 
     // Add every hash in hashesForTree to new Merkle tree
@@ -236,7 +245,8 @@ let aggregate = () => {
       proofDataItem.hash = hashesForTree[x].hash
       proofDataItem.hash_msg = hashesForTree[x].msg
       let proof = merkleTools.getProof(x)
-      proof.unshift({ left: nistDataString })
+      // only add the NIST item to the proof path if it was available and used in the tree calculation
+      if (nistDataAvailable) proof.unshift({ left: nistDataString })
       proof.unshift({ left: hashesForTree[x].hash_id })
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
