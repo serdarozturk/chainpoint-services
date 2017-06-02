@@ -10,8 +10,11 @@ const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
 const CONSUL_PORT = process.env.CONSUL_PORT || 8500
 const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
 
+// consul : uncomment to enable *very* detailed consul logging.
+// consul.on('log', console.log)
+
 // The consul key to hold for calendar blockchain DB locks
-const CALENDAR_LOCK = process.env.CALENDAR_LOCK || 'service/calendar/blockchain/lock'
+const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blockchain/lock'
 
 // Deterministic object hashing for signatures
 // see: https://github.com/emschwartz/objecthash-js
@@ -695,17 +698,34 @@ let aggregateAndAnchorBTC = () => {
 amqpOpenConnection(RABBITMQ_CONNECT_URI)
 
 // Each of these locks must be defined up front since event handlers
-// need to connect to each. They are all effectively locking the same
-// resource though since they share the same key. The value is
+// need to be registered for each. They are all effectively locking the same
+// resource since they share the same CALENDAR_LOCK_KEY. The value is
 // purely informational and allows you to see which entity is currently
 // holding a lock in the Consul admin web app.
-var genesisLock = consul.lock({ key: CALENDAR_LOCK, value: 'genesis' })
-var calendarLock = consul.lock({ key: CALENDAR_LOCK, value: 'calendar' })
-var nistLock = consul.lock({ key: CALENDAR_LOCK, value: 'nist' })
-var btcAnchorLock = consul.lock({ key: CALENDAR_LOCK, value: 'btc-anchor' })
-var btcConfirmLock = consul.lock({ key: CALENDAR_LOCK, value: 'btc-confirm' })
-var ethAnchorLock = consul.lock({ key: CALENDAR_LOCK, value: 'eth-anchor' })
-var ethConfirmLock = consul.lock({ key: CALENDAR_LOCK, value: 'eth-confirm' })
+//
+// See also : https://github.com/hashicorp/consul/blob/master/api/lock.go#L21
+//
+var lockOpts = {
+  key: CALENDAR_LOCK_KEY,
+  lockwaittime: '15s',
+  lockwaittimeout: '1s',
+  lockretrytime: '5s',
+  session: {
+    behavior: 'delete',
+    checks: ['serfHealth'],
+    lockdelay: '1s',
+    name: 'calendar-blockchain-lock',
+    ttl: '10s'
+  }
+}
+
+var genesisLock = consul.lock(_.merge({}, lockOpts, {value: 'genesis'}))
+var calendarLock = consul.lock(_.merge({}, lockOpts, {value: 'calendar'}))
+var nistLock = consul.lock(_.merge({}, lockOpts, {value: 'nist'}))
+var btcAnchorLock = consul.lock(_.merge({}, lockOpts, {value: 'btc-anchor'}))
+var btcConfirmLock = consul.lock(_.merge({}, lockOpts, {value: 'btc-confirm'}))
+var ethAnchorLock = consul.lock(_.merge({}, lockOpts, {value: 'eth-anchor'}))
+var ethConfirmLock = consul.lock(_.merge({}, lockOpts, {value: 'eth-confirm'}))
 
 // Sync models to DB tables and trigger check
 // if a new genesis block is needed.
@@ -739,16 +759,16 @@ genesisLock.on('acquire', () => {
   })
 })
 
-genesisLock.on('release', function () {
-  console.log('genesisLock released')
+genesisLock.on('error', (err) => {
+  console.log('genesisLock error: ', err)
 })
 
-genesisLock.on('error', function (err) {
-  console.log('genesisLock error:', err)
+genesisLock.on('release', () => {
+  console.log('genesisLock release')
 })
 
-genesisLock.on('end', function () {
-  // console.log('genesisLock released or there was a permanent failure')
+genesisLock.on('end', () => {
+  console.log('genesisLock end')
 })
 
 // LOCK HANDLERS : calendar
@@ -761,16 +781,16 @@ calendarLock.on('acquire', () => {
   createCalendarBlock(fakeData)
 })
 
-calendarLock.on('release', function () {
-  console.log('calendarLock released')
+calendarLock.on('error', (err) => {
+  console.log('calendarLock error: ', err)
 })
 
-calendarLock.on('error', function (err) {
-  console.log('calendarLock error:', err)
+calendarLock.on('release', () => {
+  console.log('calendarLock release')
 })
 
-calendarLock.on('end', function () {
-  // console.log('calendarLock released or there was a permanent failure')
+calendarLock.on('end', () => {
+  console.log('calendarLock end')
 })
 
 // LOCK HANDLERS : nist
@@ -779,16 +799,16 @@ nistLock.on('acquire', () => {
   console.log('nistLock acquired')
 })
 
-nistLock.on('release', function () {
-  console.log('nistLock released')
+nistLock.on('error', (err) => {
+  console.log('nistLock error: ', err)
 })
 
-nistLock.on('error', function (err) {
-  console.log('nistLock error:', err)
+nistLock.on('release', () => {
+  console.log('nistLock release')
 })
 
-nistLock.on('end', function () {
-  // console.log('nistLock released or there was a permanent failure')
+nistLock.on('end', () => {
+  console.log('nistLock end')
 })
 
 // LOCK HANDLERS : btc-anchor
@@ -797,16 +817,16 @@ btcAnchorLock.on('acquire', () => {
   console.log('btcAnchorLock acquired')
 })
 
-btcAnchorLock.on('release', function () {
-  console.log('btcAnchorLock released')
+btcAnchorLock.on('error', (err) => {
+  console.log('btcAnchorLock error: ', err)
 })
 
-btcAnchorLock.on('error', function (err) {
-  console.log('btcAnchorLock error:', err)
+btcAnchorLock.on('release', () => {
+  console.log('btcAnchorLock release')
 })
 
-btcAnchorLock.on('end', function () {
-  // console.log('btcAnchorLock released or there was a permanent failure')
+btcAnchorLock.on('end', () => {
+  console.log('btcAnchorLock end')
 })
 
 // LOCK HANDLERS : btc-confirm
@@ -815,16 +835,16 @@ btcConfirmLock.on('acquire', () => {
   console.log('btcConfirmLock acquired')
 })
 
-btcConfirmLock.on('release', function () {
-  console.log('btcConfirmLock released')
+btcConfirmLock.on('error', (err) => {
+  console.log('btcConfirmLock error: ', err)
 })
 
-btcConfirmLock.on('error', function (err) {
-  console.log('btcConfirmLock error:', err)
+btcConfirmLock.on('release', () => {
+  console.log('btcConfirmLock release')
 })
 
-btcConfirmLock.on('end', function () {
-  // console.log('btcConfirmLock released or there was a permanent failure')
+btcConfirmLock.on('end', () => {
+  console.log('btcConfirmLock end')
 })
 
 // LOCK HANDLERS : eth-anchor
@@ -833,16 +853,16 @@ ethAnchorLock.on('acquire', () => {
   console.log('ethAnchorLock acquired')
 })
 
-ethAnchorLock.on('release', function () {
-  console.log('ethAnchorLock released')
+ethAnchorLock.on('error', (err) => {
+  console.log('ethAnchorLock error: ', err)
 })
 
-ethAnchorLock.on('error', function (err) {
-  console.log('ethAnchorLock error:', err)
+ethAnchorLock.on('release', () => {
+  console.log('ethAnchorLock release')
 })
 
-ethAnchorLock.on('end', function () {
-  // console.log('ethAnchorLock released or there was a permanent failure')
+ethAnchorLock.on('end', () => {
+  console.log('ethAnchorLock end')
 })
 
 // LOCK HANDLERS : eth-confirm
@@ -851,16 +871,16 @@ ethConfirmLock.on('acquire', () => {
   console.log('ethConfirmLock acquired')
 })
 
-ethConfirmLock.on('release', function () {
-  console.log('ethConfirmLock released')
+ethConfirmLock.on('error', (err) => {
+  console.log('ethConfirmLock error: ', err)
 })
 
-ethConfirmLock.on('error', function (err) {
-  console.log('ethConfirmLock error:', err)
+ethConfirmLock.on('release', () => {
+  console.log('ethConfirmLock release')
 })
 
-ethConfirmLock.on('end', function () {
-  // console.log('ethConfirmLock released or there was a permanent failure')
+ethConfirmLock.on('end', () => {
+  console.log('ethConfirmLock end')
 })
 
 // PERIODIC TIMERS
