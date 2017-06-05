@@ -28,9 +28,6 @@ const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 // The frequency to generate new NIST Random Beacon Blocks
 const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
 
-// How often should calendar trees be persisted
-const TREE_PERSIST_INTERVAL_MS = process.env.TREE_PERSIST_INTERVAL_MS || 250
-
 // How often blocks on calendar should be aggregated and anchored
 const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
 const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
@@ -52,6 +49,12 @@ const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
+// URLs for calendar stacks to use in proofs
+const CHAINPOINT_CALENDAR_URLS = [
+  'http://a.cal.chainpoint.org',
+  'http://b.cal.chainpoint.org'
+]
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -205,9 +208,9 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
 // Calculate a deterministic block hash from a whitelist of properties to hash
 // Returns a Buffer hash value
 let calcBlockHash = (block) => {
-  let idBuffer = Buffer.from(block.id, 'utf8')
-  let timeBuffer = Buffer.from(block.time, 'utf8')
-  let versionBuffer = Buffer.from(block.version, 'utf8')
+  let idBuffer = Buffer.from(block.id.toString(), 'utf8')
+  let timeBuffer = Buffer.from(block.time.toString(), 'utf8')
+  let versionBuffer = Buffer.from(block.version.toString(), 'utf8')
   let typeBuffer = Buffer.from(block.type, 'utf8')
   let dataBuffer = Buffer.from(block.data, 'hex')
   let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
@@ -254,7 +257,7 @@ let createGenesisBlock = () => {
     })
 }
 
-let createCalendarBlock = (data) => {
+let createCalendarBlock = (data, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
@@ -273,16 +276,14 @@ let createCalendarBlock = (data) => {
 
       CalendarBlock.create(b)
         .then((block) => {
-          // console.log(block.get({plain: true}))
           console.log('CAL BLOCK : id : ' + block.get({ plain: true }).id)
+          return callback(null, block.get({ plain: true }))
         })
         .catch(err => {
-          console.error('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
+          return callback('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
         })
-        .then(() => {
-          // always release the lock, whether success or failure
-          calendarLock.release()
-        })
+    } else {
+      return callback('could not write block, no genesis block found')
     }
   })
 }
@@ -504,6 +505,7 @@ function formatAsChainpointV3Ops (proof, op) {
 let generateCalendarTree = () => {
   let rootsForTree = AGGREGATION_ROOTS.splice(0)
 
+  let treeDataObj = null
   // create merkle tree only if there is at least one root to process
   if (rootsForTree.length > 0) {
     // clear the merkleTools instance to prepare for a new tree
@@ -520,8 +522,9 @@ let generateCalendarTree = () => {
 
     // Collect and store the calendar id, Merkle root,
     // and proofs in an array where finalize() can find it
-    let treeData = {}
-    treeData.cal_id = uuidv1()
+    treeDataObj = {}
+    treeDataObj.cal_id = uuidv1()
+    treeDataObj.cal_root = merkleTools.getMerkleRoot()
 
     let treeSize = merkleTools.getLeafCount()
     let proofData = []
@@ -535,98 +538,92 @@ let generateCalendarTree = () => {
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
     }
-    treeData.proofData = proofData
-
-    TREES.push(treeData)
+    treeDataObj.proofData = proofData
     console.log('rootsForTree length : %s', rootsForTree.length)
   }
+  return treeDataObj
 }
 
-// FIXME : REFACTOR TO SPLIT BLOCKCHAIN WRITE AND RMQ TO DIFF FUNCTIONS
-// Write in-memory trees to calendar block DB and
-// also to proof state service via RMQ
-let persistCalendarTrees = () => {
-  // if the amqp channel is null (closed), processing
-  // should not continue, defer to next persistCalendarTrees call
-  if (amqpChannel === null) return
-
-  // process each set of tree data
-  let treesToPersist = TREES.splice(0)
-  _.forEach(treesToPersist, (treeDataObj) => {
-    console.log('Processing tree', treesToPersist.indexOf(treeDataObj) + 1, 'of', treesToPersist.length)
-
-    // TODO store Merkle root of calendar in DB and chain to previous calendar entries
-    console.log('calendar write')
-
+// Write tree to calendar block DB and also to proof state service via RMQ
+let persistCalendarTree = (treeDataObj, persistCallback) => {
+  async.waterfall([
+    // Store Merkle root of calendar in DB and chain to previous calendar entries
+    (callback) => {
+      createCalendarBlock(treeDataObj.cal_root.toString('hex'), (err, block) => {
+        if (err) return persistCallback(err)
+        return callback(null, block)
+      })
+    },
     // queue proof state messages for each aggregation root in the tree
-    async.series([
-      (callback) => {
-        // for each aggregation root, queue up message containing
-        // updated proof state bound for proof state service
-        async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
-          let stateObj = {}
-          stateObj.agg_id = proofDataItem.agg_id
-          stateObj.agg_hash_count = proofDataItem.agg_hash_count
-          stateObj.cal_id = treeDataObj.cal_id
-          stateObj.cal_state = {}
-          // TODO: add ops extending proof path beyond cal_root to calendar block's block_hash
-          stateObj.cal_state.ops = proofDataItem.proof
+    (block, callback) => {
+      // for each aggregation root, queue up message containing
+      // updated proof state bound for proof state service
+      async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
+        let stateObj = {}
+        stateObj.agg_id = proofDataItem.agg_id
+        stateObj.agg_hash_count = proofDataItem.agg_hash_count
+        stateObj.cal_id = treeDataObj.cal_id
+        stateObj.cal_state = {}
+        // add ops connecting agg_root to cal_root
+        stateObj.cal_state.ops = proofDataItem.proof
+        // add ops extending proof path beyond cal_root to calendar block's block_hash
+        // TODO: Maybe use ':' to separate item in next op, would need to update calcBlockHash as well
+        stateObj.cal_state.ops.push({ l: `${block.id}${block.time}${block.version}${block.type}` })
+        stateObj.cal_state.ops.push({ r: block.prevHash })
+        stateObj.cal_state.ops.push({ op: 'sha-256' })
 
-          // TODO update this temp anchor data when we start generating real values
-          stateObj.cal_state.anchor = {
-            anchor_id: '1027',
-            uris: [
-              'http://a.cal.chainpoint.org/1027/root',
-              'http://b.cal.chainpoint.org/1027/root'
-            ]
-          }
+        // Build the anchors uris using the locations configured in CHAINPOINT_CALENDAR_URLS
+        let uris = []
+        for (let x = 0; x < CHAINPOINT_CALENDAR_URLS.length; x++) uris.push(`${CHAINPOINT_CALENDAR_URLS[x]}/${block.id}/root`)
+        stateObj.cal_state.anchor = {
+          anchor_id: block.id,
+          uris: uris
+        }
 
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
-            (err, ok) => {
-              if (err !== null) {
-                // An error as occurred publishing a message
-                console.error(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
-                return eachCallback(err)
-              } else {
-                // New message has been published
-                console.log(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
-                return eachCallback(null)
-              }
-            })
-        }, (err) => {
-          if (err) {
-            console.error('Processing of tree', treesToPersist.indexOf(treeDataObj) + 1, 'had errors.')
-            return callback(err)
-          } else {
-            console.log('Processing of tree', treesToPersist.indexOf(treeDataObj) + 1, 'complete')
-            // pass all the agg_msg objects to the series() callback
-            let messages = treeDataObj.proofData.map((proofDataItem) => {
-              return proofDataItem.agg_msg
-            })
-            return callback(null, messages)
-          }
-        })
-      }
-    ], (err, results) => {
-      // results[0] contains an array of agg_msg objects from the first function in this series
-      if (err) {
-        _.forEach(results[0], (message) => {
-          // nack consumption of all original hash messages part of this aggregation event
-          if (message !== null) {
-            amqpChannel.nack(message)
-            console.error(RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
-          }
-        })
-      } else {
-        _.forEach(results[0], (message) => {
-          if (message !== null) {
-            // ack consumption of all original hash messages part of this aggregation event
-            amqpChannel.ack(message)
-            console.log(RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
-          }
-        })
-      }
-    })
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
+              return eachCallback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
+              return eachCallback(null)
+            }
+          })
+      }, (err) => {
+        if (err) {
+          return callback(err)
+        } else {
+          let messages = treeDataObj.proofData.map((proofDataItem) => {
+            return proofDataItem.agg_msg
+          })
+          return callback(null, messages)
+        }
+      })
+    }
+  ], (err, messages) => {
+    // messages contains an array of agg_msg objects
+    if (err) {
+      _.forEach(messages, (message) => {
+        // nack consumption of all original hash messages part of this aggregation event
+        if (message !== null) {
+          amqpChannel.nack(message)
+          console.error(RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
+        }
+      })
+      return persistCallback(err)
+    } else {
+      _.forEach(messages, (message) => {
+        if (message !== null) {
+          // ack consumption of all original hash messages part of this aggregation event
+          amqpChannel.ack(message)
+          console.log(RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
+        }
+      })
+      return persistCallback(null)
+    }
   })
 }
 
@@ -789,21 +786,16 @@ var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' })
 // Sync models to DB tables and trigger check
 // if a new genesis block is needed.
 // sequelize.sync({ force: true, logging: console.log })
-sequelize.sync({ logging: console.log })
-  .then(() => {
-    console.log('CalendarBlock sequelize database synchronized')
-  })
-  .then(() => {
+sequelize.sync({ logging: console.log }).then(() => {
+  console.log('CalendarBlock sequelize database synchronized')
     // trigger creation of the genesis block
-    genesisLock.acquire()
-  })
-  .catch((err) => {
-    console.error('sequelize.sync() error: ' + err.stack)
-    process.exit(1)
-  })
+  genesisLock.acquire()
+}).catch((err) => {
+  console.error('sequelize.sync() error: ' + err.stack)
+  process.exit(1)
+})
 
 // LOCK HANDLERS : genesis
-
 genesisLock.on('acquire', () => {
   console.log('genesisLock acquired')
   // The value of the lock determines what function it triggers
@@ -834,10 +826,20 @@ genesisLock.on('end', () => {
 
 calendarLock.on('acquire', () => {
   console.log('calendarLock acquired')
-
-  // FIXME : fakeData hash being inserted now just for testing.
-  let fakeData = objectHash({ time: new Date().getTime() }).toString('hex')
-  createCalendarBlock(fakeData)
+  let treeDataObj = generateCalendarTree()
+  if (treeDataObj) { // there is some data to process, continue and persist
+    persistCalendarTree(treeDataObj, (err) => {
+      if (err) {
+        console.error('persistCalendarTree error - ' + err)
+      } else {
+        console.log('persistCalendarTree succeeded')
+      }
+      calendarLock.release()
+    })
+  } else { // there is nothing to process in this calendar interval, write nothing, release lock
+    console.log('no data for this calendar interval')
+    calendarLock.release()
+  }
 })
 
 calendarLock.on('error', (err) => {
@@ -951,6 +953,8 @@ ethConfirmLock.on('end', () => {
 // Write a new calendar block
 setInterval(() => {
   try {
+    // if the amqp channel is null (closed), processing should not continue, defer to next interval
+    if (amqpChannel === null) return
     calendarLock.acquire()
   } catch (err) {
     console.error('calendarLock.acquire() : caught err : ', err.message)
@@ -965,14 +969,6 @@ setInterval(() => {
     console.error('nistLock.acquire() : caught err : ', err.message)
   }
 }, NIST_INTERVAL_MS)
-
-// generate in-memory trees and proofs : every 1000ms
-setInterval(() => generateCalendarTree(), CALENDAR_INTERVAL_MS)
-
-// FIXME : Should this be periodic? Or triggered by lockCalendarBlock()
-// put this in the lock block and call the createCalendarBlock from within this function instead of directly in the event block as it is now.
-// persist in-memory trees to calendar block and PSS every 250ms
-setInterval(() => persistCalendarTrees(), TREE_PERSIST_INTERVAL_MS)
 
 // Add all block hashes back to the previous ETH anchor to a Merkle
 // tree and send to ETH TX
