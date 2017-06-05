@@ -47,7 +47,7 @@ const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.s
 // The queue name for outgoing message to the btc tx service
 const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.btctx'
 
-// The queue name for outgoing message to the btc tx service
+// The queue name for outgoing message to the btc mon service
 const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.bntcmon'
 
 // Connection string w/ credentials for RabbitMQ
@@ -355,6 +355,7 @@ function amqpOpenConnection (connectionString) {
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
         chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
         amqpChannel = chan
 
@@ -444,9 +445,20 @@ function consumeBtcTxMessage (msg) {
             }
           })
       },
-      // TODO: inform btc-mon of new tx_id to watch, queue up message bound for btc mon
+      // inform btc-mon of new tx_id to watch, queue up message bound for btc mon
       (callback) => {
-        return callback(null)
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCMON_QUEUE, Buffer.from(JSON.stringify({ tx_id: btcTxObj.btctx_id })), { persistent: true },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
+              return callback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+              return callback(null)
+            }
+          })
       }
     ], (err, results) => {
       if (err) {
