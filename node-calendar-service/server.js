@@ -24,6 +24,9 @@ const objectHash = require('objecthash')
 // The frequency to generate new calendar trees
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 1000
 
+// The frequency to generate new NIST Random Beacon Blocks
+const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
+
 // How often should calendar trees be persisted
 const TREE_PERSIST_INTERVAL_MS = process.env.TREE_PERSIST_INTERVAL_MS || 250
 
@@ -98,8 +101,6 @@ const COCKROACH_DB_PASS = process.env.COCKROACH_DB_PASS || ''
 const COCKROACH_TABLE_NAME = process.env.COCKROACH_TABLE_NAME || 'chainpoint_calendar_blockchain'
 
 // Connect to CockroachDB through Sequelize.
-// Setup: See the setup instructions in the README.md file
-// for important database and user creation statements.
 let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
   dialect: 'postgres',
   host: COCKROACH_HOST,
@@ -239,8 +240,8 @@ let createGenesisBlock = () => {
 
   CalendarBlock.create(b)
   .then((block) => {
-    console.log('createGenesisBlock : new genesis block created!')
-    console.log(block.get({plain: true}))
+    // console.log(block.get({plain: true}))
+    console.log('GENESIS BLOCK : id : ' + block.get({plain: true}).id)
   })
   .catch(err => {
     console.error('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
@@ -270,8 +271,8 @@ let createCalendarBlock = (data) => {
 
       CalendarBlock.create(b)
       .then((block) => {
-        console.log('createCalendarBlock : new calendar block created!')
-        console.log(block.get({plain: true}))
+        // console.log(block.get({plain: true}))
+        console.log('CAL BLOCK : id : ' + block.get({plain: true}).id)
       })
       .catch(err => {
         console.error('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
@@ -279,6 +280,41 @@ let createCalendarBlock = (data) => {
       .then(() => {
         // always release the lock, whether success or failure
         calendarLock.release()
+      })
+    }
+  })
+}
+
+// FIXME : DRY UP THE BLOCK CREATION FUNCTIONS
+// FIXME : Pull in real Nist data via consul
+let createNistBlock = (data) => {
+  // Find the last block written so we can incorporate its hash as prevHash
+  // in the new block and increment its block ID by 1.
+  CalendarBlock.findOne({attributes: ['id', 'hash'], order: 'id DESC'}).then(prevBlock => {
+    if (prevBlock) {
+      let b = {}
+      b.id = parseInt(prevBlock.id, 10) + 1
+      b.time = new Date().getTime()
+      b.version = 1
+      b.type = 'nist'
+      b.data = data
+      b.prevHash = prevBlock.hash
+
+      let bh = calcBlockHash(b)
+      b.hash = bh.toString('hex')
+      b.sig = calcBlockHashSig(bh)
+
+      CalendarBlock.create(b)
+      .then((block) => {
+        // console.log(block.get({plain: true}))
+        console.log('NIST BLOCK : id : ' + block.get({plain: true}).id)
+      })
+      .catch(err => {
+        console.error('createNistBlock create error: ' + err.message + ' : ' + err.stack)
+      })
+      .then(() => {
+        // always release the lock, whether success or failure
+        nistLock.release()
       })
     }
   })
@@ -716,15 +752,15 @@ amqpOpenConnection(RABBITMQ_CONNECT_URI)
 //
 var lockOpts = {
   key: CALENDAR_LOCK_KEY,
-  lockwaittime: '15s',
-  lockwaittimeout: '1s',
-  lockretrytime: '5s',
+  lockwaittime: '60s',
+  lockwaittimeout: '60s',
+  lockretrytime: '100ms',
   session: {
     behavior: 'delete',
     checks: ['serfHealth'],
-    lockdelay: '1s',
+    lockdelay: '1ms',
     name: 'calendar-blockchain-lock',
-    ttl: '10s'
+    ttl: '30s'
   }
 }
 
@@ -806,6 +842,10 @@ calendarLock.on('end', () => {
 
 nistLock.on('acquire', () => {
   console.log('nistLock acquired')
+
+  // FIXME : fakeData hash being inserted now just for testing.
+  let fakeData = objectHash({time: new Date().getTime()}).toString('hex')
+  createNistBlock(fakeData)
 })
 
 nistLock.on('error', (err) => {
@@ -895,7 +935,22 @@ ethConfirmLock.on('end', () => {
 // PERIODIC TIMERS
 
 // Write a new calendar block
-setInterval(() => calendarLock.acquire(), CALENDAR_INTERVAL_MS)
+setInterval(() => {
+  try {
+    calendarLock.acquire()
+  } catch (err) {
+    console.error('calendarLock.acquire() : caught err : ', err.message)
+  }
+}, CALENDAR_INTERVAL_MS)
+
+// Write a new NIST block
+setInterval(() => {
+  try {
+    nistLock.acquire()
+  } catch (err) {
+    console.error('nistLock.acquire() : caught err : ', err.message)
+  }
+}, NIST_INTERVAL_MS)
 
 // generate in-memory trees and proofs : every 1000ms
 setInterval(() => generateCalendarTree(), CALENDAR_INTERVAL_MS)
