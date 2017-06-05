@@ -56,6 +56,9 @@ const CHAINPOINT_CALENDAR_URLS = [
   'http://b.cal.chainpoint.org'
 ]
 
+// The consul key to watch to receive updated NIST object
+const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
+
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
 // see: https://github.com/dchest/tweetnacl-js#signatures
@@ -154,7 +157,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-f0-9]{1,255}$', 'i']
+        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
       allowNull: false,
       unique: true
@@ -859,9 +862,20 @@ calendarLock.on('end', () => {
 nistLock.on('acquire', () => {
   console.log('nistLock acquired')
 
+<<<<<<< HEAD
   // FIXME : fakeData hash being inserted now just for testing.
   let fakeData = objectHash({ time: new Date().getTime() }).toString('hex')
   createNistBlock(fakeData)
+=======
+  if (nistLatest) {
+    console.log(nistLatest)
+    createNistBlock(nistLatest)
+  } else {
+    console.log(nistLatest)
+    console.error('nistLatest is null or missing timeStamp or seedValue props')
+    nistLock.release()
+  }
+>>>>>>> a8325c7d932b3741614b6eebc04269b8fd329f73
 })
 
 nistLock.on('error', (err) => {
@@ -948,6 +962,29 @@ ethConfirmLock.on('end', () => {
   console.log('ethConfirmLock end')
 })
 
+// NIST CONSUL WATCH
+
+let nistLatest = null
+
+// Continuous watch on the consul key holding the NIST object.
+var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
+
+// Store the updated fee object on change
+nistWatch.on('change', function (data, res) {
+  if (data.Value) {
+    nistLatest = data.Value
+    try {
+      nistLock.acquire()
+    } catch (err) {
+      console.error('nistLock.acquire() : caught err : ', err.message)
+    }
+  }
+})
+
+nistWatch.on('error', function (err) {
+  console.error('nistWatch error: ', err)
+})
+
 // PERIODIC TIMERS
 
 // Write a new calendar block
@@ -960,15 +997,6 @@ setInterval(() => {
     console.error('calendarLock.acquire() : caught err : ', err.message)
   }
 }, CALENDAR_INTERVAL_MS)
-
-// Write a new NIST block
-setInterval(() => {
-  try {
-    nistLock.acquire()
-  } catch (err) {
-    console.error('nistLock.acquire() : caught err : ', err.message)
-  }
-}, NIST_INTERVAL_MS)
 
 // Add all block hashes back to the previous ETH anchor to a Merkle
 // tree and send to ETH TX

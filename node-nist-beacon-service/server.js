@@ -1,68 +1,55 @@
-const beacon = require('nist-randomness-beacon')
 require('dotenv').config()
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
-const r = require('redis')
+const BEACON = require('nist-randomness-beacon')
 
-const NIST_KEY_BASE = process.env.NIST_KEY_BASE || 'nist:'
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
 
-// The redis connection used for all redis communication
-// This value is set once the connection has been established
-let redis = null
+const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
+const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
-/**
- * Opens a Redis connection
- *
- * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
- */
-function openRedisConnection (redisURI) {
-  redis = r.createClient(redisURI)
-  redis.on('error', () => {
-    redis.quit()
-    redis = null
-    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
-    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
-  })
-  redis.on('ready', () => {
-    console.log('Redis connected')
-
-    // run once when redis connection is established
-    retrieveLatest()
-
-    // Run every minute, at the top of the minute.
-    setInterval(() => {
-      if (new Date().getSeconds() === 0) retrieveLatest()
-    }, 1000)
-  })
-}
-
-let retrieveLatest = () => {
-  beacon.last((err, res) => {
+let getNistLatest = () => {
+  BEACON.last((err, res) => {
     if (err) {
       console.error(err)
     } else {
-      console.log(res)
+      // console.log(res)
 
-      // The latest value we have will always be stored under
-      // the 'last' key which can always be used if present.
-      // It will be updated every minute if the service API
-      // is available. If the service becomes unavailable this
-      // key will become stale and eventually be removed so
-      // clients watching this key should be prepared for it
-      // to no longer be available.
-      redis.set(NIST_KEY_BASE + 'last', JSON.stringify(res))
-      redis.expire(NIST_KEY_BASE + 'last', 60 * 60 * 1) // 1 hour
+      if (res && res.timeStamp && res.seedValue) {
+        let timeAndSeed = res.timeStamp.toString() + ':' + res.seedValue
 
-      // Keep an historical chain of the keys we've retrieved
-      // for a period of time, indexed by the timestamp.
-      redis.set(NIST_KEY_BASE + res.timeStamp, JSON.stringify(res))
-      redis.expire(NIST_KEY_BASE + res.timeStamp, 60 * 60 * 24 * 31) // 31 days
-
-      // Keep a list of all timestamps we have stored
-      redis.lpush(NIST_KEY_BASE + 'timestamps', res.timeStamp)
+        // The latest NIST value will always be stored under
+        // a known key which can always be used if present.
+        // It will be updated every minute if the service API
+        // is available. Clients that are watching this key
+        // should gracefully handle null values for this key.
+        consul.kv.get(NIST_KEY, function (err, result) {
+          if (err) {
+            console.error(err)
+          } else {
+            // Only write to the key if the value changed.
+            if (timeAndSeed !== result) {
+              console.log(timeAndSeed)
+              consul.kv.set(NIST_KEY, timeAndSeed, function (err, result) {
+                if (err) throw err
+              })
+            }
+          }
+        })
+      }
     }
   })
 }
 
-// REDIS initialization
-openRedisConnection(REDIS_CONNECT_URI)
+// run at service start
+getNistLatest()
+
+// run at interval
+setInterval(() => {
+  try {
+    getNistLatest()
+  } catch (err) {
+    console.error('getNistLatest : caught err : ', err.message)
+  }
+}, NIST_INTERVAL_MS)
