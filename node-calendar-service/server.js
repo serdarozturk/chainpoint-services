@@ -21,8 +21,8 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 // see: https://github.com/benlaurie/objecthash
 const objectHash = require('objecthash')
 
-// The frequency to generate new calendar trees
-const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 1000
+// The frequency to generate new calendar trees : 1 every 10 seconds by default
+const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
 // The frequency to generate new NIST Random Beacon Blocks
 const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
