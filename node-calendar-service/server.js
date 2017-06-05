@@ -3,6 +3,7 @@ const _ = require('lodash')
 const MerkleTools = require('merkle-tools')
 const amqp = require('amqplib/callback_api')
 const uuidv1 = require('uuid/v1')
+const crypto = require('crypto')
 
 require('dotenv').config()
 
@@ -31,13 +32,13 @@ const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
 const TREE_PERSIST_INTERVAL_MS = process.env.TREE_PERSIST_INTERVAL_MS || 250
 
 // How often blocks on calendar should be aggregated and anchored
-const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 60000 // 1 min
-const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 600000 // 10 min
+const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
+const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
 
-// The queue name for message consumption originating from the aggregator service
+// The queue name for message consumption originating from the aggregator, btc-tx, and btc-mon services
 const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.cal'
 
 // The queue name for outgoing message to the proof state service
@@ -45,6 +46,9 @@ const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.s
 
 // The queue name for outgoing message to the btc tx service
 const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.btctx'
+
+// The queue name for outgoing message to the btc tx service
+const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.bntcmon'
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
@@ -78,13 +82,6 @@ const merkleTools = new MerkleTools()
 // An array of all Merkle tree roots from aggregators needing
 // to be processed. Will be filled as new roots arrive on the queue.
 let AGGREGATION_ROOTS = []
-
-// An array of all tree data ready to be finalized.
-// Will be filled by the generateCalendar process as the
-// merkle trees are built. Each object in this array
-// contains the merkle root and the agg_id and proof
-// paths for each leaf of the tree.
-let TREES = []
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -205,19 +202,24 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
   }
 )
 
-// FIXME : do our own hashing the 'chainpoint' way. and store data somewhere?
-// Calculate a deterministic block hash from a whitelist of
-// properties to hash, and canonicalize with objectHash.
+// Calculate a deterministic block hash from a whitelist of properties to hash
+// Returns a Buffer hash value
 let calcBlockHash = (block) => {
-  let b = _.pick(block, [
-    'id',
-    'time',
-    'version',
-    'type',
-    'data',
-    'prevHash'])
+  let idBuffer = Buffer.from(block.id, 'utf8')
+  let timeBuffer = Buffer.from(block.time, 'utf8')
+  let versionBuffer = Buffer.from(block.version, 'utf8')
+  let typeBuffer = Buffer.from(block.type, 'utf8')
+  let dataBuffer = Buffer.from(block.data, 'hex')
+  let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
 
-  return objectHash(b)
+  return crypto.createHash('sha256').update(Buffer.concat([
+    idBuffer,
+    timeBuffer,
+    versionBuffer,
+    typeBuffer,
+    dataBuffer,
+    prevHashBuffer
+  ])).digest()
 }
 
 // Calculate a base64 encoded signature over the block hash
@@ -239,23 +241,23 @@ let createGenesisBlock = () => {
   b.sig = calcBlockHashSig(bh)
 
   CalendarBlock.create(b)
-  .then((block) => {
-    // console.log(block.get({plain: true}))
-    console.log('GENESIS BLOCK : id : ' + block.get({plain: true}).id)
-  })
-  .catch(err => {
-    console.error('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
-  })
-  .then(() => {
-    // always release the lock, whether success or failure
-    genesisLock.release()
-  })
+    .then((block) => {
+      // console.log(block.get({plain: true}))
+      console.log('GENESIS BLOCK : id : ' + block.get({ plain: true }).id)
+    })
+    .catch(err => {
+      console.error('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
+    })
+    .then(() => {
+      // always release the lock, whether success or failure
+      genesisLock.release()
+    })
 }
 
 let createCalendarBlock = (data) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({attributes: ['id', 'hash'], order: 'id DESC'}).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
       let b = {}
       b.id = parseInt(prevBlock.id, 10) + 1
@@ -270,17 +272,17 @@ let createCalendarBlock = (data) => {
       b.sig = calcBlockHashSig(bh)
 
       CalendarBlock.create(b)
-      .then((block) => {
-        // console.log(block.get({plain: true}))
-        console.log('CAL BLOCK : id : ' + block.get({plain: true}).id)
-      })
-      .catch(err => {
-        console.error('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
-      })
-      .then(() => {
-        // always release the lock, whether success or failure
-        calendarLock.release()
-      })
+        .then((block) => {
+          // console.log(block.get({plain: true}))
+          console.log('CAL BLOCK : id : ' + block.get({ plain: true }).id)
+        })
+        .catch(err => {
+          console.error('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
+        })
+        .then(() => {
+          // always release the lock, whether success or failure
+          calendarLock.release()
+        })
     }
   })
 }
@@ -290,7 +292,7 @@ let createCalendarBlock = (data) => {
 let createNistBlock = (data) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({attributes: ['id', 'hash'], order: 'id DESC'}).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
       let b = {}
       b.id = parseInt(prevBlock.id, 10) + 1
@@ -305,17 +307,17 @@ let createNistBlock = (data) => {
       b.sig = calcBlockHashSig(bh)
 
       CalendarBlock.create(b)
-      .then((block) => {
-        // console.log(block.get({plain: true}))
-        console.log('NIST BLOCK : id : ' + block.get({plain: true}).id)
-      })
-      .catch(err => {
-        console.error('createNistBlock create error: ' + err.message + ' : ' + err.stack)
-      })
-      .then(() => {
-        // always release the lock, whether success or failure
-        nistLock.release()
-      })
+        .then((block) => {
+          // console.log(block.get({plain: true}))
+          console.log('NIST BLOCK : id : ' + block.get({ plain: true }).id)
+        })
+        .catch(err => {
+          console.error('createNistBlock create error: ' + err.message + ' : ' + err.stack)
+        })
+        .then(() => {
+          // always release the lock, whether success or failure
+          nistLock.release()
+        })
     }
   })
 }
@@ -341,7 +343,7 @@ function amqpOpenConnection (connectionString) {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
         amqpChannel = null
         // un-acked messaged will be requeued, so clear all work in progress
-        AGGREGATION_ROOTS = TREES = []
+        AGGREGATION_ROOTS = []
         setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
       })
       // create communication channel
@@ -459,7 +461,7 @@ function consumeBtcTxMessage (msg) {
 }
 
 function consumeBtcMonMessage (msg) {
- // TODO: put dode that does stuff here
+  // TODO: put dode that does stuff here
 }
 
 /**
@@ -764,13 +766,13 @@ var lockOpts = {
   }
 }
 
-var genesisLock = consul.lock(_.merge({}, lockOpts, {value: 'genesis'}))
-var calendarLock = consul.lock(_.merge({}, lockOpts, {value: 'calendar'}))
-var nistLock = consul.lock(_.merge({}, lockOpts, {value: 'nist'}))
-var btcAnchorLock = consul.lock(_.merge({}, lockOpts, {value: 'btc-anchor'}))
-var btcConfirmLock = consul.lock(_.merge({}, lockOpts, {value: 'btc-confirm'}))
-var ethAnchorLock = consul.lock(_.merge({}, lockOpts, {value: 'eth-anchor'}))
-var ethConfirmLock = consul.lock(_.merge({}, lockOpts, {value: 'eth-confirm'}))
+var genesisLock = consul.lock(_.merge({}, lockOpts, { value: 'genesis' }))
+var calendarLock = consul.lock(_.merge({}, lockOpts, { value: 'calendar' }))
+var nistLock = consul.lock(_.merge({}, lockOpts, { value: 'nist' }))
+var btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
+var btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
+var ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
+var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
 
 // Sync models to DB tables and trigger check
 // if a new genesis block is needed.
@@ -822,7 +824,7 @@ calendarLock.on('acquire', () => {
   console.log('calendarLock acquired')
 
   // FIXME : fakeData hash being inserted now just for testing.
-  let fakeData = objectHash({time: new Date().getTime()}).toString('hex')
+  let fakeData = objectHash({ time: new Date().getTime() }).toString('hex')
   createCalendarBlock(fakeData)
 })
 
@@ -844,7 +846,7 @@ nistLock.on('acquire', () => {
   console.log('nistLock acquired')
 
   // FIXME : fakeData hash being inserted now just for testing.
-  let fakeData = objectHash({time: new Date().getTime()}).toString('hex')
+  let fakeData = objectHash({ time: new Date().getTime() }).toString('hex')
   createNistBlock(fakeData)
 })
 
