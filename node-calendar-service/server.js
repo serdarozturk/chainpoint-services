@@ -24,9 +24,6 @@ const objectHash = require('objecthash')
 // The frequency to generate new calendar trees : 1 every 10 seconds by default
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
-// The frequency to generate new NIST Random Beacon Blocks
-const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
-
 // How often should calendar trees be persisted
 const TREE_PERSIST_INTERVAL_MS = process.env.TREE_PERSIST_INTERVAL_MS || 250
 
@@ -48,6 +45,9 @@ const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.b
 
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+
+// The consul key to watch to receive updated NIST object
+const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -154,7 +154,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-f0-9]{1,255}$', 'i']
+        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
       allowNull: false,
       unique: true
@@ -843,9 +843,14 @@ calendarLock.on('end', () => {
 nistLock.on('acquire', () => {
   console.log('nistLock acquired')
 
-  // FIXME : fakeData hash being inserted now just for testing.
-  let fakeData = objectHash({time: new Date().getTime()}).toString('hex')
-  createNistBlock(fakeData)
+  if (nistLatest) {
+    console.log(nistLatest)
+    createNistBlock(nistLatest)
+  } else {
+    console.log(nistLatest)
+    console.error('nistLatest is null or missing timeStamp or seedValue props')
+    nistLock.release()
+  }
 })
 
 nistLock.on('error', (err) => {
@@ -932,6 +937,29 @@ ethConfirmLock.on('end', () => {
   console.log('ethConfirmLock end')
 })
 
+// NIST CONSUL WATCH
+
+let nistLatest = null
+
+// Continuous watch on the consul key holding the NIST object.
+var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
+
+// Store the updated fee object on change
+nistWatch.on('change', function (data, res) {
+  if (data.Value) {
+    nistLatest = data.Value
+    try {
+      nistLock.acquire()
+    } catch (err) {
+      console.error('nistLock.acquire() : caught err : ', err.message)
+    }
+  }
+})
+
+nistWatch.on('error', function (err) {
+  console.error('nistWatch error: ', err)
+})
+
 // PERIODIC TIMERS
 
 // Write a new calendar block
@@ -942,15 +970,6 @@ setInterval(() => {
     console.error('calendarLock.acquire() : caught err : ', err.message)
   }
 }, CALENDAR_INTERVAL_MS)
-
-// Write a new NIST block
-setInterval(() => {
-  try {
-    nistLock.acquire()
-  } catch (err) {
-    console.error('nistLock.acquire() : caught err : ', err.message)
-  }
-}, NIST_INTERVAL_MS)
 
 // generate in-memory trees and proofs : every 1000ms
 setInterval(() => generateCalendarTree(), CALENDAR_INTERVAL_MS)
