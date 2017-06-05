@@ -348,6 +348,10 @@ function processMessage (msg) {
         // Consumes a tx  message from the btctx service
         consumeBtcTxMessage(msg)
         break
+      case 'btcmon':
+        // Consumes a tx  message from the btctx service
+        consumeBtcMonMessage(msg)
+        break
       default:
         // This is an unknown state type
         console.error('Unknown state type', msg.properties.type)
@@ -413,6 +417,10 @@ function consumeBtcTxMessage (msg) {
       }
     })
   }
+}
+
+function consumeBtcMonMessage (msg) {
+ // TODO: put dode that does stuff here
 }
 
 /**
@@ -671,14 +679,15 @@ let aggregateAndAnchorBTC = () => {
       }
 
       // Send anchorData to the btc tx service for anchoring
-      // FIXME : Jason says there should be a return callback that directs things to the final callback.
       // FIXME : Note, CRITICAL to always release lock no matter what goes wrong.
       amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
         (err, ok) => {
           if (err !== null) {
             console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
+            return callback(err)
           } else {
             console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+            return callback(null)
           }
         })
     }
