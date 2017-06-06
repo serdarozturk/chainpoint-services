@@ -7,9 +7,9 @@ const uuidv1 = require('uuid/v1')
 
 require('dotenv').config()
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
-const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
+const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
+const CONSUL_PORT = process.env.CONSUL_PORT || 8500
+const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -61,10 +61,12 @@ const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.s
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-const NIST_KEY_LAST = process.env.NIST_KEY_BASE || 'nist:last'
+// The consul key to watch to receive updated NIST object
+const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
-// The local variable holding the NIST Beacon data, from Redis in NIST_KEY_LAST, refreshed every minute
-let nistLastData = null
+// The latest NIST data
+// This value is updated from consul events as changes are detected
+let nistLatest = null
 
 // Validate env variables and exit if values are out of bounds
 var envErrors = []
@@ -72,67 +74,6 @@ if (!_.inRange(AGGREGATION_INTERVAL, 250, 10001)) envErrors.push('Bad AGGREGATIO
 if (!_.inRange(FINALIZATION_INTERVAL, 250, 10001)) envErrors.push('Bad FINALIZATION_INTERVAL')
 if (!_.inRange(HASHES_PER_MERKLE_TREE, 100, 25001)) envErrors.push('Bad HASHES_PER_MERKLE_TREE')
 if (envErrors.length > 0) throw new Error(envErrors)
-
-/**
- * Opens an AMPQ connection and channel
- * Retry logic is included to handle losses of connection
- *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
- */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
-      // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
-      })
-    },
-    (conn, callback) => {
-      // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
-        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-        amqpChannel = null
-        // un-acked messaged will be requeued, so clear all work in progress
-        HASHES = TREES = []
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-      })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('Connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
-        amqpChannel = chan
-        // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
-          consumeHashMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
-      // catch errors when attempting to establish connection
-      console.error('Cannot establish connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    }
-  })
-}
-
-const refreshNistData = (callback) => {
-  redis.get(NIST_KEY_LAST, (err, res) => {
-    if (err) return callback(err)
-    // save received nistData object
-    nistLastData = JSON.parse(res)
-    if (!nistLastData) return callback('NIST data is null')
-    return callback(null)
-  })
-}
 
 function consumeHashMessage (msg) {
   if (msg !== null) {
@@ -168,43 +109,17 @@ function formatAsChainpointV3Ops (proof, op) {
   return ChainpointV3Ops
 }
 
-/**
- * Initializes NistData
- **/
-function initializeNistData (callback) {
-  // refresh on script startup, and periodically afterwards
-  refreshNistData((err) => {
-    if (err) {
-      setTimeout(initializeNistData.bind(null, callback), 5 * 1000)
-      return callback('Cannot initialize NistData. Attempting in 5 seconds...')
-    } else {
-      // NistData initialized, now refresh every 60 seconds
-      console.log('NistData initialized')
-      setInterval(() => refreshNistData((err) => { if (err) console.error(err) }), 1000 * 60)
-      return callback(null, true)
-    }
-  })
-}
-
-// Initializes nistData and then amqp connection
-initializeNistData((err, result) => {
-  if (err) {
-    console.error(err)
-  } else {
-    // AMQP initialization
-    amqpOpenConnection(RABBITMQ_CONNECT_URI)
-  }
-})
-
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = () => {
   let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
 
   // get snapshot of last NIST data and determine if it is valid and available to use for this aggregation
-  let nistObj = nistLastData
-  let nistDataAvailable = nistObj !== null
+  let nistLastestString = nistLatest
+  let nistDataAvailable = nistLastestString !== null
 
-  let nistDataString = nistDataAvailable ? (nistObj.timeStamp + ':' + nistObj.seedValue).toLowerCase() : null
+  let nistTimestamp = nistDataAvailable ? nistLastestString.split(':')[0].toString() : null
+  let nistValue = nistDataAvailable ? nistLastestString.split(':')[1].toString() : null
+  let nistDataString = nistDataAvailable ? (nistTimestamp + ':' + nistValue).toLowerCase() : null
   let nistDataBuffer = nistDataAvailable ? Buffer.from(nistDataString, 'utf8') : null
 
   // create merkle tree only if there is at least one hash to process
@@ -350,9 +265,91 @@ let finalize = () => {
   })
 }
 
-setInterval(() => finalize(), FINALIZATION_INTERVAL)
+// This initalizes all the consul watches and JS intervals that fire all aggregator events
+function startListening () {
+  console.log('starting watches and intervals')
 
-setInterval(() => aggregate(), AGGREGATION_INTERVAL)
+  // Continuous watch on the consul key holding the NIST object.
+  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
+
+  // Store the updated fee object on change
+  nistWatch.on('change', function (data, res) {
+    // process only if a value has been returned and it is different than what is already stored
+    if (data.Value && nistLatest !== data.Value) {
+      nistLatest = data.Value
+    }
+  })
+
+  nistWatch.on('error', function (err) {
+    console.error('nistWatch error: ', err)
+  })
+
+  // PERIODIC TIMERS
+
+  setInterval(() => finalize(), FINALIZATION_INTERVAL)
+
+  setInterval(() => aggregate(), AGGREGATION_INTERVAL)
+}
+
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+function amqpOpenConnection (connectionString) {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
+      // if the channel closes for any reason, attempt to reconnect
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        // un-acked messaged will be requeued, so clear all work in progress
+        HASHES = TREES = []
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('Connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+        // Continuously load the HASHES from RMQ with hash objects to process)
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+          consumeHashMessage(msg)
+        })
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  })
+}
+
+function initConnectionsAndStart () {
+  amqpOpenConnection(RABBITMQ_CONNECT_URI)
+  // Init intervals and watches
+  startListening()
+}
+
+// start the whole show here
+initConnectionsAndStart()
 
 // export these functions for unit tests
 module.exports = {
