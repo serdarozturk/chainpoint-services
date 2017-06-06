@@ -727,9 +727,27 @@ var btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' })
 var ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
 var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
 
+function registerLockEvents (lock, lockName, acquireFunction) {
+  lock.on('acquire', () => {
+    console.log(`${lockName} acquired`)
+    acquireFunction()
+  })
+
+  lock.on('error', (err) => {
+    console.log(`${lockName} error - ${err}`)
+  })
+
+  lock.on('release', () => {
+    console.log(`${lockName} release`)
+  })
+
+  lock.on('end', () => {
+    console.log(`${lockName} end`)
+  })
+}
+
 // LOCK HANDLERS : genesis
-genesisLock.on('acquire', () => {
-  console.log('genesisLock acquired')
+registerLockEvents(genesisLock, 'genesisLock', () => {
   // The value of the lock determines what function it triggers
   // Is a genesis block needed? If not release lock and move on.
   CalendarBlock.count().then(c => {
@@ -737,27 +755,13 @@ genesisLock.on('acquire', () => {
       createGenesisBlock()
     } else {
       genesisLock.release()
-      console.log('No genesis block needed : ' + c + ' blocks found.')
+      console.log(`No genesis block needed : ${c} block(s) found.`)
     }
   })
 })
 
-genesisLock.on('error', (err) => {
-  console.log('genesisLock error: ', err)
-})
-
-genesisLock.on('release', () => {
-  console.log('genesisLock release')
-})
-
-genesisLock.on('end', () => {
-  console.log('genesisLock end')
-})
-
 // LOCK HANDLERS : calendar
-
-calendarLock.on('acquire', () => {
-  console.log('calendarLock acquired')
+registerLockEvents(calendarLock, 'calendarLock', () => {
   let treeDataObj = generateCalendarTree()
   if (treeDataObj) { // there is some data to process, continue and persist
     persistCalendarTree(treeDataObj, (err) => {
@@ -774,22 +778,8 @@ calendarLock.on('acquire', () => {
   }
 })
 
-calendarLock.on('error', (err) => {
-  console.log('calendarLock error: ', err)
-})
-
-calendarLock.on('release', () => {
-  console.log('calendarLock release')
-})
-
-calendarLock.on('end', () => {
-  console.log('calendarLock end')
-})
-
 // LOCK HANDLERS : nist
-
-nistLock.on('acquire', () => {
-  console.log('nistLock acquired')
+registerLockEvents(nistLock, 'nistLock', () => {
   if (nistLatest) {
     console.log(nistLatest)
     createNistBlock(nistLatest)
@@ -799,88 +789,24 @@ nistLock.on('acquire', () => {
   }
 })
 
-nistLock.on('error', (err) => {
-  console.log('nistLock error: ', err)
-})
-
-nistLock.on('release', () => {
-  console.log('nistLock release')
-})
-
-nistLock.on('end', () => {
-  console.log('nistLock end')
-})
-
 // LOCK HANDLERS : btc-anchor
+registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
 
-btcAnchorLock.on('acquire', () => {
-  console.log('btcAnchorLock acquired')
-})
-
-btcAnchorLock.on('error', (err) => {
-  console.log('btcAnchorLock error: ', err)
-})
-
-btcAnchorLock.on('release', () => {
-  console.log('btcAnchorLock release')
-})
-
-btcAnchorLock.on('end', () => {
-  console.log('btcAnchorLock end')
 })
 
 // LOCK HANDLERS : btc-confirm
+registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
 
-btcConfirmLock.on('acquire', () => {
-  console.log('btcConfirmLock acquired')
-})
-
-btcConfirmLock.on('error', (err) => {
-  console.log('btcConfirmLock error: ', err)
-})
-
-btcConfirmLock.on('release', () => {
-  console.log('btcConfirmLock release')
-})
-
-btcConfirmLock.on('end', () => {
-  console.log('btcConfirmLock end')
 })
 
 // LOCK HANDLERS : eth-anchor
+registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
 
-ethAnchorLock.on('acquire', () => {
-  console.log('ethAnchorLock acquired')
-})
-
-ethAnchorLock.on('error', (err) => {
-  console.log('ethAnchorLock error: ', err)
-})
-
-ethAnchorLock.on('release', () => {
-  console.log('ethAnchorLock release')
-})
-
-ethAnchorLock.on('end', () => {
-  console.log('ethAnchorLock end')
 })
 
 // LOCK HANDLERS : eth-confirm
+registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
 
-ethConfirmLock.on('acquire', () => {
-  console.log('ethConfirmLock acquired')
-})
-
-ethConfirmLock.on('error', (err) => {
-  console.log('ethConfirmLock error: ', err)
-})
-
-ethConfirmLock.on('release', () => {
-  console.log('ethConfirmLock release')
-})
-
-ethConfirmLock.on('end', () => {
-  console.log('ethConfirmLock end')
 })
 
 // This initalizes all the consul watches and JS intervals that fire all calendar events
