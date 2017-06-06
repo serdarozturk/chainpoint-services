@@ -98,7 +98,7 @@ The following is an example of state data published in a calendar message:
 {
   "agg_id": "0cdecc3e-2452-11e7-93ae-92361f002671",
   "agg_hash_count": 100,
-  "cal_id": "b117b242-2458-11e7-93ae-92361f002671",
+  "cal_id": "1027",
   "cal_state": {
     "ops": [
       { "l": "315be5d46580b617928b53f3bac5bac3d5e0d10a1c6143cc1fdab224cd1450ea" },
@@ -120,7 +120,7 @@ The following is an example of state data published in a calendar message:
 | :--------------- |:-----------------------------------------------------------------------|
 | agg_id          | The UUIDv1 unique identifier for the aggregation event with embedded timestamp |
 | agg\_hash\_count         | An integer representing the total hash count for the aggregation event  |
-| cal_id          | The UUIDv1 unique identifier for a calendar entry with embedded timestamp |
+| cal_id          | The block height for the calendar block |
 | cal_state  | The state data being stored, in this case, calendar aggregation operations and cal anchor information |
 
 
@@ -129,7 +129,7 @@ Periodically, calendar entries are read and aggregated for anchoring. The calend
 The following is an example of state data published in an anchor agg message: 
 ```json
 {
-  "cal_id": "b117b242-2458-11e7-93ae-92361f002671",
+  "cal_id": "1027",
   "anchor_agg_id": "af884cde-422b-11e7-a919-92ebcb67fe33",
   "anchor_agg_state": {
     "ops": [
@@ -143,7 +143,7 @@ The following is an example of state data published in an anchor agg message:
 ```
 | Name             | Description                                                            |
 | :--------------- |:-----------------------------------------------------------------------|
-| cal\_id          | The UUIDv1 unique identifier for the calendar aggregation event with embedded timestamp |
+| cal\_id          | The block height for the calendar block |
 | anchor\_agg\_id          | The UUIDv1 unique identifier for an anchor aggregation event with embedded timestamp |
 | anchor\_agg\_state  | The state data being stored, in this case, anchor aggregation operations |
 
