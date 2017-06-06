@@ -235,15 +235,16 @@ let calcBlockHashSig = (bh) => {
   return nacl.util.encodeBase64(nacl.sign(bh, signingKeypair.secretKey))
 }
 
-let createGenesisBlock = (callback) => {
+// The write function used by all block creation functions to write to calendar blockchain
+let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callback) => {
   let b = {}
-  b.id = 0
+  b.id = height
   b.time = new Date().getTime()
   b.version = 1
-  b.type = 'cal'
-  b.dataId = '0'
-  b.dataVal = zeroStr
-  b.prevHash = zeroStr
+  b.type = type
+  b.dataId = dataId
+  b.dataVal = dataVal
+  b.prevHash = prevHash
 
   let bh = calcBlockHash(b)
   b.hash = bh.toString('hex')
@@ -251,13 +252,16 @@ let createGenesisBlock = (callback) => {
 
   CalendarBlock.create(b)
     .then((block) => {
-      // console.log(block.get({plain: true}))
-      console.log('GENESIS BLOCK : id : ' + block.get({ plain: true }).id)
+      console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
       return callback(null, block.get({ plain: true }))
     })
     .catch(err => {
-      return callback('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
+      return callback(`GENESIS BLOCK create error: ${err.message} : ${err.stack}`)
     })
+}
+
+let createGenesisBlock = (callback) => {
+  return writeBlock(0, 'cal', '0', zeroStr, zeroStr, 'GENESIS', callback)
 }
 
 let createCalendarBlock = (data, callback) => {
@@ -265,62 +269,23 @@ let createCalendarBlock = (data, callback) => {
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
-      let b = {}
-      b.id = parseInt(prevBlock.id, 10) + 1
-      b.time = new Date().getTime()
-      b.version = 1
-      b.type = 'cal'
-      b.dataId = b.id.toString()
-      b.dataVal = data.toString()
-      b.prevHash = prevBlock.hash
-
-      let bh = calcBlockHash(b)
-      b.hash = bh.toString('hex')
-      b.sig = calcBlockHashSig(bh)
-
-      CalendarBlock.create(b)
-        .then((block) => {
-          console.log('CAL BLOCK : id : ' + block.get({ plain: true }).id)
-          return callback(null, block.get({ plain: true }))
-        })
-        .catch(err => {
-          return callback('createCalendarBlock create error: ' + err.message + ' : ' + err.stack)
-        })
+      let newId = parseInt(prevBlock.id, 10) + 1
+      return writeBlock(newId, 'cal', newId.toString(), data.toString(), prevBlock.hash, 'CAL', callback)
     } else {
       return callback('could not write block, no genesis block found')
     }
   })
 }
 
-// FIXME : DRY UP THE BLOCK CREATION FUNCTIONS
-// FIXME : Pull in real Nist data via consul
 let createNistBlock = (data, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
-      let b = {}
-      b.id = parseInt(prevBlock.id, 10) + 1
-      b.time = new Date().getTime()
-      b.version = 1
-      b.type = 'nist'
-      b.dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
-      b.dataVal = data.split(':')[1].toString()  // the the hex value for this NIST entry
-      b.prevHash = prevBlock.hash
-
-      let bh = calcBlockHash(b)
-      b.hash = bh.toString('hex')
-      b.sig = calcBlockHashSig(bh)
-
-      CalendarBlock.create(b)
-        .then((block) => {
-          // console.log(block.get({plain: true}))
-          console.log('NIST BLOCK : id : ' + block.get({ plain: true }).id)
-          return callback(null, block.get({ plain: true }))
-        })
-        .catch(err => {
-          return callback('createNistBlock create error: ' + err.message + ' : ' + err.stack)
-        })
+      let newId = parseInt(prevBlock.id, 10) + 1
+      let dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
+      let dataVal = data.split(':')[1].toString()  // the the hex value for this NIST entry
+      return writeBlock(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST', callback)
     } else {
       return callback('could not write block, no genesis block found')
     }
@@ -578,11 +543,6 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
   })
 }
 
-let aggregateAndAnchorETH = () => {
-  // TODO
-  console.log('TODO aggregateAndAnchorETH()')
-}
-
 // Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
 let aggregateAndAnchorBTC = () => {
   // TODO: Retrieve calendar blocks since last anchor block (inclusive?, lock db?)
@@ -699,6 +659,11 @@ let aggregateAndAnchorBTC = () => {
       console.error('aggregateAndAnchorBTC process complete.')
     }
   })
+}
+
+let aggregateAndAnchorETH = () => {
+  // TODO
+  console.log('TODO aggregateAndAnchorETH()')
 }
 
 // Each of these locks must be defined up front since event handlers
