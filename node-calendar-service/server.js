@@ -17,16 +17,8 @@ const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
 // The consul key to hold for calendar blockchain DB locks
 const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blockchain/lock'
 
-// Deterministic object hashing for signatures
-// see: https://github.com/emschwartz/objecthash-js
-// see: https://github.com/benlaurie/objecthash
-const objectHash = require('objecthash')
-
 // The frequency to generate new calendar trees : 1 every 10 seconds by default
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
-
-// The frequency to generate new NIST Random Beacon Blocks
-const NIST_INTERVAL_MS = process.env.NIST_INTERVAL_MS || 60000
 
 // How often blocks on calendar should be aggregated and anchored
 const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
@@ -791,7 +783,7 @@ var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' })
 // sequelize.sync({ force: true, logging: console.log })
 sequelize.sync({ logging: console.log }).then(() => {
   console.log('CalendarBlock sequelize database synchronized')
-    // trigger creation of the genesis block
+  // trigger creation of the genesis block
   genesisLock.acquire()
 }).catch((err) => {
   console.error('sequelize.sync() error: ' + err.stack)
@@ -861,21 +853,13 @@ calendarLock.on('end', () => {
 
 nistLock.on('acquire', () => {
   console.log('nistLock acquired')
-
-<<<<<<< HEAD
-  // FIXME : fakeData hash being inserted now just for testing.
-  let fakeData = objectHash({ time: new Date().getTime() }).toString('hex')
-  createNistBlock(fakeData)
-=======
   if (nistLatest) {
     console.log(nistLatest)
     createNistBlock(nistLatest)
   } else {
-    console.log(nistLatest)
-    console.error('nistLatest is null or missing timeStamp or seedValue props')
+    console.error('nistLatest is null or missing Value property')
     nistLock.release()
   }
->>>>>>> a8325c7d932b3741614b6eebc04269b8fd329f73
 })
 
 nistLock.on('error', (err) => {
