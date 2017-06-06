@@ -37,7 +37,7 @@ var AggStates = sequelize.define('agg_states', {
 // table for state data connecting aggregation roots to calendar block hashes
 var CalStates = sequelize.define('cal_states', {
   agg_id: { type: Sequelize.UUID, primaryKey: true },
-  cal_id: { type: Sequelize.UUID },
+  cal_id: { type: Sequelize.INTEGER },
   cal_state: { type: Sequelize.TEXT }
 }, {
   indexes: [
@@ -50,7 +50,7 @@ var CalStates = sequelize.define('cal_states', {
 
 // table for state data connecting calendar block hashes to anchor_agg_root
 var AnchorAggStates = sequelize.define('anchor_agg_states', {
-  cal_id: { type: Sequelize.UUID, primaryKey: true },
+  cal_id: { type: Sequelize.INTEGER, primaryKey: true },
   anchor_agg_id: { type: Sequelize.UUID },
   anchor_agg_state: { type: Sequelize.TEXT }
 }, {
