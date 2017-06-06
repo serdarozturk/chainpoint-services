@@ -149,21 +149,23 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       },
       allowNull: false
     },
-    data_id: {
+    dataId: {
       comment: 'The identifier for the data to be anchored to this block, data identifier meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
         is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
+      field: 'data_id',
       allowNull: false,
       unique: true
     },
-    data_val: {
+    dataVal: {
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
         is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
+      field: 'data_val',
       allowNull: false,
       unique: true
     },
@@ -216,19 +218,14 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
 // Calculate a deterministic block hash from a whitelist of properties to hash
 // Returns a Buffer hash value
 let calcBlockHash = (block) => {
-  let idBuffer = Buffer.from(block.id.toString(), 'utf8')
-  let timeBuffer = Buffer.from(block.time.toString(), 'utf8')
-  let versionBuffer = Buffer.from(block.version.toString(), 'utf8')
-  let typeBuffer = Buffer.from(block.type, 'utf8')
-  let dataBuffer = Buffer.from(block.data, 'hex')
+  let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.type.toString()}:${block.dataId.toString()}`
+  let prefixBuffer = Buffer.from(prefixString, 'utf8')
+  let dataValBuffer = Buffer.from(block.dataVal, 'hex')
   let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
 
   return crypto.createHash('sha256').update(Buffer.concat([
-    idBuffer,
-    timeBuffer,
-    versionBuffer,
-    typeBuffer,
-    dataBuffer,
+    prefixBuffer,
+    dataValBuffer,
     prevHashBuffer
   ])).digest()
 }
@@ -244,7 +241,8 @@ let createGenesisBlock = (callback) => {
   b.time = new Date().getTime()
   b.version = 1
   b.type = 'cal'
-  b.data = zeroStr
+  b.dataId = '0'
+  b.dataVal = zeroStr
   b.prevHash = zeroStr
 
   let bh = calcBlockHash(b)
@@ -272,7 +270,8 @@ let createCalendarBlock = (data, callback) => {
       b.time = new Date().getTime()
       b.version = 1
       b.type = 'cal'
-      b.data = data
+      b.dataId = b.id.toString()
+      b.dataVal = data.toString()
       b.prevHash = prevBlock.hash
 
       let bh = calcBlockHash(b)
@@ -305,7 +304,8 @@ let createNistBlock = (data, callback) => {
       b.time = new Date().getTime()
       b.version = 1
       b.type = 'nist'
-      b.data = data
+      b.dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
+      b.dataVal = data.split(':')[1].toString()  // the the hex value for this NIST entry
       b.prevHash = prevBlock.hash
 
       let bh = calcBlockHash(b)
@@ -519,8 +519,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         // add ops connecting agg_root to cal_root
         stateObj.cal_state.ops = proofDataItem.proof
         // add ops extending proof path beyond cal_root to calendar block's block_hash
-        // TODO: Maybe use ':' to separate item in next op, would need to update calcBlockHash as well
-        stateObj.cal_state.ops.push({ l: `${block.id}${block.time}${block.version}${block.type}` })
+        stateObj.cal_state.ops.push({ l: `${block.id}:${block.time}:${block.version}:${block.type}:${block.dataId}` })
         stateObj.cal_state.ops.push({ r: block.prevHash })
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
