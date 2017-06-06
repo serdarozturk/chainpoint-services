@@ -837,7 +837,7 @@ function startListening () {
   // Store the updated fee object on change
   nistWatch.on('change', function (data, res) {
     // process only if a value has been returned and it is different than what is already stored
-    if (data.Value && nistLatest !== data.Value) {
+    if (data && data.Value && nistLatest !== data.Value) {
       nistLatest = data.Value
       try {
         nistLock.acquire()
