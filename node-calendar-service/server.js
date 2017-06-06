@@ -85,6 +85,10 @@ let AGGREGATION_ROOTS = []
 // This value is set once the connection has been established
 let amqpChannel = null
 
+// The latest NIST data
+// This value is updated from consul events as changes are detected
+let nistLatest = null
+
 // CockroachDB Sequelize ORM
 let Sequelize = require('sequelize-cockroachdb')
 
@@ -314,58 +318,6 @@ let createNistBlock = (data) => {
           // always release the lock, whether success or failure
           nistLock.release()
         })
-    }
-  })
-}
-
-/**
- * Opens an AMPQ connection and channel
- * Retry logic is included to handle losses of connection
- *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
- */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
-      // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
-      })
-    },
-    (conn, callback) => {
-      // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
-        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-        amqpChannel = null
-        // un-acked messaged will be requeued, so clear all work in progress
-        AGGREGATION_ROOTS = []
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-      })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('amqpChannel connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
-        amqpChannel = chan
-
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
-          processMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
-      // catch errors when attempting to establish connection
-      console.error('Cannot establish connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     }
   })
 }
@@ -745,9 +697,6 @@ let aggregateAndAnchorBTC = () => {
   })
 }
 
-// SERVICE SETUP : AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
-
 // Each of these locks must be defined up front since event handlers
 // need to be registered for each. They are all effectively locking the same
 // resource since they share the same CALENDAR_LOCK_KEY. The value is
@@ -777,18 +726,6 @@ var btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
 var btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
 var ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
 var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
-
-// Sync models to DB tables and trigger check
-// if a new genesis block is needed.
-// sequelize.sync({ force: true, logging: console.log })
-sequelize.sync({ logging: console.log }).then(() => {
-  console.log('CalendarBlock sequelize database synchronized')
-  // trigger creation of the genesis block
-  genesisLock.acquire()
-}).catch((err) => {
-  console.error('sequelize.sync() error: ' + err.stack)
-  process.exit(1)
-})
 
 // LOCK HANDLERS : genesis
 genesisLock.on('acquire', () => {
@@ -946,51 +883,138 @@ ethConfirmLock.on('end', () => {
   console.log('ethConfirmLock end')
 })
 
-// NIST CONSUL WATCH
+// This initalizes all the consul watches and JS intervals that fire all calendar events
+function startListening () {
+  console.log('starting watches and intervals')
 
-let nistLatest = null
+  // Continuous watch on the consul key holding the NIST object.
+  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
 
-// Continuous watch on the consul key holding the NIST object.
-var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
-
-// Store the updated fee object on change
-nistWatch.on('change', function (data, res) {
-  if (data.Value) {
-    nistLatest = data.Value
-    try {
-      nistLock.acquire()
-    } catch (err) {
-      console.error('nistLock.acquire() : caught err : ', err.message)
+  // Store the updated fee object on change
+  nistWatch.on('change', function (data, res) {
+    if (data.Value) {
+      nistLatest = data.Value
+      try {
+        nistLock.acquire()
+      } catch (err) {
+        console.error('nistLock.acquire() : caught err : ', err.message)
+      }
     }
-  }
-})
+  })
 
-nistWatch.on('error', function (err) {
-  console.error('nistWatch error: ', err)
-})
+  nistWatch.on('error', function (err) {
+    console.error('nistWatch error: ', err)
+  })
 
-// PERIODIC TIMERS
+  // PERIODIC TIMERS
 
-// Write a new calendar block
-setInterval(() => {
-  try {
-    // if the amqp channel is null (closed), processing should not continue, defer to next interval
-    if (amqpChannel === null) return
-    calendarLock.acquire()
-  } catch (err) {
-    console.error('calendarLock.acquire() : caught err : ', err.message)
-  }
-}, CALENDAR_INTERVAL_MS)
+  // Write a new calendar block
+  setInterval(() => {
+    try {
+      // if the amqp channel is null (closed), processing should not continue, defer to next interval
+      if (amqpChannel === null) return
+      calendarLock.acquire()
+    } catch (err) {
+      console.error('calendarLock.acquire() : caught err : ', err.message)
+    }
+  }, CALENDAR_INTERVAL_MS)
 
-// Add all block hashes back to the previous ETH anchor to a Merkle
-// tree and send to ETH TX
-setInterval(() => aggregateAndAnchorETH(), ANCHOR_ETH_INTERVAL_MS)
+  // Add all block hashes back to the previous ETH anchor to a Merkle
+  // tree and send to ETH TX
+  setInterval(() => aggregateAndAnchorETH(), ANCHOR_ETH_INTERVAL_MS)
 
-// Add all block hashes back to the previous BTC anchor to a Merkle
-// tree and send to BTC TX
-// FIXME : change ANCHOR_BTC_INTERVAL_MS to a one second tick interval
-// FIXME : don't call aggregateAndAnchorBTC() directly, instead, acquire a btcAnchorLock
-// FIXME : In the btcAnchorLock .on('acquire) handler, call aggregateAndAnchorBTC()
-// FIXME : aggregateAndAnchorBTC() checks if the last anchor block is equal or older to some new val (10 min)
-// FIXME : Only if last anchor was older/equal to 10 min, do we write a new anchor and do the work of that function. Otherwise immediate release lock.
-setInterval(() => aggregateAndAnchorBTC(), ANCHOR_BTC_INTERVAL_MS)
+  // Add all block hashes back to the previous BTC anchor to a Merkle
+  // tree and send to BTC TX
+  // FIXME : change ANCHOR_BTC_INTERVAL_MS to a one second tick interval
+  // FIXME : don't call aggregateAndAnchorBTC() directly, instead, acquire a btcAnchorLock
+  // FIXME : In the btcAnchorLock .on('acquire) handler, call aggregateAndAnchorBTC()
+  // FIXME : aggregateAndAnchorBTC() checks if the last anchor block is equal or older to some new val (10 min)
+  // FIXME : Only if last anchor was older/equal to 10 min, do we write a new anchor and do the work of that function. Otherwise immediate release lock.
+  setInterval(() => aggregateAndAnchorBTC(), ANCHOR_BTC_INTERVAL_MS)
+}
+
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+function amqpOpenConnection (connectionString) {
+  async.waterfall([
+    (callback) => {
+      // connect to rabbitmq server
+      amqp.connect(connectionString, (err, conn) => {
+        if (err) return callback(err)
+        return callback(null, conn)
+      })
+    },
+    (conn, callback) => {
+      // if the channel closes for any reason, attempt to reconnect
+      conn.on('close', () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        // un-acked messaged will be requeued, so clear all work in progress
+        AGGREGATION_ROOTS = []
+        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      })
+      // create communication channel
+      conn.createConfirmChannel((err, chan) => {
+        if (err) return callback(err)
+        // the connection and channel have been established
+        // set 'amqpChannel' so that publishers have access to the channel
+        console.log('amqpChannel connection established')
+        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
+        chan.assertQueue(RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
+        chan.prefetch(RMQ_PREFETCH_COUNT)
+        amqpChannel = chan
+
+        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+          processMessage(msg)
+        })
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+    }
+  })
+}
+
+/**
+ * Opens a storage connection
+ **/
+function openStorageConnection (callback) {
+  // Sync models to DB tables and trigger check
+  // if a new genesis block is needed.
+  sequelize.sync({ logging: console.log }).then(() => {
+    console.log('CalendarBlock sequelize database synchronized')
+    // trigger creation of the genesis block
+    genesisLock.acquire()
+    return callback(null, true)
+  }).catch((err) => {
+    console.error('sequelize.sync() error: ' + err.stack)
+    setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+  })
+}
+
+function initConnectionsAndStart () {
+  // Open storage connection and then amqp connection
+  openStorageConnection((err, result) => {
+    if (err) {
+      console.error(err)
+    } else {
+      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      // Init intervals and watches
+      startListening()
+    }
+  })
+}
+
+// start the whole show here
+// first open the required connections, then allow locks for db writing
+initConnectionsAndStart()
