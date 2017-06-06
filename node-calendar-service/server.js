@@ -149,7 +149,16 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       },
       allowNull: false
     },
-    data: {
+    data_id: {
+      comment: 'The identifier for the data to be anchored to this block, data identifier meaning is determined by block type.',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
+      },
+      allowNull: false,
+      unique: true
+    },
+    data_val: {
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
@@ -159,7 +168,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       unique: true
     },
     prevHash: {
-      comment: 'Block hash of previous block ID',
+      comment: 'Block hash of previous block',
       type: Sequelize.STRING,
       validate: {
         is: ['^[a-f0-9]{64}$', 'i']
@@ -169,7 +178,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       unique: true
     },
     hash: {
-      comment: 'Hex encoded SHA-256 over canonical values',
+      comment: 'The block hash, a hex encoded SHA-256 over canonical values',
       type: Sequelize.STRING,
       validate: {
         is: ['^[a-f0-9]{64}$', 'i']
@@ -229,7 +238,7 @@ let calcBlockHashSig = (bh) => {
   return nacl.util.encodeBase64(nacl.sign(bh, signingKeypair.secretKey))
 }
 
-let createGenesisBlock = () => {
+let createGenesisBlock = (callback) => {
   let b = {}
   b.id = 0
   b.time = new Date().getTime()
@@ -246,13 +255,10 @@ let createGenesisBlock = () => {
     .then((block) => {
       // console.log(block.get({plain: true}))
       console.log('GENESIS BLOCK : id : ' + block.get({ plain: true }).id)
+      return callback(null, block.get({ plain: true }))
     })
     .catch(err => {
-      console.error('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
-    })
-    .then(() => {
-      // always release the lock, whether success or failure
-      genesisLock.release()
+      return callback('createGenesisBlock create error: ' + err.message + ' : ' + err.stack)
     })
 }
 
@@ -289,7 +295,7 @@ let createCalendarBlock = (data, callback) => {
 
 // FIXME : DRY UP THE BLOCK CREATION FUNCTIONS
 // FIXME : Pull in real Nist data via consul
-let createNistBlock = (data) => {
+let createNistBlock = (data, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
@@ -310,14 +316,13 @@ let createNistBlock = (data) => {
         .then((block) => {
           // console.log(block.get({plain: true}))
           console.log('NIST BLOCK : id : ' + block.get({ plain: true }).id)
+          return callback(null, block.get({ plain: true }))
         })
         .catch(err => {
-          console.error('createNistBlock create error: ' + err.message + ' : ' + err.stack)
+          return callback('createNistBlock create error: ' + err.message + ' : ' + err.stack)
         })
-        .then(() => {
-          // always release the lock, whether success or failure
-          nistLock.release()
-        })
+    } else {
+      return callback('could not write block, no genesis block found')
     }
   })
 }
@@ -752,7 +757,14 @@ registerLockEvents(genesisLock, 'genesisLock', () => {
   // Is a genesis block needed? If not release lock and move on.
   CalendarBlock.count().then(c => {
     if (c === 0) {
-      createGenesisBlock()
+      createGenesisBlock((err, block) => {
+        if (err) {
+          console.error('createGenesisBlock error - ' + err)
+        } else {
+          console.log('createGenesisBlock succeeded')
+        }
+        genesisLock.release()
+      })
     } else {
       genesisLock.release()
       console.log(`No genesis block needed : ${c} block(s) found.`)
@@ -782,7 +794,14 @@ registerLockEvents(calendarLock, 'calendarLock', () => {
 registerLockEvents(nistLock, 'nistLock', () => {
   if (nistLatest) {
     console.log(nistLatest)
-    createNistBlock(nistLatest)
+    createNistBlock(nistLatest, (err, block) => {
+      if (err) {
+        console.error('createNistBlock error - ' + err)
+      } else {
+        console.log('createNistBlock succeeded')
+      }
+      nistLock.release()
+    })
   } else {
     console.error('nistLatest is null or missing Value property')
     nistLock.release()
@@ -818,7 +837,8 @@ function startListening () {
 
   // Store the updated fee object on change
   nistWatch.on('change', function (data, res) {
-    if (data.Value) {
+    // process only if a value has been returned and it is different than what is already stored
+    if (data.Value && nistLatest !== data.Value) {
       nistLatest = data.Value
       try {
         nistLock.acquire()
