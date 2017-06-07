@@ -21,7 +21,7 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
 // How often blocks on calendar should be aggregated and anchored
-const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 60000 // TODO: Put back to 1800000 // 30 min
+const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
 const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
