@@ -21,7 +21,7 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
 // How often blocks on calendar should be aggregated and anchored
-const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 60000 // TODO: Put back to 1800000 // 30 min
+const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
 const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
 
 // THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
@@ -103,7 +103,8 @@ const COCKROACH_TABLE_NAME = process.env.COCKROACH_TABLE_NAME || 'chainpoint_cal
 let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
   dialect: 'postgres',
   host: COCKROACH_HOST,
-  port: COCKROACH_PORT
+  port: COCKROACH_PORT,
+  logging: false
 })
 
 // Define the model and the table it will be stored in.
@@ -199,24 +200,17 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
     }
   },
   {
-    // no automatic timestamp fields, we add our own 'timestamp' so it is
+    // No automatic timestamp fields, we add our own 'timestamp' so it is
     // known prior to save so it can be included in the block signature.
     timestamps: false,
-    // disable the modification of table names; By default, sequelize will automatically
+    // Disable the modification of table names; By default, sequelize will automatically
     // transform all passed model names (first parameter of define) into plural.
     // if you don't want that, set the following
-    freezeTableName: true,
-    // setup object lifecycle hooks
-    hooks: {
-      // beforeValidate: function (block, options) {
-      //   console.log(block.get({plain: true}))
-      // }
-    }
+    freezeTableName: true
   }
 )
 
-// Calculate a deterministic block hash from a whitelist of properties to hash
-// Returns a Buffer hash value
+// Calculate a deterministic block hash and return a Buffer hash value
 let calcBlockHash = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
@@ -284,7 +278,7 @@ let createNistBlock = (data, callback) => {
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       let dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
-      let dataVal = data.split(':')[1].toString()  // the the hex value for this NIST entry
+      let dataVal = data.split(':')[1].toString()  // the hex value for this NIST entry
       return writeBlock(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST', callback)
     } else {
       return callback('could not write block, no genesis block found')
@@ -404,7 +398,7 @@ function consumeBtcTxMessage (msg) {
 }
 
 function consumeBtcMonMessage (msg) {
-  // TODO: put dode that does stuff here
+  // TODO: put code that does stuff here
   console.log('btcmon message received!!!')
   console.log(JSON.stringify(msg))
   amqpChannel.ack(msg)
@@ -558,7 +552,8 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
   })
 }
 
-// Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
+// Aggregate all block hashes on chain since last BTC anchor block, add new
+// BTC anchor block to calendar, add new proof state entries, anchor root
 let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
   async.waterfall([
     (wfCallback) => {
@@ -619,10 +614,12 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
       })
     },
     (treeData, newBlock, wfCallback) => {
-      // For each calendar record block in the tree, add proof state item containing proof ops from block_hash to anchor_agg_root
+      // For each calendar record block in the tree, add proof state
+      // item containing proof ops from block_hash to anchor_agg_root
       async.series([
         (seriesCallback) => {
-          // for each calendar block hash, queue up message containing updated proof state bound for proof state service
+          // for each calendar block hash, queue up message containing updated
+          // proof state bound for proof state service
           async.each(treeData.proofData, (proofDataItem, eachCallback) => {
             let stateObj = {}
             stateObj.cal_id = proofDataItem.cal_id

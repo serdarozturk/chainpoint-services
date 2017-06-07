@@ -27,7 +27,7 @@ var amqpChannel = null
 const MONITOR_INTERVAL_SECONDS = process.env.MONITOR_INTERVAL_SECONDS || 30
 
 // The number of confirmations needed before the transaction is considered ready for proof delivery
-const MIN_BTC_CONFIRMS = process.env.MIN_BTC_CONFIRMS || 1 // TODO: Put back to 6
+const MIN_BTC_CONFIRMS = process.env.MIN_BTC_CONFIRMS || 6
 
 // The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
 const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
