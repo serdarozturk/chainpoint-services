@@ -103,7 +103,8 @@ const COCKROACH_TABLE_NAME = process.env.COCKROACH_TABLE_NAME || 'chainpoint_cal
 let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
   dialect: 'postgres',
   host: COCKROACH_HOST,
-  port: COCKROACH_PORT
+  port: COCKROACH_PORT,
+  logging: false
 })
 
 // Define the model and the table it will be stored in.
@@ -199,24 +200,17 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
     }
   },
   {
-    // no automatic timestamp fields, we add our own 'timestamp' so it is
+    // No automatic timestamp fields, we add our own 'timestamp' so it is
     // known prior to save so it can be included in the block signature.
     timestamps: false,
-    // disable the modification of table names; By default, sequelize will automatically
+    // Disable the modification of table names; By default, sequelize will automatically
     // transform all passed model names (first parameter of define) into plural.
     // if you don't want that, set the following
-    freezeTableName: true,
-    // setup object lifecycle hooks
-    hooks: {
-      // beforeValidate: function (block, options) {
-      //   console.log(block.get({plain: true}))
-      // }
-    }
+    freezeTableName: true
   }
 )
 
-// Calculate a deterministic block hash from a whitelist of properties to hash
-// Returns a Buffer hash value
+// Calculate a deterministic block hash and return a Buffer hash value
 let calcBlockHash = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
