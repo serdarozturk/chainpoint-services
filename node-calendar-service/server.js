@@ -192,7 +192,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       comment: 'Base64 encoded signature over block hash',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-zA-Z0-9\=\+\/]{1,255}$', 'i']
+        is: ['^[a-zA-Z0-9=+/]{1,255}$', 'i']
       },
       allowNull: false,
       unique: true
@@ -796,7 +796,7 @@ registerLockEvents(nistLock, 'nistLock', () => {
 
 // LOCK HANDLERS : btc-anchor
 registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
-  // checks if the last anchor block is at least ANCHOR_BTC_INTERVAL_MS old
+  // checks if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   let lastBtcAnchorBlockId = null
   CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).then(lastBtcAnchorBlock => {
@@ -831,7 +831,32 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
 
 // LOCK HANDLERS : eth-anchor
 registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
-  ethAnchorLock.release()
+  // checks if the eth last anchor block is at least ANCHOR_ETH_INTERVAL_MS old
+  // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+  let lastEthAnchorBlockId = null
+  CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).then(lastEthAnchorBlock => {
+    if (lastEthAnchorBlock) {
+      // check if the last eth anchor block is at least ANCHOR_ETH_INTERVAL_MS old
+      // if not, release lock and return
+      let lastEthAnchorMS = lastEthAnchorBlock.time
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastEthAnchorMS
+      if (ageMS < ANCHOR_ETH_INTERVAL_MS) {
+        console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
+        ethAnchorLock.release()
+        return
+      }
+      lastEthAnchorBlockId = parseInt(lastEthAnchorBlock.id, 10)
+    }
+    aggregateAndAnchorETH(lastEthAnchorBlockId, (err) => {
+      if (err) {
+        console.error('aggregateAndAnchorETH error - ' + err)
+      } else {
+        console.log('aggregateAndAnchorETH succeeded')
+      }
+      ethAnchorLock.release()
+    })
+  })
 })
 
 // LOCK HANDLERS : eth-confirm
