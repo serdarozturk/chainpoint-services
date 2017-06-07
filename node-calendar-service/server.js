@@ -811,7 +811,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
         btcAnchorLock.release()
         return
       }
-      lastBtcAnchorBlockId = parseInt(lastBtcAnchorBlockId.id, 10)
+      lastBtcAnchorBlockId = parseInt(lastBtcAnchorBlock.id, 10)
     }
     aggregateAndAnchorBTC(lastBtcAnchorBlockId, (err) => {
       if (err) {

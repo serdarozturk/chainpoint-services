@@ -259,8 +259,8 @@ let monitorTransactions = () => {
         // retrieve btc block transactions ids and build state data object
         getBlockInfoForBlockHash(blockHash, (err, blockInfo) => {
           if (err) return wfCallback(err)
-          let blockTxIds = blockInfo.tx
-          let blockRoot = blockInfo.merkleroot
+          let blockTxIds = blockInfo.result.tx
+          let blockRoot = blockInfo.result.merkleroot
           return wfCallback(null, blockTxIds, txIndex, blockRoot, blockHeight)
         })
       },
