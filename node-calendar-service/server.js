@@ -278,7 +278,7 @@ let createNistBlock = (data, callback) => {
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       let dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
-      let dataVal = data.split(':')[1].toString()  // the the hex value for this NIST entry
+      let dataVal = data.split(':')[1].toString()  // the hex value for this NIST entry
       return writeBlock(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST', callback)
     } else {
       return callback('could not write block, no genesis block found')
