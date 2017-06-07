@@ -398,7 +398,7 @@ function consumeBtcTxMessage (msg) {
 }
 
 function consumeBtcMonMessage (msg) {
-  // TODO: put dode that does stuff here
+  // TODO: put code that does stuff here
   console.log('btcmon message received!!!')
   console.log(JSON.stringify(msg))
   amqpChannel.ack(msg)
@@ -552,7 +552,8 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
   })
 }
 
-// Aggregate all block hashes on chain since last anchor block, add new anchor block to calendar, add new proof state entries, anchor root
+// Aggregate all block hashes on chain since last BTC anchor block, add new
+// BTC anchor block to calendar, add new proof state entries, anchor root
 let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
   async.waterfall([
     (wfCallback) => {
@@ -613,10 +614,12 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
       })
     },
     (treeData, newBlock, wfCallback) => {
-      // For each calendar record block in the tree, add proof state item containing proof ops from block_hash to anchor_agg_root
+      // For each calendar record block in the tree, add proof state
+      // item containing proof ops from block_hash to anchor_agg_root
       async.series([
         (seriesCallback) => {
-          // for each calendar block hash, queue up message containing updated proof state bound for proof state service
+          // for each calendar block hash, queue up message containing updated
+          // proof state bound for proof state service
           async.each(treeData.proofData, (proofDataItem, eachCallback) => {
             let stateObj = {}
             stateObj.cal_id = proofDataItem.cal_id
