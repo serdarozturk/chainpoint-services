@@ -283,6 +283,7 @@ let monitorTransactions = () => {
         let messageObj = {}
         messageObj.btctx_id = btcTxIdObj.tx_id
         messageObj.btchead_height = blockHeight
+        messageObj.btchead_root = rootValueHex
         messageObj.path = proofPath
         amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' },
           (err, ok) => {

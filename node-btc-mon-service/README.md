@@ -78,6 +78,7 @@ The following is an example of a block object message sent to both service:
 {
   "btctx_id": "752d66de3111c308ac16b7e114b855d79b1bbdaa45f0c4a44b64e79bbc69bb78",
   "btchead_height": 469222,
+  "btchead_root": "3016a73bb0fc915193a3adddf90ef46b643e270665dcdde35fb52eb1f44a48be",
   "path": [
         { "left": "fab4a0b99def4631354ca8b3a7f7fe026623ade9c8c5b080b16b2c744d2b9c7d" },
         { "right": "7fb6bb6387d1ffa74671ecf5d337f7a8881443e5b5532106f9bebb673dd72bc9" }
@@ -88,6 +89,7 @@ The following is an example of a block object message sent to both service:
 | :--------------- |:-----------------------------------------------------------------------|
 | btctx_id          | The bitcoin transaction id |
 | btchead_height | The block height of the block containing the transaction |
+| btchead_root | The merkle root of the block containing the transaction |
 | path | left and right operations connecting the transaction hash to the block merkle root, double sha256 tree implied |
 
 When a transation has achieved minimum confirmations, the original transaction message is acked.
