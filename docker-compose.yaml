@@ -136,7 +136,6 @@ services:
       context: ./node-calendar-service
     environment:
       NACL_KEYPAIR_SEED: '+zy90opG2vQIUOL1rI6Ja3tN26QtE6AC5F5bP1j+NgM='
-      ANCHOR_BTC_INTERVAL_MS: 60000
     depends_on:
       - roach1
       - roach2
