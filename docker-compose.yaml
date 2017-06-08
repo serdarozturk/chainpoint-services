@@ -175,6 +175,9 @@ services:
     build:
       context: ./node-btc-tx-service
     depends_on:
+      - roach1
+      - roach2
+      - roach3
       - consul
       - rabbitmq
       - btc-fee
