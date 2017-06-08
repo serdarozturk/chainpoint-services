@@ -144,11 +144,91 @@ function generateCALProof (msg) {
       }
     })
 }
+
+function generateBTCProof (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+
+  let proof = {}
+  proof = addChainpointHeader(proof, messageObj.hash, messageObj.hash_id)
+  proof = addCalendarBranch(proof, messageObj.agg_state, messageObj.cal_state)
+  proof = addBtcBranch(proof, messageObj.anchor_agg_state, messageObj.btctx_state, messageObj.btchead_state)
+
+  // ensure the proof is valid according to the defined Chainpoint v3 JSON schema
+  let isValidSchema = chainpointProofSchema.validate(proof).valid
+  if (!isValidSchema) {
+    // This schema is not valid, ack the message but log an error and end processing
+    // We are not nacking here because the poorly formatted proof would just be
+    // re-qeueud and re-processed on and on forever
+    amqpChannel.ack(msg)
+    console.error(RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
+    return
+  }
+
+  async.waterfall([
+    // compress proof to binary format Base64
+    (callback) => {
+      chpBinary.objectToBase64(proof, (err, proofBase64) => {
+        if (err) return callback(err)
+        return callback(null, proofBase64)
+      })
+    },
+    // save proof to redis
+    (proofBase64, callback) => {
+      redis.set(messageObj.hash_id, proofBase64, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    },
+    (callback) => {
+      // check if a subscription for the hash exists
+      // Preface the sub key with 'sub:' so as not to conflict with the proof storage, which uses the plain hashId as the key already
+      let key = 'sub:' + messageObj.hash_id
+      redis.hgetall(key, (err, res) => {
+        if (err) return callback(err)
+        // if not subscription is found, return null to skip the rest of the process
+        if (res == null || !res.api_id || !res.cx_id) return callback(null, null, null)
+        // a subscription with valid api_id and cx_id has been found, return api_id and cx_id to deliver the proof to
+        return callback(null, res.api_id, res.cx_id)
+      })
+    },
+    // publish 'ready' message for API service if and only if a subscription exists for this hash
+    (APIServiceInstanceId, wsConnectionId, callback) => {
+      // no subcription fvor this hash, so skip publishing
+      if (APIServiceInstanceId == null || wsConnectionId == null) return callback(null)
+
+      let opts = { headers: { 'api_id': APIServiceInstanceId }, persistent: true }
+      let message = {
+        cx_id: wsConnectionId,
+        hash_id: messageObj.hash_id
+      }
+      amqpChannel.publish(RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
+        (err, ok) => {
+          if (err !== null) {
+            // An error as occurred publishing a message
+            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+            return callback(err)
+          } else {
+            // New message has been published
+            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
+            return callback(null)
+          }
+        })
+    }
+  ],
+    (err) => {
+      if (err) {
+        // An error has occurred saving the proof and publishing the ready message, nack consumption of message
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_QUEUE, '[btc] consume message nacked')
+      } else {
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, '[btc] consume message acked')
+      }
+    })
+}
+
 function generateETHProof (msg) {
   console.log('building eth proof')
-}
-function generateBTCProof (msg) {
-  console.log('building btc proof')
 }
 
 function addChainpointHeader (proof, hash, hashId) {
@@ -173,6 +253,21 @@ function addCalendarBranch (proof, aggState, calState) {
   calendarBranch.ops.push({ anchors: [calendarAnchor] })
 
   proof.branches = [calendarBranch]
+  return proof
+}
+
+function addBtcBranch (proof, anchorAggState, btcTxState, btcHeadState) {
+  let btcBranch = {}
+  btcBranch.label = 'btc_anchor_branch'
+  btcBranch.ops = anchorAggState.ops.concat(btcTxState.ops, btcHeadState.ops)
+
+  let btcAnchor = {}
+  btcAnchor.type = 'btc'
+  btcAnchor.anchor_id = btcHeadState.anchor.anchor_id
+
+  btcBranch.ops.push({ anchors: [btcAnchor] })
+
+  proof.branches[0].branches = [btcBranch]
   return proof
 }
 

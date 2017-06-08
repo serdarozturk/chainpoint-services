@@ -233,6 +233,71 @@ function ConsumeBtcTxMessage (msg) {
 }
 
 /**
+* Writes the state data to persistent storage and queues proof ready messages bound for the proof state service
+*
+* @param {amqp message object} msg - The AMQP message received from the queue
+*/
+function ConsumeBtcMonMessage (msg) {
+  let messageObj = JSON.parse(msg.content.toString())
+  let stateObj = {}
+  stateObj.btctx_id = messageObj.btctx_id
+  stateObj.btchead_height = messageObj.btchead_height
+  stateObj.btchead_state = messageObj.btchead_state
+
+  async.waterfall([
+    (callback) => {
+      // get all hash ids for a given btctx_id
+      storageClient.getHashIdsByBtcTxId(stateObj.btctx_id, (err, rows) => {
+        if (err) return callback(err)
+        return callback(null, rows)
+      })
+    },
+    (rows, callback) => {
+      // write the calendar state object to storage
+      storageClient.writeBTCHeadStateObject(stateObj, (err, success) => {
+        if (err) return callback(err)
+        return callback(null, rows)
+      })
+    },
+    (rows, callback) => {
+      async.eachLimit(rows, 10, (hashIdRow, eachCallback) => {
+        // construct a calendar 'proof ready' message for a given hash
+        let dataOutObj = {}
+        dataOutObj.type = 'btc'
+        dataOutObj.hash_id = hashIdRow.hash_id
+        // Publish a proof ready object for consumption by the proof state service
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
+              return eachCallback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+              return eachCallback(null)
+            }
+          })
+      }, (err) => {
+        if (err) return callback(err)
+        return callback(null)
+      })
+    }
+  ], (err) => {
+    if (err) {
+      console.error('error consuming calendar message', err)
+      // An error as occurred publishing a message, nack consumption of original message
+      amqpChannel.nack(msg)
+      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
+    } else {
+      // New messages have been published, ack consumption of original message
+      amqpChannel.ack(msg)
+      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    }
+  })
+}
+
+/**
 * Retrieves all proof state data for a given hash and publishes message bound for the proof generator service
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
@@ -284,6 +349,93 @@ function ConsumeProofReadyMessage (msg) {
         (hashId, callback) => {
           // logs the calendar proof event
           storageClient.logCalendarEventForHashId(hashId, (err, success) => {
+            if (err) return callback(err)
+            return callback(null)
+          })
+        }
+      ], (err) => {
+        if (err) {
+          console.error('error consuming proof ready message', err)
+          // An error as occurred consuming a message, nack consumption of original message
+          amqpChannel.nack(msg)
+          console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(err))
+        } else {
+          // Proof ready message has been consumed, ack consumption of original message
+          amqpChannel.ack(msg)
+          console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+        }
+      })
+      break
+    case 'btc':
+      async.waterfall([
+        (callback) => {
+          // get the agg_state object for the hash_id
+          storageClient.getAggStateObjectByHashId(messageObj.hash_id, (err, row) => {
+            if (err) return callback(err)
+            if (!row) return callback(new Date().toISOString() + ' no matching agg_state data found')
+            return callback(null, row)
+          })
+        },
+        (aggStateObj, callback) => {
+          // get the cal_state object for the agg_id
+          storageClient.getCalStateObjectByAggId(aggStateObj.agg_id, (err, row) => {
+            if (err) return callback(err)
+            if (!row) return callback(new Date().toISOString() + ' no matching cal_state data found')
+            return callback(null, aggStateObj, row)
+          })
+        },
+        (aggStateObj, calStateObj, callback) => {
+          // get the anchorAgg_state object for the cal_id
+          storageClient.getAnchorAggStateObjectByCalId(calStateObj.cal_id, (err, row) => {
+            if (err) return callback(err)
+            if (!row) return callback(new Date().toISOString() + ' no matching anchor_agg_state data found')
+            return callback(null, aggStateObj, calStateObj, row)
+          })
+        },
+        (aggStateObj, calStateObj, anchorAggStateObj, callback) => {
+          // get the btctx_state object for the anchor_agg_id
+          storageClient.getBTCTxStateObjectByAnchorAggId(anchorAggStateObj.anchor_agg_id, (err, row) => {
+            if (err) return callback(err)
+            if (!row) return callback(new Date().toISOString() + ' no matching btctx_state data found')
+            return callback(null, aggStateObj, calStateObj, anchorAggStateObj, row)
+          })
+        },
+        (aggStateObj, calStateObj, anchorAggStateObj, btcTxStateObj, callback) => {
+          // get the btcthead_state object for the btctx_id
+          storageClient.getBTCHeadStateObjectByBTCTxId(btcTxStateObj.btctx_id, (err, row) => {
+            if (err) return callback(err)
+            if (!row) return callback(new Date().toISOString() + ' no matching btchead_state data found')
+            return callback(null, aggStateObj, calStateObj, anchorAggStateObj, btcTxStateObj, row)
+          })
+        },
+        (aggStateObj, calStateObj, anchorAggStateObj, btcTxStateObj, btcHeadStateObj, callback) => {
+          let dataOutObj = {}
+          dataOutObj.type = 'btc'
+          dataOutObj.hash_id = aggStateObj.hash_id
+          dataOutObj.hash = aggStateObj.hash
+          dataOutObj.agg_state = JSON.parse(aggStateObj.agg_state)
+          dataOutObj.cal_state = JSON.parse(calStateObj.cal_state)
+          dataOutObj.anchor_agg_state = JSON.parse(anchorAggStateObj.anchor_agg_state)
+          dataOutObj.btctx_state = JSON.parse(btcTxStateObj.btctx_state)
+          dataOutObj.btchead_state = JSON.parse(btcHeadStateObj.btchead_state)
+
+          // Publish a proof data object for consumption by the proof generation service
+          amqpChannel.sendToQueue(RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'btc' },
+            (err, ok) => {
+              if (err !== null) {
+                // An error as occurred publishing a message
+                console.error(RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
+                return callback(err)
+              } else {
+                // New message has been published
+                console.log(RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
+                return callback(null, aggStateObj.hash_id)
+              }
+            })
+        },
+        (hashId, callback) => {
+          // logs the btc proof event
+          storageClient.logBtcEventForHashId(hashId, (err, success) => {
             if (err) return callback(err)
             return callback(null)
           })
@@ -405,6 +557,11 @@ function processMessage (msg) {
         // Consumes a btctx state message from the Calendar service
         // Stores state information for btctx events
         ConsumeBtcTxMessage(msg)
+        break
+      case 'btcmon':
+        // Consumes a btcmon state message from the Calendar service
+        // Stores state information for btcmon events
+        ConsumeBtcMonMessage(msg)
         break
       case 'state':
         // Consumes a proof ready message from the proof state service

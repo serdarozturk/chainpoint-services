@@ -157,6 +157,18 @@ function getHashIdsByAggId (aggId, callback) {
   })
 }
 
+function getHashIdsByBtcTxId (btcTxId, callback) {
+  sequelize.query(`SELECT a.hash_id FROM agg_states a 
+    INNER JOIN cal_states c ON c.agg_id = a.agg_id 
+    INNER JOIN anchor_agg_states aa ON aa.cal_id = c.cal_id 
+    INNER JOIN btctx_states tx ON tx.anchor_agg_id = aa.anchor_agg_id 
+    WHERE tx.btctx_id = '${btcTxId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
+      return callback(null, results)
+    }).catch((err) => {
+      return callback(err)
+    })
+}
+
 function getAggStateObjectByHashId (hashId, callback) {
   AggStates.findOne({
     where: {
@@ -468,6 +480,7 @@ module.exports = {
   openConnection: openConnection,
   getHashIdCountByAggId: getHashIdCountByAggId,
   getHashIdsByAggId: getHashIdsByAggId,
+  getHashIdsByBtcTxId: getHashIdsByBtcTxId,
   getAggStateObjectByHashId: getAggStateObjectByHashId,
   getCalStateObjectByAggId: getCalStateObjectByAggId,
   getAnchorAggStateObjectByCalId: getAnchorAggStateObjectByCalId,

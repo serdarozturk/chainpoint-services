@@ -288,10 +288,10 @@ let monitorTransactions = () => {
         amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' },
           (err, ok) => {
             if (err !== null) {
-              console.error(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
+              console.error(RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message nacked')
               return wfCallback(err)
             } else {
-              console.log(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+              console.log(RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message acked')
               return wfCallback(null)
             }
           })
@@ -304,7 +304,6 @@ let monitorTransactions = () => {
         console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
       } else {
         // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
-        amqpChannel.ack(btcTxIdObj.msg)
         console.log(btcTxIdObj.tx_id + ' confirmed and processed')
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       }

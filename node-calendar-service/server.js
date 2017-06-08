@@ -154,11 +154,10 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       comment: 'The identifier for the data to be anchored to this block, data identifier meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
+        is: ['^[a-fA-F0-9:]{0,255}$', 'i']
       },
       field: 'data_id',
-      allowNull: false,
-      unique: true
+      allowNull: false
     },
     dataVal: {
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
@@ -167,8 +166,7 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
         is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
       field: 'data_val',
-      allowNull: false,
-      unique: true
+      allowNull: false
     },
     prevHash: {
       comment: 'Block hash of previous block',
@@ -258,27 +256,27 @@ let createGenesisBlock = (callback) => {
   return writeBlock(0, 'gen', '0', zeroStr, zeroStr, 'GENESIS', callback)
 }
 
-let createCalendarBlock = (data, callback) => {
+let createCalendarBlock = (root, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      return writeBlock(newId, 'cal', newId.toString(), data.toString(), prevBlock.hash, 'CAL', callback)
+      return writeBlock(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL', callback)
     } else {
       return callback('could not write block, no genesis block found')
     }
   })
 }
 
-let createNistBlock = (data, callback) => {
+let createNistBlock = (nistDataObj, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      let dataId = data.split(':')[0].toString() // the epoch timestamp for this NIST entry
-      let dataVal = data.split(':')[1].toString()  // the hex value for this NIST entry
+      let dataId = nistDataObj.split(':')[0].toString() // the epoch timestamp for this NIST entry
+      let dataVal = nistDataObj.split(':')[1].toString()  // the hex value for this NIST entry
       return writeBlock(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST', callback)
     } else {
       return callback('could not write block, no genesis block found')
@@ -286,13 +284,27 @@ let createNistBlock = (data, callback) => {
   })
 }
 
-let createBtcAnchorBlock = (data, callback) => {
+let createBtcAnchorBlock = (root, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      return writeBlock(newId, 'btc-a', newId.toString(), data.toString(), prevBlock.hash, 'BTC-ANCHOR', callback)
+      console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
+      return writeBlock(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR', callback)
+    } else {
+      return callback('could not write block, no genesis block found')
+    }
+  })
+}
+
+let createBtcConfirmBlock = (height, root, callback) => {
+  // Find the last block written so we can incorporate its hash as prevHash
+  // in the new block and increment its block ID by 1.
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
+    if (prevBlock) {
+      let newId = parseInt(prevBlock.id, 10) + 1
+      return writeBlock(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM', callback)
     } else {
       return callback('could not write block, no genesis block found')
     }
@@ -398,10 +410,65 @@ function consumeBtcTxMessage (msg) {
 }
 
 function consumeBtcMonMessage (msg) {
-  // TODO: put code that does stuff here
-  console.log('btcmon message received!!!')
-  console.log(JSON.stringify(msg))
-  amqpChannel.ack(msg)
+  if (msg !== null) {
+    try {
+      btcConfirmLock.acquire()
+    } catch (err) {
+      console.error('btcConfirmLock.acquire() : caught err : ', err.message)
+      setTimeout(() => { amqpChannel.nack(msg) }, 1000) // nack and try again in 1 second to acquire lock and proceed
+    }
+    let btcMonObj = JSON.parse(msg.content.toString())
+    let btctxId = btcMonObj.btctx_id
+    let btcheadHeight = btcMonObj.btchead_height
+    let btcheadRoot = btcMonObj.btchead_root
+    let proofPath = btcMonObj.path
+
+    async.waterfall([
+      // Store Merkle root of BTC block in chain
+      (wfCallback) => {
+        createBtcConfirmBlock(btcheadHeight, btcheadRoot, (err, block) => {
+          if (err) return wfCallback(err)
+          return wfCallback(null, block)
+        })
+      },
+      // queue up message containing updated proof state bound for proof state service
+      (block, wfCallback) => {
+        let stateObj = {}
+        stateObj.btctx_id = btctxId
+        stateObj.btchead_height = btcheadHeight
+        stateObj.btchead_state = {}
+        stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
+        stateObj.btchead_state.anchor = {
+          anchor_id: btcheadHeight.toString()
+        }
+
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
+              return wfCallback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+              return wfCallback(null)
+            }
+          })
+      }
+    ], (err) => {
+      btcConfirmLock.release()
+      if (err) {
+        // nack consumption of all original message
+        console.error(err)
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
+      } else {
+        // ack consumption of all original hash messages part of this aggregation event
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
+      }
+    })
+  }
 }
 
 /**
@@ -680,9 +747,9 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
   })
 }
 
-let aggregateAndAnchorETH = (anchorCallback) => {
-  // TODO
+let aggregateAndAnchorETH = (lastEthAnchorBlockId, anchorCallback) => {
   console.log('TODO aggregateAndAnchorETH()')
+  return anchorCallback(null)
 }
 
 // Each of these locks must be defined up front since event handlers
@@ -823,7 +890,6 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
 
 // LOCK HANDLERS : btc-confirm
 registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
-  btcConfirmLock.release()
 })
 
 // LOCK HANDLERS : eth-anchor
