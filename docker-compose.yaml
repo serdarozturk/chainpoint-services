@@ -136,6 +136,7 @@ services:
       context: ./node-calendar-service
     environment:
       NACL_KEYPAIR_SEED: '+zy90opG2vQIUOL1rI6Ja3tN26QtE6AC5F5bP1j+NgM='
+      ANCHOR_BTC_INTERVAL_MS: 60000
     depends_on:
       - roach1
       - roach2
@@ -172,14 +173,14 @@ services:
     restart: always
     image: chainpoint/node-btc-tx-service
     container_name: btc-tx
-    build:
-      context: ./node-btc-tx-service
     environment:
       BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
       BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
       BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
       BCOIN_API_PASS: ${BCOIN_API_PASS}
       CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+    build:
+      context: ./node-btc-tx-service
     depends_on:
       - roach1
       - roach2
