@@ -174,6 +174,8 @@ services:
     container_name: btc-tx
     build:
       context: ./node-btc-tx-service
+    environment:
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
     depends_on:
       - consul
       - rabbitmq
