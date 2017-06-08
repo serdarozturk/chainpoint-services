@@ -89,6 +89,9 @@ let amqpChannel = null
 // This value is updated from consul events as changes are detected
 let nistLatest = null
 
+// An array of all Btc-Mon messages received and awaiting processing
+let BTC_MON_MESSAGES = []
+
 // CockroachDB Sequelize ORM
 let Sequelize = require('sequelize-cockroachdb')
 
@@ -411,63 +414,8 @@ function consumeBtcTxMessage (msg) {
 
 function consumeBtcMonMessage (msg) {
   if (msg !== null) {
-    try {
-      btcConfirmLock.acquire()
-    } catch (err) {
-      console.error('btcConfirmLock.acquire() : caught err : ', err.message)
-      setTimeout(() => { amqpChannel.nack(msg) }, 1000) // nack and try again in 1 second to acquire lock and proceed
-    }
-    let btcMonObj = JSON.parse(msg.content.toString())
-    let btctxId = btcMonObj.btctx_id
-    let btcheadHeight = btcMonObj.btchead_height
-    let btcheadRoot = btcMonObj.btchead_root
-    let proofPath = btcMonObj.path
-
-    async.waterfall([
-      // Store Merkle root of BTC block in chain
-      (wfCallback) => {
-        createBtcConfirmBlock(btcheadHeight, btcheadRoot, (err, block) => {
-          if (err) return wfCallback(err)
-          return wfCallback(null, block)
-        })
-      },
-      // queue up message containing updated proof state bound for proof state service
-      (block, wfCallback) => {
-        let stateObj = {}
-        stateObj.btctx_id = btctxId
-        stateObj.btchead_height = btcheadHeight
-        stateObj.btchead_state = {}
-        stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
-        stateObj.btchead_state.anchor = {
-          anchor_id: btcheadHeight.toString()
-        }
-
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
-          (err, ok) => {
-            if (err !== null) {
-              // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
-              return wfCallback(err)
-            } else {
-              // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
-              return wfCallback(null)
-            }
-          })
-      }
-    ], (err) => {
-      btcConfirmLock.release()
-      if (err) {
-        // nack consumption of all original message
-        console.error(err)
-        amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
-      } else {
-        // ack consumption of all original hash messages part of this aggregation event
-        amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
-      }
-    })
+    BTC_MON_MESSAGES.push(msg)
+    btcConfirmLock.acquire()
   }
 }
 
@@ -890,6 +838,71 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
 
 // LOCK HANDLERS : btc-confirm
 registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
+  let monMessageToProcess = BTC_MON_MESSAGES.splice(0)
+  // if there are no messaes left to processes, release lock and return
+  if (monMessageToProcess.length === 0) {
+    btcConfirmLock.release()
+    return
+  }
+  async.eachSeries(monMessageToProcess, (msg, eachCallback) => {
+    let btcMonObj = JSON.parse(msg.content.toString())
+    let btctxId = btcMonObj.btctx_id
+    let btcheadHeight = btcMonObj.btchead_height
+    let btcheadRoot = btcMonObj.btchead_root
+    let proofPath = btcMonObj.path
+
+    async.waterfall([
+      // Store Merkle root of BTC block in chain
+      (wfCallback) => {
+        createBtcConfirmBlock(btcheadHeight, btcheadRoot, (err, block) => {
+          if (err) return wfCallback(err)
+          return wfCallback(null, block)
+        })
+      },
+      // queue up message containing updated proof state bound for proof state service
+      (block, wfCallback) => {
+        let stateObj = {}
+        stateObj.btctx_id = btctxId
+        stateObj.btchead_height = btcheadHeight
+        stateObj.btchead_state = {}
+        stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
+        stateObj.btchead_state.anchor = {
+          anchor_id: btcheadHeight.toString()
+        }
+
+        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
+              return wfCallback(err)
+            } else {
+              // New message has been published
+              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+              return wfCallback(null)
+            }
+          })
+      }
+    ], (err) => {
+      if (err) {
+        // nack consumption of all original message
+        console.error(err)
+        amqpChannel.nack(msg)
+        console.error(RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
+      } else {
+        // ack consumption of all original hash messages part of this aggregation event
+        amqpChannel.ack(msg)
+        console.log(RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
+      }
+      return eachCallback(null)
+    })
+  },
+    (err) => {
+      btcConfirmLock.release()
+      if (err) {
+        console.error('monitoring message processing error - ' + err)
+      }
+    })
 })
 
 // LOCK HANDLERS : eth-anchor
