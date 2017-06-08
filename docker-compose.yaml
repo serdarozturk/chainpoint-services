@@ -175,6 +175,10 @@ services:
     build:
       context: ./node-btc-tx-service
     environment:
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
       CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
     depends_on:
       - roach1
@@ -196,6 +200,11 @@ services:
     container_name: btc-mon
     build:
       context: ./node-btc-mon-service
+    environment:
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
     depends_on:
       - rabbitmq
       - influxdb
