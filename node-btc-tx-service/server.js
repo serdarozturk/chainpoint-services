@@ -21,6 +21,9 @@ const RMQ_WORK_OUT_CAL_QUEUE = process.env.RMQ_WORK_OUT_CAL_QUEUE || 'work.cal'
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
+// Global service stack Id
+const CHAINPOINT_STACK_ID = process.env.CHAINPOINT_STACK_ID || ''
+
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
@@ -51,7 +54,6 @@ const BCOIN_API_PASS = process.env.BCOIN_API_PASS
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
 var BTCRecommendedFee = null
 
-
 // CockroachDB Sequelize ORM
 let Sequelize = require('sequelize-cockroachdb')
 
@@ -71,93 +73,88 @@ let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB
 })
 
 // Define the model and the table it will be stored in.
-// See : Why don't we auto increment primary key automatically:
-//   https://www.cockroachlabs.com/docs/serial.html
-var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
+var BtcTxLog = sequelize.define(COCKROACH_TABLE_NAME,
   {
-    id: {
-      comment: 'Sequential monotonically incrementing Integer ID representing block height.',
+    txId: {
+      comment: 'The bitcoin transaction id hash.',
       primaryKey: true,
-      type: Sequelize.INTEGER,
-      validate: {
-        isInt: true
-      },
-      allowNull: false,
-      unique: true
-    },
-    time: {
-      comment: 'Block creation time in milliseconds since unix epoch',
-      type: Sequelize.INTEGER,
-      validate: {
-        isInt: true
-      },
-      allowNull: false,
-      unique: true
-    },
-    version: {
-      comment: 'Block version number, for future use.',
-      type: Sequelize.INTEGER,
-      defaultValue: function () {
-        return 1
-      },
-      validate: {
-        isInt: true
-      },
-      allowNull: false
-    },
-    type: {
-      comment: 'Block type.',
-      type: Sequelize.STRING,
-      validate: {
-        isIn: [['gen', 'cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c']]
-      },
-      allowNull: false
-    },
-    dataId: {
-      comment: 'The identifier for the data to be anchored to this block, data identifier meaning is determined by block type.',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[a-fA-F0-9:]{0,255}$', 'i']
-      },
-      field: 'data_id',
-      allowNull: false
-    },
-    dataVal: {
-      comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
         is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
-      field: 'data_val',
+      field: 'tx_id',
+      allowNull: false,
+      unique: true
+    },
+    publishDate: {
+      comment: 'Transaction publish time in milliseconds since unix epoch',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'publish_date',
+      allowNull: false,
+      unique: true
+    },
+    txSizeBytes: {
+      comment: 'Size of the transaction in bytes',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'tx_size_bytes',
       allowNull: false
     },
-    prevHash: {
-      comment: 'Block hash of previous block',
-      type: Sequelize.STRING,
+    feeBtcPerKb: {
+      comment: 'The fee expressed in BTC per kilobyte',
+      type: Sequelize.FLOAT,
       validate: {
-        is: ['^[a-f0-9]{64}$', 'i']
+        isFloat: true
       },
-      field: 'prev_hash',
-      allowNull: false,
-      unique: true
+      field: 'fee_btc_per_kb',
+      allowNull: false
     },
-    hash: {
-      comment: 'The block hash, a hex encoded SHA-256 over canonical values',
-      type: Sequelize.STRING,
+    feePaidBtc: {
+      comment: 'The fee paid for this transaction expressed in BTC',
+      type: Sequelize.FLOAT,
       validate: {
-        is: ['^[a-f0-9]{64}$', 'i']
+        isFloat: true
       },
-      allowNull: false,
-      unique: true
+      field: 'fee_paid_btc',
+      allowNull: false
     },
-    sig: {
-      comment: 'Base64 encoded signature over block hash',
+    inputAddress: {
+      comment: 'The bitcoin input address',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-zA-Z0-9=+/]{1,255}$', 'i']
+        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
       },
-      allowNull: false,
-      unique: true
+      field: 'input_address',
+      allowNull: false
+    },
+    outputAddress: {
+      comment: 'The bitcoin output address',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
+      },
+      field: 'output_address',
+      allowNull: false
+    },
+    balanceBtc: {
+      comment: 'The remaining balance for the stack\'s bitcoin wallet expressed in BTC',
+      type: Sequelize.FLOAT,
+      validate: {
+        isFloat: true
+      },
+      field: 'balance_btc',
+      allowNull: false
+    },
+    stackId: {
+      comment: 'The unique identifier for the stack in which this service runs',
+      type: Sequelize.STRING,
+      field: 'stack_id',
+      allowNull: false
     }
   },
   {
@@ -170,6 +167,29 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
     freezeTableName: true
   }
 )
+
+// The write function used write all btc tx log events
+let logBtcTxData = (txObj, callback) => {
+  let row = {}
+  row.txId = txObj.hash
+  row.publishDate = Date.parse(txObj.date)
+  row.txSizeBytes = txObj.size
+  row.feeBtcPerKb = parseFloat(txObj.rate)
+  row.feePaidBtc = parseFloat(txObj.fee)
+  row.inputAddress = txObj.inputs[0].address
+  row.outputAddress = txObj.outputs[1].address
+  row.balanceBtc = parseFloat(txObj.outputs[1].value)
+  row.stackId = CHAINPOINT_STACK_ID
+
+  BtcTxLog.create(row)
+    .then((newRow) => {
+      console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
+      return callback(null, newRow.get({ plain: true }))
+    })
+    .catch(err => {
+      return callback(`BTC log create error: ${err.message} : ${err.stack}`)
+    })
+}
 
 /**
 * Convert string into compiled bcoin TX value for a null data OP_RETURN
@@ -221,7 +241,6 @@ const genTxBody = (feeSatPerByte, hash) => {
 const sendTxToBTC = (hash, callback) => {
   let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
   console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
-  console.log(body)
 
   let options = {
     headers: [
@@ -271,8 +290,15 @@ function processIncomingAnchorJob (msg) {
         })
       },
       (body, callback) => {
+        // log the btc tx transaction
+        logBtcTxData(body, (err, newLogEntry) => {
+          if (err) return callback(err)
+          console.log(newLogEntry)
+          return callback(null, body)
+        })
+      },
+      (body, callback) => {
         // queue return message for calendar containing the new transaction information
-        console.log(body)
         // adding btc transaction id and full transaction body to original message and returning
         messageObj.btctx_id = body.hash
         messageObj.btctx_body = body.tx
@@ -353,21 +379,54 @@ function amqpOpenConnection (connectionString) {
   })
 }
 
-// Initialize amqp connection
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+// This initalizes all the consul watches and JS intervals
+function startListening () {
+  console.log('starting watches and intervals')
+  // Continuous watch on the consul key holding the fee object.
+  var watch = consul.watch({ method: consul.kv.get, options: { key: BTC_REC_FEE_KEY } })
 
-// Continuous watch on the consul key holding the fee object.
-var watch = consul.watch({ method: consul.kv.get, options: { key: BTC_REC_FEE_KEY } })
+  // Store the updated fee object on change
+  watch.on('change', function (data, res) {
+    // console.log('data:', data)
+    BTCRecommendedFee = JSON.parse(data.Value)
+    console.log(BTCRecommendedFee)
+  })
 
-// Store the updated fee object on change
-watch.on('change', function (data, res) {
-  // console.log('data:', data)
-  BTCRecommendedFee = JSON.parse(data.Value)
-  console.log(BTCRecommendedFee)
-})
+  // Oops, something is wrong with consul
+  // or the fee service key
+  watch.on('error', function (err) {
+    console.error('error:', err)
+  })
+}
 
-// Oops, something is wrong with consul
-// or the fee service key
-watch.on('error', function (err) {
-  console.error('error:', err)
-})
+/**
+ * Opens a storage connection
+ **/
+function openStorageConnection (callback) {
+  // Sync models to DB tables and trigger check
+  // if a new genesis block is needed.
+  sequelize.sync({ logging: console.log }).then(() => {
+    console.log('BtcTxLog sequelize database table synchronized')
+    return callback(null, true)
+  }).catch((err) => {
+    console.error('sequelize.sync() error: ' + err.stack)
+    setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+  })
+}
+
+function initConnectionsAndStart () {
+  // Open storage connection and then amqp connection
+  openStorageConnection((err, result) => {
+    if (err) {
+      console.error(err)
+    } else {
+      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      // Init intervals and watches
+      startListening()
+    }
+  })
+}
+
+// start the whole show here
+// first open the required connections, then allow locks for db writing
+initConnectionsAndStart()
