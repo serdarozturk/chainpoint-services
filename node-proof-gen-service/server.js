@@ -326,7 +326,7 @@ function amqpOpenConnection (connectionString) {
         if (err) return callback(err)
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
-        console.log('Connection established')
+        console.log('RabbitMQ connection established')
         chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
         chan.assertExchange(RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
         chan.prefetch(RMQ_PREFETCH_COUNT)
@@ -341,7 +341,7 @@ function amqpOpenConnection (connectionString) {
   ], (err) => {
     if (err) {
       // catch errors when attempting to establish connection
-      console.error('Cannot establish connection. Attempting in 5 seconds...')
+      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
       setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
     }
   })
