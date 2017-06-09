@@ -227,9 +227,10 @@ function generatePostHashesResponseMetadata () {
   let timestamp = new Date()
   metaDataObj.submitted_at = formatDateISO8601NoMs(timestamp)
 
+  // FIXME : Calculate these based on last anchor time and known interval?
   metaDataObj.processing_hints = {
     cal: formatDateISO8601NoMs(addMinutes(timestamp, 1)),
-    eth: formatDateISO8601NoMs(addMinutes(timestamp, 11)),
+    eth: formatDateISO8601NoMs(addMinutes(timestamp, 41)),
     btc: formatDateISO8601NoMs(addMinutes(timestamp, 61))
   }
 
