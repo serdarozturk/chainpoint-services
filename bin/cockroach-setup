@@ -22,7 +22,7 @@ do
  esac
 done
 
-if [ $DELETE = 'true' ]
+if [ "$DELETE" == 'true' ]
 then
 docker-compose stop roach3
 docker-compose stop roach2
