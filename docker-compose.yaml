@@ -1,4 +1,4 @@
-version: '3'
+version: '2'
 
 networks:
   front-end:
@@ -193,7 +193,7 @@ services:
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
-  # 
+  #
   btc-mon:
     restart: always
     image: chainpoint/node-btc-mon-service
