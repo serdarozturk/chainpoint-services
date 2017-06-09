@@ -57,6 +57,9 @@ services:
     build:
       context: ./node-api-service
     depends_on:
+      - roach1
+      - roach2
+      - roach3
       - redis
       - rabbitmq
       - influxdb

@@ -65,6 +65,23 @@ var amqpChannel = null
 // This value is set once the connection has been established
 let redis = null
 
+// CockroachDB Sequelize ORM
+let Sequelize = require('sequelize-cockroachdb')
+
+const COCKROACH_HOST = process.env.COCKROACH_HOST || 'roach1'
+const COCKROACH_PORT = process.env.COCKROACH_PORT || 26257
+const COCKROACH_DB_NAME = process.env.COCKROACH_DB_NAME || 'chainpoint'
+const COCKROACH_DB_USER = process.env.COCKROACH_DB_USER || 'chainpoint'
+const COCKROACH_DB_PASS = process.env.COCKROACH_DB_PASS || ''
+
+// Connect to CockroachDB through Sequelize.
+let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
+  dialect: 'postgres',
+  host: COCKROACH_HOST,
+  port: COCKROACH_PORT,
+  logging: false
+})
+
 /**
  * Opens a Redis connection
  *
@@ -534,16 +551,49 @@ server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
 server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, getProofsByIDV1)
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
-// AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+// Instruct REST server to begin listening for request
+function startListening () {
+  // SERVER
+  server.listen(8080, () => {
+    console.log('%s listening at %s', server.name, server.url)
+  })
+}
 
-// REDIS initialization
-openRedisConnection(REDIS_CONNECT_URI)
+/**
+ * Opens a storage connection
+ **/
+function openStorageConnection (callback) {
+  // Confirm connection to DB
+  sequelize.authenticate()
+    .then(() => {
+      console.log('Connection to database has been established successfully.')
+      return callback(null)
+    })
+    .catch(err => {
+      console.error('Unable to connect to the database:', err)
+      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+    })
+}
 
-// SERVER
-server.listen(8080, () => {
-  console.log('%s listening at %s', server.name, server.url)
-})
+function initConnectionsAndStart () {
+  // Open storage connection and then amqp connection
+  openStorageConnection((err, result) => {
+    if (err) {
+      console.error(err)
+    } else {
+      // AMQP initialization
+      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      // REDIS initialization
+      openRedisConnection(REDIS_CONNECT_URI)
+      // Init intervals and watches
+      startListening()
+    }
+  })
+}
+
+// start the whole show here
+// first open the required connections, then listen for requests
+initConnectionsAndStart()
 
 // export these functions for testing purposes
 module.exports = {
