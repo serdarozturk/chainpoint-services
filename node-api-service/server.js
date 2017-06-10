@@ -479,10 +479,10 @@ function confirmExpectedValue (anchorInfo, callback) {
   let expectedValue = anchorInfo.expected_value
   switch (anchorInfo.type) {
     case 'cal':
-      sequelize.query(`SELECT data_val FROM chainpoint_calendar_blockchain 
+      sequelize.query(`SELECT * FROM chainpoint_calendar_blockchain 
       WHERE type = 'cal' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
-        if (!results[0] || !results[0].data_val) return callback(null, false)
-        return callback(null, results[0].data_val === expectedValue)
+        if (!results[0] || !results[0].hash) return callback(null, false)
+        return callback(null, results[0].hash === expectedValue)
       }).catch((err) => {
         if (err) return callback(err)
       })
