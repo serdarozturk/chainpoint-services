@@ -259,7 +259,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, hashes Array max size exceeded')
+            .and.to.equal('invalid JSON body, hashes Array max size of 1000 exceeded')
           done()
         })
     })

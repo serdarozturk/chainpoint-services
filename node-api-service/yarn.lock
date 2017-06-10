@@ -35,9 +35,9 @@ assertion-error@^1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/assertion-error/-/assertion-error-1.0.2.tgz#13ca515d86206da0bac66e834dd397d87581094c"
 
-async@^2.3.0:
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/async/-/async-2.3.0.tgz#1013d1051047dd320fe24e494d5c66ecaf6147d9"
+async@^2.4.1:
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/async/-/async-2.4.1.tgz#62a56b279c98a11d0987096a01cc3eeb8eb7bbd7"
   dependencies:
     lodash "^4.14.0"
 
@@ -108,6 +108,14 @@ chainpoint-binary@^3.1.1:
     chainpoint-proof-json-schema "^0.0.2"
     msgpack-lite "^0.1.26"
     pako "^1.0.5"
+
+chainpoint-parse@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/chainpoint-parse/-/chainpoint-parse-1.0.1.tgz#aac383a3d42d0b4057e603498d5724529945e124"
+  dependencies:
+    chainpoint-binary "^3.1.1"
+    chainpoint-proof-json-schema "^0.0.2"
+    js-sha3 "^0.5.7"
 
 chainpoint-proof-json-schema@^0.0.2:
   version "0.0.2"
@@ -357,6 +365,10 @@ isarray@^1.0.0, isarray@~1.0.0:
 isexe@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/isexe/-/isexe-2.0.0.tgz#e8fbf374dc556ff8947a10dcb0572d633f2cfa10"
+
+js-sha3@^0.5.7:
+  version "0.5.7"
+  resolved "https://registry.yarnpkg.com/js-sha3/-/js-sha3-0.5.7.tgz#0d4ffd8002d5333aabaf4a23eed2f6374c9f28e7"
 
 jsonpointer@^4.0.0:
   version "4.0.1"
