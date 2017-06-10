@@ -25,7 +25,7 @@ const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.api'
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // Lifespan of stored proofs, in minutes
-const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
+const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60 * 24
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
