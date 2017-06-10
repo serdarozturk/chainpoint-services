@@ -227,7 +227,6 @@ let monitorTransactions = () => {
   let btcTxIdsToMonitor = BTCTXIDS.splice(0)
   console.log(`Btc Tx montoring process starting for ${btcTxIdsToMonitor.length} transaction(s)`)
   async.eachSeries(btcTxIdsToMonitor, (btcTxIdObj, eachCallback) => {
-    console.log(`Checking btc tx id = ${btcTxIdObj.tx_id} started`)
     async.waterfall([
       (wfCallback) => {
         // get tx information
@@ -276,7 +275,7 @@ let monitorTransactions = () => {
         let rootValueBuffer = merkleTools.getMerkleRoot()
         // re-adjust for endieness, reverse and convert back to hex
         let rootValueHex = rootValueBuffer.reverse().toString('hex')
-        if (rootValueHex !== blockRoot) return wfCallback('calculated merkle root does not match block merkle root')
+        if (rootValueHex !== blockRoot) return wfCallback(btcTxIdObj.tx_id + 'calculated merkle root does not match block merkle root')
         // get proof path from tx to block root
         let proofPath = merkleTools.getProof(txIndex)
         // send data back to calendar
@@ -304,6 +303,7 @@ let monitorTransactions = () => {
         console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
       } else {
         // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
+        amqpChannel.ack(btcTxIdObj.msg)
         console.log(btcTxIdObj.tx_id + ' confirmed and processed')
         console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
