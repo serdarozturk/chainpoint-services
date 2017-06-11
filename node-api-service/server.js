@@ -797,6 +797,7 @@ function openStorageConnection (callback) {
 }
 
 function initConnectionsAndStart () {
+  if (process.env.NODE_ENV === 'test') return
   // Open storage connection and then amqp connection
   openStorageConnection((err, result) => {
     if (err) {
