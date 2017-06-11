@@ -1,5 +1,7 @@
 /* global describe, it */
 
+process.env.NODE_ENV = 'test'
+
 // test related packages
 var expect = require('chai').expect
 var request = require('supertest')
