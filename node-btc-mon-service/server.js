@@ -139,7 +139,7 @@ const getBTCTxById = (id, callback) => {
   }
   request(options, function (err, response, body) {
     if (err || response.statusCode !== 200) {
-      if (!err) err = `GET failed with status code ${response.statusCode}`
+      if (!err) err = `getBTCTxById : GET failed with status code ${response.statusCode}`
       return callback(err)
     }
     return callback(null, body)
@@ -169,7 +169,7 @@ const getChainState = (callback) => {
   }
   request(options, function (err, response, body) {
     if (err || response.statusCode !== 200) {
-      if (!err) err = `GET failed with status code ${response.statusCode}`
+      if (!err) err = `getChainState : GET failed with status code ${response.statusCode}`
       return callback(err)
     }
     return callback(null, body)
@@ -205,7 +205,7 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
   }
   request(options, function (err, response, body) {
     if (err || response.statusCode !== 200) {
-      if (!err || !body.tx) err = `GET failed with status code ${response.statusCode}`
+      if (!err || !body.tx) err = `getBlockInfoForBlockHash : GET failed with status code ${response.statusCode}`
       return callback(err)
     }
     return callback(null, body)
