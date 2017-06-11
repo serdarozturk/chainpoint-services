@@ -36,7 +36,7 @@ const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.splitter'
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // The lifespan of stored proofs, in minutes
-const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60
+const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60 * 24
 
 // The maximum number of proofs that can be requested in one GET /proofs request
 const GET_PROOFS_MAX_REST = process.env.GET_PROOFS_MAX_REST || 250
@@ -494,6 +494,7 @@ function confirmExpectedValue (anchorInfo, callback) {
     case 'btc':
       sequelize.query(`SELECT data_val FROM chainpoint_calendar_blockchain 
       WHERE type = 'btc-c' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
+        console.log(results)
         if (!results[0] || !results[0].data_val) return callback(null, false)
         let blockRoot = results[0].data_val.match(/.{2}/g).reverse().join('')
         return callback(null, blockRoot === expectedValue)
