@@ -493,7 +493,7 @@ function confirmExpectedValue (anchorInfo, callback) {
       break
     case 'btc':
       sequelize.query(`SELECT data_val FROM chainpoint_calendar_blockchain 
-      WHERE type = 'btc' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
+      WHERE type = 'btc-c' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
         if (!results[0] || !results[0].data_val) return callback(null, false)
         let blockRoot = results[0].data_val.match(/.{2}/g).reverse().join('')
         return callback(null, blockRoot === expectedValue)
