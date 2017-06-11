@@ -360,7 +360,7 @@ function postHashesV1 (req, res, next) {
 /**
  * GET /proofs/:hash_id handler
  *
- * Expects a query string 'hash_id' in the form of a Version 1 UUID
+ * Expects a path parameter 'hash_id' in the form of a Version 1 UUID
  *
  * Returns a chainpoint proof for the requested Hash ID
  */
@@ -759,9 +759,16 @@ server.use(restify.bodyParser({
 }))
 
 // API RESOURCES
+
+// submit hash(es)
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
+// get a single proof with a single hash_id
 server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, getProofsByIDV1)
+// get multiple proofs with 'hashids' header param
+server.get({ path: '/proofs', version: '1.0.0' }, getProofsByIDV1)
+// verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, postProofsForVerificationV1)
+// teapot
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
 // Instruct REST server to begin listening for request
