@@ -407,7 +407,7 @@ function getProofsByIDV1 (req, res, next) {
     let uuidDiff = nowEpoch - uuidEpoch
     let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
     if (uuidDiff > maxDiff) return callback(null)
-    // retrieve proof fromn storage
+    // retrieve proof from storage
     redis.get(hashIdResult.hash_id, (err, proofBase64) => {
       if (err) return callback(null)
       if (requestedType === BASE64_MIME_TYPE) {
