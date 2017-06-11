@@ -54,6 +54,9 @@ const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
 // This is used to associate API Service instances with websocket connections
 const APIServiceInstanceId = uuidv1()
 
+// Mox body size in bytes for incoming requests
+const MAX_BODY_SIZE = process.env.MAX_BODY_SIZE || 131072
+
 // The maximum number of hashes allowed to be submitted in one request
 const POST_HASHES_MAX = process.env.POST_HASHES_MAX || 1000
 
@@ -382,6 +385,7 @@ function getProofsByIDV1 (req, res, next) {
   if (hashIdResults.length === 0) {
     return next(new restify.InvalidArgumentError('invalid request, at least one hash id required'))
   }
+
   // ensure that the request count does not exceed the maximum setting
   if (hashIdResults.length > GET_PROOFS_MAX_REST) {
     return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + GET_PROOFS_MAX_REST + ' max)'))
@@ -623,33 +627,6 @@ function rootV1 (req, res, next) {
   return next(new restify.ImATeapotError('This is an API endpoint. Please consult https://chainpoint.org'))
 }
 
-// RESTIFY
-var server = restify.createServer({
-  name: 'chainpoint'
-})
-
-// Create a WS server to run in association with the Restify server
-var webSocketServer = new webSocket.Server({ server: server.server })
-// Handle new web socket connections
-webSocketServer.on('connection', (ws) => {
-  // set up ping to keep connection open over long periods of inactivity
-  let pingInterval = setInterval(() => { ws.ping('ping') }, 1000 * 45)
-  // retrieve the unique identifier for this connection
-  let wsConnectionId = ws.upgradeReq.headers['sec-websocket-key']
-  // save this connection to the open connection registry
-  WebSocketConnections[wsConnectionId] = ws
-  // when a message is received, process it as a subscription request
-  ws.on('message', (hashIds) => subscribeForProofs(ws, wsConnectionId, hashIds))
-  // when a connection closes, remove it from the open connection registry
-  ws.on('close', () => {
-    // remove this connection from the open connections object
-    delete WebSocketConnections[wsConnectionId]
-    // remove ping interval
-    clearInterval(pingInterval)
-  })
-  ws.on('error', (e) => console.error(e))
-})
-
 function subscribeForProofs (ws, wsConnectionId, hashIds) {
   // build an array of hash_ids, ignoring any hash_ids above the GET_PROOFS_MAX_WS limit
   let hashIdResults = hashIds.split(',').slice(0, GET_PROOFS_MAX_WS).map((hashId) => {
@@ -717,6 +694,43 @@ function createProofSubscription (APIServiceInstanceId, wsConnectionId, hashId, 
     })
 }
 
+// RESTIFY SETUP
+// 'version' : all routes will default to this version
+var server = restify.createServer({
+  name: 'chainpoint',
+  version: '1.0.0'
+})
+
+// Create a WS server to run in association with the Restify server
+var webSocketServer = new webSocket.Server({ server: server.server })
+// Handle new web socket connections
+webSocketServer.on('connection', (ws) => {
+  // set up ping to keep connection open over long periods of inactivity
+  let pingInterval = setInterval(() => { ws.ping('ping') }, 1000 * 45)
+  // retrieve the unique identifier for this connection
+  let wsConnectionId = ws.upgradeReq.headers['sec-websocket-key']
+  // save this connection to the open connection registry
+  WebSocketConnections[wsConnectionId] = ws
+  // when a message is received, process it as a subscription request
+  ws.on('message', (hashIds) => subscribeForProofs(ws, wsConnectionId, hashIds))
+  // when a connection closes, remove it from the open connection registry
+  ws.on('close', () => {
+    // remove this connection from the open connections object
+    delete WebSocketConnections[wsConnectionId]
+    // remove ping interval
+    clearInterval(pingInterval)
+  })
+  ws.on('error', (e) => console.error(e))
+})
+
+// Clean up sloppy paths like //todo//////1//
+server.pre(restify.pre.sanitizePath())
+
+// Checks whether the user agent is curl. If it is, it sets the
+// Connection header to "close" and removes the "Content-Length" header
+// See : http://restify.com/#server-api
+server.pre(restify.pre.userAgentConnection())
+
 // CORS
 // See : https://github.com/TabDigital/restify-cors-middleware
 // See : https://github.com/restify/node-restify/issues/1151#issuecomment-271402858
@@ -738,8 +752,11 @@ var cors = corsMiddleware({
 server.pre(cors.preflight)
 server.use(cors.actual)
 
+server.use(restify.gzipResponse())
 server.use(restify.queryParser())
-server.use(restify.bodyParser())
+server.use(restify.bodyParser({
+  maxBodySize: MAX_BODY_SIZE
+}))
 
 // API RESOURCES
 server.post({ path: '/hashes', version: '1.0.0' }, postHashesV1)
