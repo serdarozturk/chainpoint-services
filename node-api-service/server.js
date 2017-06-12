@@ -8,7 +8,10 @@ const uuidTime = require('uuid-time')
 const webSocket = require('ws')
 const chpBinary = require('chainpoint-binary')
 const chpParse = require('chainpoint-parse')
-const calendarBlock = require('./lib/models/CalendarBlock.js')
+
+// When running tests locally, the model isnt copied over, load the model from the node-lib project instead
+let calendarBlockModelPath = process.env.NODE_ENV === 'test' ? '../node-lib/lib/models/CalendarBlock.js' : './lib/models/CalendarBlock.js'
+const calendarBlock = require(calendarBlockModelPath)
 
 require('dotenv').config()
 
