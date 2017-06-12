@@ -335,6 +335,167 @@ describe('Hashes Controller', () => {
   })
 })
 
+describe('Calendar Controller', () => {
+  describe('GET /calendar/height', () => {
+    it('should return proper error with bad height', (done) => {
+      request(server)
+        .get('/calendar/badheight')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, height must be an integer')
+          done()
+        })
+    })
+  })
+
+  describe('GET /calendar/height/data', () => {
+    it('should return proper error with bad height', (done) => {
+      request(server)
+        .get('/calendar/badheight/data')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, height must be an integer')
+          done()
+        })
+    })
+  })
+
+  describe('GET /calendar/height/hash', () => {
+    it('should return proper error with bad height', (done) => {
+      request(server)
+        .get('/calendar/badheight/hash')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid request, height must be an integer')
+          done()
+        })
+    })
+  })
+})
+
+describe('Verify Controller', () => {
+  describe('POST /verify', () => {
+    it('should return proper error with invalid content type', (done) => {
+      request(server)
+        .post('/verify')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid content type')
+          done()
+        })
+    })
+  })
+
+  it('should return proper error with missing proofs', (done) => {
+    request(server)
+      .post('/verify')
+      .send({ name: 'Manny' })
+      .expect('Content-type', /json/)
+      .expect(409)
+      .end((err, res) => {
+        expect(err).to.equal(null)
+        expect(res.body).to.have.property('code')
+          .and.to.be.a('string')
+          .and.to.equal('InvalidArgument')
+        expect(res.body).to.have.property('message')
+          .and.to.be.a('string')
+          .and.to.equal('invalid JSON body, missing proofs')
+        done()
+      })
+  })
+
+  it('should return proper error with bad proofs array', (done) => {
+    request(server)
+      .post('/verify')
+      .send({ proofs: 'Manny' })
+      .expect('Content-type', /json/)
+      .expect(409)
+      .end((err, res) => {
+        expect(err).to.equal(null)
+        expect(res.body).to.have.property('code')
+          .and.to.be.a('string')
+          .and.to.equal('InvalidArgument')
+        expect(res.body).to.have.property('message')
+          .and.to.be.a('string')
+          .and.to.equal('invalid JSON body, proofs is not an Array')
+        done()
+      })
+  })
+
+  it('should return proper error with empty proofs array', (done) => {
+    request(server)
+      .post('/verify')
+      .send({ proofs: [] })
+      .expect('Content-type', /json/)
+      .expect(409)
+      .end((err, res) => {
+        expect(err).to.equal(null)
+        expect(res.body).to.have.property('code')
+          .and.to.be.a('string')
+          .and.to.equal('InvalidArgument')
+        expect(res.body).to.have.property('message')
+          .and.to.be.a('string')
+          .and.to.equal('invalid JSON body, proofs Array is empty')
+        done()
+      })
+  })
+
+  it('should return proper error with too many proofs', (done) => {
+    let proofs = []
+    for (let x = 0; x < 1100; x++) {
+      proofs.push('proof')
+    }
+
+    request(server)
+      .post('/verify')
+      .send({ proofs: proofs })
+      .expect('Content-type', /json/)
+      .expect(409)
+      .end((err, res) => {
+        expect(err).to.equal(null)
+        expect(res.body).to.have.property('code')
+          .and.to.be.a('string')
+          .and.to.equal('InvalidArgument')
+        expect(res.body).to.have.property('message')
+          .and.to.be.a('string')
+          .and.to.equal('invalid JSON body, proofs Array max size of 1000 exceeded')
+        done()
+      })
+  })
+})
+
 describe('Functions', () => {
   describe('calling generatePostHashesResponse with one hash', () => {
     it('should return proper repsonse object', (done) => {
