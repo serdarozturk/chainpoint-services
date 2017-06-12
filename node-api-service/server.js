@@ -8,6 +8,7 @@ const uuidTime = require('uuid-time')
 const webSocket = require('ws')
 const chpBinary = require('chainpoint-binary')
 const chpParse = require('chainpoint-parse')
+const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 require('dotenv').config()
 
@@ -75,22 +76,9 @@ var amqpChannel = null
 // This value is set once the connection has been established
 let redis = null
 
-// CockroachDB Sequelize ORM
-let Sequelize = require('sequelize-cockroachdb')
-
-const COCKROACH_HOST = process.env.COCKROACH_HOST || 'roach1'
-const COCKROACH_PORT = process.env.COCKROACH_PORT || 26257
-const COCKROACH_DB_NAME = process.env.COCKROACH_DB_NAME || 'chainpoint'
-const COCKROACH_DB_USER = process.env.COCKROACH_DB_USER || 'chainpoint'
-const COCKROACH_DB_PASS = process.env.COCKROACH_DB_PASS || ''
-
-// Connect to CockroachDB through Sequelize.
-let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
-  dialect: 'postgres',
-  host: COCKROACH_HOST,
-  port: COCKROACH_PORT,
-  logging: false
-})
+// pull in variables defined in shared CalendarBlock module
+let sequelize = calendarBlock.sequelize
+let CalendarBlock = calendarBlock.CalendarBlock
 
 /**
  * Opens a Redis connection
@@ -483,23 +471,27 @@ function confirmExpectedValue (anchorInfo, callback) {
   let expectedValue = anchorInfo.expected_value
   switch (anchorInfo.type) {
     case 'cal':
-      sequelize.query(`SELECT * FROM chainpoint_calendar_blockchain 
-      WHERE type = 'cal' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
-        if (!results[0] || !results[0].hash) return callback(null, false)
-        return callback(null, results[0].hash === expectedValue)
+      CalendarBlock.findOne({ where: { type: 'cal', data_id: anchorId }, attributes: ['hash'] }).then(block => {
+        if (block) {
+          return callback(null, block.hash === expectedValue)
+        } else {
+          return callback(null, false)
+        }
       }).catch((err) => {
-        if (err) return callback(err)
+        return callback(err)
       })
       break
     case 'btc':
-      sequelize.query(`SELECT data_val FROM chainpoint_calendar_blockchain 
-      WHERE type = 'btc-c' AND data_id = '${anchorId}'`, { type: sequelize.QueryTypes.SELECT }).then((results) => {
-        console.log(results)
-        if (!results[0] || !results[0].data_val) return callback(null, false)
-        let blockRoot = results[0].data_val.match(/.{2}/g).reverse().join('')
-        return callback(null, blockRoot === expectedValue)
+      CalendarBlock.findOne({ where: { type: 'btc-c', dataId: anchorId }, attributes: ['dataVal'] }).then(block => {
+        if (block) {
+          console.log(JSON.stringify(block))
+          let blockRoot = block.dataVal.match(/.{2}/g).reverse().join('')
+          return callback(null, blockRoot === expectedValue)
+        } else {
+          return callback(null, false)
+        }
       }).catch((err) => {
-        if (err) return callback(err)
+        return callback(err)
       })
       break
     case 'eth':
