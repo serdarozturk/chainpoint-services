@@ -45,8 +45,7 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 
 // URLs for calendar stacks to use in proofs
 const CHAINPOINT_CALENDAR_URLS = [
-  'http://a.cal.chainpoint.org',
-  'http://b.cal.chainpoint.org'
+  'http://a.cal.chainpoint.org'
 ]
 
 // The consul key to watch to receive updated NIST object
@@ -400,7 +399,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
 
         // Build the anchors uris using the locations configured in CHAINPOINT_CALENDAR_URLS
         let uris = []
-        for (let x = 0; x < CHAINPOINT_CALENDAR_URLS.length; x++) uris.push(`${CHAINPOINT_CALENDAR_URLS[x]}/${block.id}/root`)
+        for (let x = 0; x < CHAINPOINT_CALENDAR_URLS.length; x++) uris.push(`${CHAINPOINT_CALENDAR_URLS[x]}/calendar/${block.id}/hash`)
         stateObj.cal_state.anchor = {
           anchor_id: block.id,
           uris: uris
@@ -752,8 +751,13 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
         stateObj.btchead_height = btcheadHeight
         stateObj.btchead_state = {}
         stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
+
+        // Build the anchors uris using the locations configured in CHAINPOINT_CALENDAR_URLS
+        let uris = []
+        for (let x = 0; x < CHAINPOINT_CALENDAR_URLS.length; x++) uris.push(`${CHAINPOINT_CALENDAR_URLS[x]}/calendar/${block.id}/data`)
         stateObj.btchead_state.anchor = {
-          anchor_id: btcheadHeight.toString()
+          anchor_id: btcheadHeight.toString(),
+          uris: uris
         }
 
         amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },

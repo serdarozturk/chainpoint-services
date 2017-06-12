@@ -192,8 +192,7 @@ sample output (prettified with [jq](https://stedolan.github.io/jq/)):
                   "type": "cal",
                   "anchor_id": "3",
                   "uris": [
-                    "http://a.cal.chainpoint.org/3/root",
-                    "http://b.cal.chainpoint.org/3/root"
+                    "http://a.cal.chainpoint.org/3/hash"
                   ]
                 }
               ]

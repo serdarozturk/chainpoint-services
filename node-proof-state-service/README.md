@@ -109,8 +109,7 @@ The following is an example of state data published in a calendar message:
     "anchor": {
       "anchor_id" : "1027",
       "uris": [
-        "http://a.cal.chainpoint.org/1027/root",
-        "http://b.cal.chainpoint.org/1027/root"
+        "http://a.cal.chainpoint.org/1027/hash"
       ]
     }
   }
@@ -243,8 +242,7 @@ The following is an example of a proof generation message sent to the proof gen 
     "anchor": {
       "anchor_id" : "1027",
       "uris": [
-        "http://a.cal.chainpoint.org/1027/root",
-        "http://b.cal.chainpoint.org/1027/root"
+        "http://a.cal.chainpoint.org/1027/hash"
       ]
     }
   }
