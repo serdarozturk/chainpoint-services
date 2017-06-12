@@ -612,6 +612,93 @@ function flattenExpectedValues (branchArray) {
 }
 
 /**
+ * GET /calendar/:height handler
+ *
+ * Expects a path parameter 'height' as an integer
+ *
+ * Returns a calendar block by calendar height
+ */
+function getCalBlockByHeightV1 (req, res, next) {
+  let height = parseInt(req.params.height, 10)
+
+  // ensure that :height is an integer
+  if (!_.isInteger(height)) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  }
+
+  CalendarBlock.findOne({ where: { id: height } }).then(block => {
+    if (block) {
+      res.contentType = 'application/json'
+      res.send(block)
+      return next()
+    } else {
+      return next(new restify.NotFoundError())
+    }
+  }).catch((err) => {
+    console.error(err)
+    return next(new restify.InternalError(err))
+  })
+}
+
+/**
+ * GET /calendar/:height/data handler
+ *
+ * Expects a path parameter 'height' as an integer
+ *
+ * Returns dataVal item for calendar block by calendar height
+ */
+function getCalBlockDataByHeightV1 (req, res, next) {
+  let height = parseInt(req.params.height, 10)
+
+  // ensure that :height is an integer
+  if (!_.isInteger(height)) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  }
+
+  CalendarBlock.findOne({ where: { id: height }, attributes: ['dataVal'] }).then(result => {
+    if (result) {
+      res.contentType = 'text/plain'
+      res.send(result.dataVal)
+      return next()
+    } else {
+      return next(new restify.NotFoundError())
+    }
+  }).catch((err) => {
+    console.error(err)
+    return next(new restify.InternalError(err))
+  })
+}
+
+/**
+ * GET /calendar/:height/data handler
+ *
+ * Expects a path parameter 'height' as an integer
+ *
+ * Returns dataVal item for calendar block by calendar height
+ */
+function getCalBlockHashByHeightV1 (req, res, next) {
+  let height = parseInt(req.params.height, 10)
+
+  // ensure that :height is an integer
+  if (!_.isInteger(height)) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  }
+
+  CalendarBlock.findOne({ where: { id: height }, attributes: ['hash'] }).then(result => {
+    if (result) {
+      res.contentType = 'text/plain'
+      res.send(result.hash)
+      return next()
+    } else {
+      return next(new restify.NotFoundError())
+    }
+  }).catch((err) => {
+    console.error(err)
+    return next(new restify.InternalError(err))
+  })
+}
+
+/**
  * GET / handler
  *
  * Root path handler with default message.
@@ -762,6 +849,12 @@ server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, getProofsByIDV1)
 server.get({ path: '/proofs', version: '1.0.0' }, getProofsByIDV1)
 // verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, postProofsForVerificationV1)
+// get the block hash for the calendar at the specified hieght
+server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, getCalBlockHashByHeightV1)
+// get the dataVal item for the calendar at the specified hieght
+server.get({ path: '/calendar/:height/data', version: '1.0.0' }, getCalBlockDataByHeightV1)
+// get the block object for the calendar at the specified hieght
+server.get({ path: '/calendar/:height', version: '1.0.0' }, getCalBlockByHeightV1)
 // teapot
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
