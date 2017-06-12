@@ -1,33 +1,47 @@
 # chainpoint-services
 
 Chainpoint Services is a modern
-[microservices architecture](https://martinfowler.com/articles/microservices.html) that implements the backend for the [chainpoint.org](https://chainpoint.org) proof engine.
+[microservices architecture](https://martinfowler.com/articles/microservices.html)
+that implements the [chainpoint.org](https://chainpoint.org) API.
 
 The services provided are generally composed of Node.js applications
 running within Alpine Linux Docker containers. These containers,
 while intended to be run within a full Docker orchestration
 system such as Kubernetes in production, run well on a single host
-using [Docker Compose](https://docs.docker.com/compose/overview/). This run method is suitable for light production
-use or while in development.
+using [Docker Compose](https://docs.docker.com/compose/overview/).
+This run method is suitable for light production use and development.
 
-## Setup
+## TL;DR
+
+Build and start the whole system locally. After the first run of `make` try `make help`
+to see additional helper commands available. Shut it all down with `make down`.
+
+```
+git clone https://github.com/chainpoint/chainpoint-services
+cd chainpoint-services
+make
+```
+
+## Getting Started
 
 This repository contains all of the code needed to
-run the application stack locally.
+run the full application stack locally.
 
-To do so you'll only need a functional Docker environment.
+To do so you'll only need a functional Docker environment with the `docker`
+and `docker-compose` commands available. In addition you'll need the `make`
+utility.
 
 On `macOS` the easiest way to install Docker is from the official
-installation package which can be found [here](https://www.docker.com/docker-mac). When running
-this will provide you with the `docker` and `docker-compose` commands that you'll need.
+installation package which can be found [here](https://www.docker.com/docker-mac).
 
-On Linux systems you may need to [install](https://docs.docker.com/compose/install/) `docker-compose` separately.
+On Linux systems you may need to [install](https://docs.docker.com/compose/install/) `docker-compose`
+separately in addition to Docker.
 
 ### Setup PATH
 
-For your convenience we provide most of the dependencies you need as shell script wrappers
-that let you use containerized applications with
-no need to install them locally.
+For your convenience we provide most of the other dependencies you might need
+as shell script wrappers that let you use containerized applications
+with no need to install them locally.
 
 These wrappers are provided in the `./bin` directory.
 
@@ -37,10 +51,10 @@ You can execute them by calling them directly:
 ./bin/yarn -h
 ```
 
-Or by adding the `./bin` directory to the
-beginning of your `$PATH` environment variable.
-This will ensure that these packaged commands, locked to the same versions we develop with,
-will be used by you as well.
+Or by adding the `./bin` directory to the beginning of your `$PATH`
+environment variable. This will ensure that these packaged commands,
+which will be locked to the same versions we developed with, will
+be available to you as well.
 
 ```
 export PATH="$PWD/bin:$PATH"
@@ -54,72 +68,26 @@ If you do add that directory to your path any
 references to `./bin/COMMAND` that you see below
 can be shorted to just the command name.
 
-### Build Base Image
-
-In dev build the base image first. `docker-compose`, even with
-the `--build` flag won't do this build step for you.
-
-```
-cd node-base && docker build -t chainpoint/node-base:latest --no-cache=true .
-```
-
-### Build Shared Lib Image
-
-In dev build the shared lib image. `docker-compose`, even with
-the `--build` flag won't do this build step for you.
-
-```
-cd node-lib && docker build -t chainpoint/node-lib:latest --no-cache=true .
-```
-
 ### Setup Environment Variables
 
-Modify the `.env` file in the root of this repository to
-provide `docker-compose` with the environment variables it
-needs to get started.
+Running `make` the first time will copy `.env.sample` to `.env`. This file will be used by `docker-compose` to set required environment variables.
 
-### Setup CockroachDB
+You can modify the `.env` as needed, any changes will be ignored by Git.
 
-Run the following script to start a local dev CockroachDB cluster
-and initialize it. This generally only needs to be done once unless
-you remove the `./data/roach*` data directories.
+## Startup
 
-```
-./bin/cockroach-setup
-```
+Running `make` should build and start all services for you.
 
-## Service Startup & Shutdown
+## Examples
 
-Startup all services daemonized and build all remaining service images as needed:
-
-```
-docker-compose up -d --build
-```
-
-Shutdown:
-
-```
-docker-compose down
-```
-
-View Logs:
-
-```
-docker-compose logs [servicename]
-```
-
-View Running Services:
-
-```
-docker-compose ps
-```
-
-## Testing
+The following examples use `curl` to submit requests.
 
 ### Submit a Hash
 
+Once the environment is running you can start submitting hashes to be anchored.
+
 ```
-curl -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1/hashes
+curl -s -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1/hashes
 ```
 
 sample output (prettified with [jq](https://stedolan.github.io/jq/)):
@@ -143,10 +111,31 @@ sample output (prettified with [jq](https://stedolan.github.io/jq/)):
 }
 ```
 
-### Retrieve a Proof for a Hash ID
+### Retrieve a Base64 encoded Binary Proof for a Hash ID
+
+Proofs can be retrieved in the supported
+[Chainpoint binary](https://github.com/chainpoint/chainpoint-binary) format by passing
+an appropriate `Accept` header with your request.
 
 ```
-curl 127.0.0.1/proofs/cb1980c0-4d53-11e7-88fb-870abcce3652
+curl -s -H 'Accept: application/vnd.chainpoint.api.v1.base64+json' 127.0.0.1/proofs/cb1980c0-4d53-11e7-88fb-870abcce3652
+```
+
+sample output (prettified with [jq](https://stedolan.github.io/jq/)):
+
+```
+[
+  {
+    "hash_id": "358d14f0-4e2e-11e7-87be-37208b69c348",
+    "proof": "eJyNUruO1EAQ/BkIvZ7unqejlfgFIpLVPHqwpWVt2T4e4YJEQnREpMct2oPsJFL4j/0bxnunQxAg0prqruqaen+zjv1u5tfzz3aeh6mp61fUpVU/Pq9j67vd0He7uX5Jh/nNwN+ePECH1k/taR1CRp05aiCfExiTvMiSlJAoLCTNClOImbWPFCx5ReyJkVyZMirI47Jm06XTI1I2gcyikoxcAbCprAlckSmbgnaRpL09s6eL8KKbZ04bP39HAaYSugLxFLGR1CA9uwmj38WWp8u3X7Y+8PY2+u1mgfpxc/d23Q/Tp/3V9v9095/74Ti1vkKll6EPIJ0BkgpFkzPoxGicDtqqoKRIiWxSSRPGgFEKg+AzOy1jEp6cR19Sk6SlxTJmSzYW2QrwwumEZQtlxSpFJXKOYIMDQTpQSpmVI0ghg0Qgo1RO6m9vP4o12dz708Ipogaacv+Cyf3VeFpnH3S5OIrolHDlesHSWoxkyj8Za0xBjXVBowflRHEEwaOUicEb1n8qHu9inS7fnRtyXZS+3ifdpcOiebgYu+nj6fHSr1IvvyqU1e9unau28Oqx7+cHWvgn7RdSPeSX"
+  }
+]
+```
+
+### Retrieve a JSON-LD Proof for a Hash ID
+
+```
+curl -s 127.0.0.1/proofs/cb1980c0-4d53-11e7-88fb-870abcce3652
 ```
 
 sample output (prettified with [jq](https://stedolan.github.io/jq/)):
@@ -205,39 +194,67 @@ sample output (prettified with [jq](https://stedolan.github.io/jq/)):
 ]
 ```
 
-### Simple Load Test
-
-To get a sense of the load this service can handle use
-the [hey](https://github.com/rakyll/hey) load testing tool
-to send hashes to your local running instance. You don't even
-need to install it, we provide it via Docker for your
-convenience.
-
-Sending Hashes:
+### Verify a Proof
 
 ```
-./bin/hey -m POST -H "Content-Type: application/json" -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' -T 'application/json' -n 1000 -c 25 http://127.0.0.1/hashes
+curl -X POST \
+  http://104.198.1.217/verify \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/json' \
+  -d '{
+    "proofs": [
+        {
+            "@context": "https://w3id.org/chainpoint/v3",
+            "type": "Chainpoint",
+            "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4",
+            "hash_id": "69b06800-4e23-11e7-87be-37208b69c348",
+            "hash_submitted_at": "2017-06-10T21:26:06Z",
+            "branches": [{
+                "label": "cal_anchor_branch",
+                "ops": [{
+                    "l": "69b06800-4e23-11e7-87be-37208b69c348"
+                }, {
+                    "op": "sha-256"
+                }, {
+                    "l": "1497129900:58a0e3c8b0411b2b394a72633621d8fe232be71fd80513007f8cfd48db1da3025496ac6497c191598d0a1af3254d90e90e7e000a8df73319e04f0e538c834a53"
+                }, {
+                    "op": "sha-256"
+                }, {
+                    "l": "1408:1497129967524:1:cal:1408"
+                }, {
+                    "r": "aa9ab1c2d4a794f00594ce61ef208abfabf6e1dbb181692241b8679d3700bea7"
+                }, {
+                    "op": "sha-256"
+                }, {
+                    "anchors": [{
+                        "type": "cal",
+                        "anchor_id": "1408",
+                        "uris": ["http://a.cal.chainpoint.org/1408/root", "http://b.cal.chainpoint.org/1408/root"]
+                    }]
+                }]
+            }]
+        }
+    ]
+}'
 ```
 
-Retrieving Proofs:
+sample output (prettified with [jq](https://stedolan.github.io/jq/)):
 
 ```
-./bin/hey -n 1000 -c 25 http://127.0.0.1/proofs/cb1980c0-4d53-11e7-88fb-870abcce3652
-```
-
-
-### Cleanup
-
-```
-# shutdown all services
-docker-compose down
-
-# remove all service data volumes
-rm -rf ./data/*
-
-# caution: remove *all* docker artifacts
-docker container prune -f
-docker image prune -f
-docker volume prune -f
-docker network prune -f
+[
+    {
+        "proof_index": 0,
+        "hash_id": "69b06800-4e23-11e7-87be-37208b69c348",
+        "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4",
+        "hash_submitted_at": "2017-06-10T21:26:06Z",
+        "anchors": [
+            {
+                "branch": "cal_anchor_branch",
+                "type": "cal",
+                "valid": true
+            }
+        ],
+        "status": "verified"
+    }
+]
 ```
