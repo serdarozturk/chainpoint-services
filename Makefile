@@ -29,19 +29,6 @@ cockroachdb-setup:
 bootstrap-node-modules:
 	./bin/yarn
 
-# create symbolic links to shared lib dir for convenience when testing
-create-lib-links:
-	@ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-aggregator-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-api-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-fee-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-mon-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-tx-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-calendar-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-nist-beacon-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-proof-gen-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-proof-state-service"; \
-	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-splitter-service"
-
 # copy the .env config from sample if not present
 build-config:
 	@[ ! -f ./.env ] && \
@@ -77,6 +64,16 @@ build-api: build-lib
 	@cd node-api-service; \
 	docker build -t chainpoint/node-api-service:$(VERSION) --no-cache=$(NO_CACHE) . \
 	&& docker tag chainpoint/node-api-service:$(VERSION) chainpoint/node-api-service:latest
+
+# build API test runner
+build-api-test: build-lib build-api
+	@cd node-api-service; \
+	docker build -t chainpoint/node-api-service-test:$(VERSION) -f Dockerfile.test --no-cache=$(NO_CACHE) . \
+	&& docker tag chainpoint/node-api-service-test:$(VERSION) chainpoint/node-api-service-test:latest
+
+# run API test suite with Mocha
+run-api-test: build-api build-api-test
+	docker run --rm chainpoint/node-api-service-test
 
 # build btc-fee
 build-btc-fee: build-lib
@@ -143,7 +140,7 @@ build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-
 	docker-compose build
 
 # build all and start
-up: bootstrap-node-modules create-lib-links build cockroachdb-setup
+up: bootstrap-node-modules build cockroachdb-setup
 	docker-compose up -d --build
 
 # shutdown
@@ -177,4 +174,4 @@ hey:
 	-c 25 \
 	http://127.0.0.1/hashes
 
-.PHONY: all cockroachdb-reset cockroachdb-setup bootstrap-node-modules create-lib-links build-config build-base build-lib build up down clean prune phoenix hey
+.PHONY: all cockroachdb-reset cockroachdb-setup bootstrap-node-modules run-api-test build-config build-base build-lib build up down clean prune phoenix hey
