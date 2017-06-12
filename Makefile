@@ -1,10 +1,14 @@
-ifneq ($(wildcard ./node_modules),)
-  include ./node_modules/makefile-help/Makefile
-endif
+# Get the location of this makefile.
+ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 REQUIRED_BINS := docker docker-compose
 $(foreach bin,$(REQUIRED_BINS),\
     $(if $(shell command -v $(bin) 2> /dev/null),$(info Found `$(bin)`),$(error Please install `$(bin)`)))
+
+# makefile-help
+ifneq ($(wildcard ./node_modules),)
+  include ./node_modules/makefile-help/Makefile
+endif
 
 # a SemVer version tag to apply to all built docker images
 VERSION ?= "v0.0.1"
@@ -24,6 +28,19 @@ cockroachdb-setup:
 # install top level npm packages
 bootstrap-node-modules:
 	./bin/yarn
+
+# create symbolic links to shared lib dir for convenience when testing
+create-lib-links:
+	@ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-aggregator-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-api-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-fee-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-mon-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-btc-tx-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-calendar-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-nist-beacon-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-proof-gen-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-proof-state-service"; \
+	ln -sf "$(ROOT_DIR)node-lib/lib" "$(ROOT_DIR)node-splitter-service"
 
 # copy the .env config from sample if not present
 build-config:
@@ -126,7 +143,7 @@ build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-
 	docker-compose build
 
 # build all and start
-up: bootstrap-node-modules build cockroachdb-setup
+up: bootstrap-node-modules create-lib-links build cockroachdb-setup
 	docker-compose up -d --build
 
 # shutdown
@@ -160,4 +177,4 @@ hey:
 	-c 25 \
 	http://127.0.0.1/hashes
 
-.PHONY: all cockroachdb-reset cockroachdb-setup bootstrap-node-modules build-config build-base build-lib build up down clean prune phoenix hey
+.PHONY: all cockroachdb-reset cockroachdb-setup bootstrap-node-modules create-lib-links build-config build-base build-lib build up down clean prune phoenix hey
