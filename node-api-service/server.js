@@ -629,6 +629,11 @@ function getCalBlockByHeightV1 (req, res, next) {
   CalendarBlock.findOne({ where: { id: height } }).then(block => {
     if (block) {
       res.contentType = 'application/json'
+      // getting the plain object allows id conversion to int below
+      block = block.get({ plain: true })
+      block.id = parseInt(block.id, 10)
+      block.time = parseInt(block.time, 10)
+      block.version = parseInt(block.version, 10)
       res.send(block)
       return next()
     } else {
