@@ -63,6 +63,15 @@ the `--build` flag won't do this build step for you.
 cd node-base && docker build -t chainpoint/node-base:latest --no-cache=true .
 ```
 
+### Build Shared Lib Image
+
+In dev build the shared lib image. `docker-compose`, even with
+the `--build` flag won't do this build step for you.
+
+```
+cd node-lib && docker build -t chainpoint/node-lib:latest --no-cache=true .
+```
+
 ### Setup Environment Variables
 
 Modify the `.env` file in the root of this repository to

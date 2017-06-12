@@ -1,4 +1,4 @@
-FROM chainpoint/node-base
+FROM chainpoint/node-lib
 
 # needed for bcoin npm package to build
 # native extensions
