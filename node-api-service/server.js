@@ -65,6 +65,9 @@ const POST_HASHES_MAX = process.env.POST_HASHES_MAX || 1000
 // The maximum number of proofs allowed to be verified in one request
 const POST_VERIFY_PROOFS_MAX = process.env.POST_VERIFY_PROOFS_MAX || 1000
 
+// The maximum number of calendar blocks allowed to be retrieved in one request
+const GET_CALENDAR_BLOCKS_MAX = process.env.GET_CALENDAR_BLOCKS_MAX || 1000
+
 // Initial an object that will hold all open websocket connections
 let WebSocketConnections = {}
 
@@ -623,8 +626,8 @@ function getCalBlockByHeightV1 (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
-  if (!_.isInteger(height)) {
-    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  if (!_.isInteger(height) || height < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
 
   CalendarBlock.findOne({ where: { id: height } }).then(block => {
@@ -647,6 +650,76 @@ function getCalBlockByHeightV1 (req, res, next) {
 }
 
 /**
+ * GET /calendar/:fromHeight/:toHeight handler
+ *
+ * Expects path parameters 'fromHeight' and 'topHeight' as an integers
+ *
+ * Returns an array of calendar blocks
+ */
+function getCalBlockRangeV1 (req, res, next) {
+  let fromHeight = parseInt(req.params.fromHeight, 10)
+  let toHeight = parseInt(req.params.toHeight, 10)
+
+  // ensure that :fromHeight is an integer
+  if (!_.isInteger(fromHeight) || fromHeight < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, fromHeight must be a positive integer'))
+  }
+  // ensure that :toHeight is an integer
+  if (!_.isInteger(toHeight) || toHeight < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, toHeight must be a positive integer'))
+  }
+  // ensure that :toHeight is greater or equal to :fromHeight
+  if (toHeight < fromHeight) {
+    return next(new restify.InvalidArgumentError('invalid request, toHeight must be greater or equal to fromHeight'))
+  }
+  // ensure the requested range does not exceed GET_CALENDAR_BLOCKS_MAX
+  if ((toHeight - fromHeight + 1) > GET_CALENDAR_BLOCKS_MAX) {
+    return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${GET_CALENDAR_BLOCKS_MAX} blocks`))
+  }
+
+  async.waterfall([
+    (callback) => {
+      CalendarBlock.findOne({ attributes: ['id'], order: 'id DESC' }).then(lastBlock => {
+        if (lastBlock) {
+          // getting the plain object allows id conversion to int below
+          lastBlock = lastBlock.get({ plain: true })
+          lastBlock.id = parseInt(lastBlock.id, 10)
+          return callback(null, lastBlock.id)
+        } else {
+          return callback('notfound')
+        }
+      }).catch((err) => {
+        return callback(err)
+      })
+    },
+    (blockHeight, callback) => {
+      CalendarBlock.findAll({ where: { id: { $between: [fromHeight, toHeight] } }, order: 'id ASC' }).then(blocks => {
+        if (blocks.length) {
+          // getting the plain object allows id conversion to int below
+          let results = {}
+          results.blocks = blocks
+          results.start = fromHeight
+          results.end = toHeight
+          results.height = blockHeight
+          return callback(null, results)
+        } else {
+          return callback('notfound')
+        }
+      }).catch((err) => {
+        return callback(err)
+      })
+    }
+  ], (err, results) => {
+    if (err) {
+      console.error(err)
+      return next(new restify.InternalError(err))
+    }
+    res.send(results)
+    return next()
+  })
+}
+
+/**
  * GET /calendar/:height/data handler
  *
  * Expects a path parameter 'height' as an integer
@@ -657,8 +730,8 @@ function getCalBlockDataByHeightV1 (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
-  if (!_.isInteger(height)) {
-    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  if (!_.isInteger(height) || height < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
 
   CalendarBlock.findOne({ where: { id: height }, attributes: ['dataVal'] }).then(result => {
@@ -686,8 +759,8 @@ function getCalBlockHashByHeightV1 (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
-  if (!_.isInteger(height)) {
-    return next(new restify.InvalidArgumentError('invalid request, height must be an integer'))
+  if (!_.isInteger(height) || height < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
 
   CalendarBlock.findOne({ where: { id: height }, attributes: ['hash'] }).then(result => {
@@ -861,6 +934,8 @@ server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, getCalBlockHash
 server.get({ path: '/calendar/:height/data', version: '1.0.0' }, getCalBlockDataByHeightV1)
 // get the block object for the calendar at the specified hieght
 server.get({ path: '/calendar/:height', version: '1.0.0' }, getCalBlockByHeightV1)
+// get the block objects for the calendar in the specified range, incusive
+server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, getCalBlockRangeV1)
 // teapot
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
