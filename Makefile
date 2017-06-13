@@ -38,102 +38,102 @@ build-config:
 # build the base image
 build-base:
 	@cd node-base; \
-	docker build -t chainpoint/node-base:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-base:$(VERSION) chainpoint/node-base:latest
+	docker build -t quay.io/chainpoint/node-base:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-base:$(VERSION) quay.io/chainpoint/node-base:latest
 
 # build the shared lib intermediate image
 build-lib: build-base
 	@cd node-lib; \
-	docker build -t chainpoint/node-lib:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-lib:$(VERSION) chainpoint/node-lib:latest
+	docker build -t quay.io/chainpoint/node-lib:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-lib:$(VERSION) quay.io/chainpoint/node-lib:latest
 
 # build bcoin
 build-bcoin: build-lib
 	@cd bcoin; \
-	docker build -t chainpoint/bcoin:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/bcoin:$(VERSION) chainpoint/bcoin:latest
+	docker build -t quay.io/chainpoint/bcoin:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/bcoin:$(VERSION) quay.io/chainpoint/bcoin:latest
 
 # build aggregator
 build-aggregator: build-lib
 	@cd node-aggregator-service; \
-	docker build -t chainpoint/node-aggregator-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-aggregator-service:$(VERSION) chainpoint/node-aggregator-service:latest
+	docker build -t quay.io/chainpoint/node-aggregator-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-aggregator-service:$(VERSION) quay.io/chainpoint/node-aggregator-service:latest
 
 # build API
 build-api: build-lib
 	@cd node-api-service; \
-	docker build -t chainpoint/node-api-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-api-service:$(VERSION) chainpoint/node-api-service:latest
+	docker build -t quay.io/chainpoint/node-api-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-api-service:$(VERSION) quay.io/chainpoint/node-api-service:latest
 
 # build API test runner
-build-api-test: build-lib build-api
+build-api-test: build-api
 	@cd node-api-service; \
-	docker build -t chainpoint/node-api-service-test:$(VERSION) -f Dockerfile.test --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-api-service-test:$(VERSION) chainpoint/node-api-service-test:latest
+	docker build -t quay.io/chainpoint/node-api-service-test:$(VERSION) -f Dockerfile.test --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-api-service-test:$(VERSION) quay.io/chainpoint/node-api-service-test:latest
 
 # run API test suite with Mocha
-run-api-test: build-api build-api-test
-	docker run --rm chainpoint/node-api-service-test
+run-api-test: build-api-test
+	docker run --rm quay.io/chainpoint/node-api-service-test
 
 # build btc-fee
 build-btc-fee: build-lib
 	@cd node-btc-fee-service; \
-	docker build -t chainpoint/node-btc-fee-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-btc-fee-service:$(VERSION) chainpoint/node-btc-fee-service:latest
+	docker build -t quay.io/chainpoint/node-btc-fee-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-btc-fee-service:$(VERSION) quay.io/chainpoint/node-btc-fee-service:latest
 
 # build btc-mon
 build-btc-mon: build-lib
 	@cd node-btc-mon-service; \
-	docker build -t chainpoint/node-btc-mon-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-btc-mon-service:$(VERSION) chainpoint/node-btc-mon-service:latest
+	docker build -t quay.io/chainpoint/node-btc-mon-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-btc-mon-service:$(VERSION) quay.io/chainpoint/node-btc-mon-service:latest
 
 # build btc-tx
 build-btc-tx: build-lib
 	@cd node-btc-tx-service; \
-	docker build -t chainpoint/node-btc-tx-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-btc-tx-service:$(VERSION) chainpoint/node-btc-tx-service:latest
+	docker build -t quay.io/chainpoint/node-btc-tx-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-btc-tx-service:$(VERSION) quay.io/chainpoint/node-btc-tx-service:latest
 
 # build calendar
 build-calendar: build-lib
 	@cd node-calendar-service; \
-	docker build -t chainpoint/node-calendar-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-calendar-service:$(VERSION) chainpoint/node-calendar-service:latest
+	docker build -t quay.io/chainpoint/node-calendar-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-calendar-service:$(VERSION) quay.io/chainpoint/node-calendar-service:latest
 
 # build NIST
 build-nist: build-lib
 	@cd node-nist-beacon-service; \
-	docker build -t chainpoint/node-nist-beacon-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-nist-beacon-service:$(VERSION) chainpoint/node-nist-beacon-service:latest
+	docker build -t quay.io/chainpoint/node-nist-beacon-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-nist-beacon-service:$(VERSION) quay.io/chainpoint/node-nist-beacon-service:latest
 
 # build proof-gen
 build-proof-gen: build-lib
 	@cd node-proof-gen-service; \
-	docker build -t chainpoint/node-proof-gen-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-proof-gen-service:$(VERSION) chainpoint/node-proof-gen-service:latest
+	docker build -t quay.io/chainpoint/node-proof-gen-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-proof-gen-service:$(VERSION) quay.io/chainpoint/node-proof-gen-service:latest
 
 # build proof-state
 build-proof-state: build-lib
 	@cd node-proof-state-service; \
-	docker build -t chainpoint/node-proof-state-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-proof-state-service:$(VERSION) chainpoint/node-proof-state-service:latest
+	docker build -t quay.io/chainpoint/node-proof-state-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-proof-state-service:$(VERSION) quay.io/chainpoint/node-proof-state-service:latest
 
 # build splitter
 build-splitter: build-lib
 	@cd node-splitter-service; \
-	docker build -t chainpoint/node-splitter-service:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/node-splitter-service:$(VERSION) chainpoint/node-splitter-service:latest
+	docker build -t quay.io/chainpoint/node-splitter-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-splitter-service:$(VERSION) quay.io/chainpoint/node-splitter-service:latest
 
 # build redis
 build-redis: build-lib
 	@cd redis; \
-	docker build -t chainpoint/redis:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/redis:$(VERSION) chainpoint/redis:latest
+	docker build -t quay.io/chainpoint/redis:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/redis:$(VERSION) quay.io/chainpoint/redis:latest
 
 # build telegraf
 build-telegraf: build-lib
 	@cd redis; \
-	docker build -t chainpoint/telegraf:$(VERSION) --no-cache=$(NO_CACHE) . \
-	&& docker tag chainpoint/telegraf:$(VERSION) chainpoint/telegraf:latest
+	docker build -t quay.io/chainpoint/telegraf:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/telegraf:$(VERSION) quay.io/chainpoint/telegraf:latest
 
 # build all
 build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-mon build-btc-tx build-calendar build-nist build-proof-gen build-proof-state build-splitter build-redis build-telegraf

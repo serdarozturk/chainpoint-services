@@ -51,7 +51,7 @@ services:
   #
   api:
     restart: always
-    image: chainpoint/node-api-service:latest
+    image: quay.io/chainpoint/node-api-service:latest
     build:
       context: ./node-api-service
     depends_on:
@@ -74,7 +74,7 @@ services:
   #
   splitter:
     restart: always
-    image: chainpoint/node-splitter-service:latest
+    image: quay.io/chainpoint/node-splitter-service:latest
     build:
       context: ./node-splitter-service
     depends_on:
@@ -91,7 +91,7 @@ services:
   #
   aggregator:
     restart: always
-    image: chainpoint/node-aggregator-service:latest
+    image: quay.io/chainpoint/node-aggregator-service:latest
     build:
       context: ./node-aggregator-service
     depends_on:
@@ -110,7 +110,7 @@ services:
   #
   nist-beacon:
     restart: always
-    image: chainpoint/node-nist-beacon-service:latest
+    image: quay.io/chainpoint/node-nist-beacon-service:latest
     build:
       context: ./node-nist-beacon-service
     container_name: nist-beacon
@@ -130,7 +130,7 @@ services:
   #
   calendar:
     restart: always
-    image: chainpoint/node-calendar-service:latest
+    image: quay.io/chainpoint/node-calendar-service:latest
     build:
       context: ./node-calendar-service
     container_name: calendar
@@ -154,7 +154,7 @@ services:
   #
   btc-fee:
     restart: always
-    image: chainpoint/node-btc-fee-service:latest
+    image: quay.io/chainpoint/node-btc-fee-service:latest
     build:
       context: ./node-btc-fee-service
     container_name: btc-fee
@@ -170,7 +170,7 @@ services:
   # 
   btc-tx:
     restart: always
-    image: chainpoint/node-btc-tx-service:latest
+    image: quay.io/chainpoint/node-btc-tx-service:latest
     build:
       context: ./node-btc-tx-service
     container_name: btc-tx
@@ -196,7 +196,7 @@ services:
   #
   btc-mon:
     restart: always
-    image: chainpoint/node-btc-mon-service:latest
+    image: quay.io/chainpoint/node-btc-mon-service:latest
     build:
       context: ./node-btc-mon-service
     container_name: btc-mon
@@ -216,7 +216,7 @@ services:
   # 
   proof-state:
     restart: always
-    image: chainpoint/node-proof-state-service:latest
+    image: quay.io/chainpoint/node-proof-state-service:latest
     build:
       context: ./node-proof-state-service
     depends_on:
@@ -232,7 +232,7 @@ services:
   # 
   proof-gen:
     restart: always
-    image: chainpoint/node-proof-gen-service:latest
+    image: quay.io/chainpoint/node-proof-gen-service:latest
     build:
       context: ./node-proof-gen-service
     depends_on:
@@ -244,7 +244,7 @@ services:
   # InfluxDB Telegraf service
   #
   telegraf:
-    image: chainpoint/telegraf:latest
+    image: quay.io/chainpoint/telegraf:latest
     build:
       context: ./telegraf
     ports:
@@ -370,7 +370,7 @@ services:
   #
   rabbitmq:
     restart: always
-    image: "rabbitmq:3.6.9-management-alpine"
+    image: rabbitmq:3.6.9-management-alpine
     container_name: rabbitmq
     hostname: rabbitmq
     ports:
@@ -389,7 +389,7 @@ services:
   #
   redis:
     restart: always
-    image: chainpoint/redis:latest
+    image: quay.io/chainpoint/redis:latest
     build:
       context: ./redis
     container_name: redis
@@ -473,3 +473,25 @@ services:
     networks:
       - chainpoint
 
+  # bcoin:
+  #   image: quay.io/chainpoint/bcoin:latest
+  #   build:
+  #     context: ./bcoin
+  #   container_name: bcoin
+  #   restart: unless-stopped
+  #   ports:
+  #     #-- Mainnet
+  #     # - "8333:8333"
+  #     # - "8332:8332" # RPC
+  #     #-- Testnet
+  #     - "18333:18333"
+  #     - "18332:18332" # RPC
+  #   environment:
+  #     BCOIN_CONFIG: /root/.bcoin/bcoin.conf
+  #     # VIRTUAL_HOST: bcoin.chainpoint.org
+  #     # VIRTUAL_PORT: 8332 # Mainnet
+  #     VIRTUAL_PORT: 18332 # Testnest
+  #   volumes:
+  #     - ./data/bcoin:/root/.bcoin
+  #   networks:
+  #     - chainpoint

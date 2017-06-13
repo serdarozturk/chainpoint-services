@@ -1,4 +1,4 @@
-FROM chainpoint/node-lib
+FROM quay.io/chainpoint/node-lib
 
 # Define and install dependencies
 COPY package.json yarn.lock /home/node/app/
