@@ -1,3 +1,7 @@
+# First target in the Makefile is the default.
+all: up
+default: up
+
 # Get the location of this makefile.
 ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
@@ -29,8 +33,6 @@ VERSION ?= "v0.0.1"
 
 # skip use of Docker cache when building images?
 NO_CACHE ?= false
-
-all: up
 
 ## Bring the system down, delete CDB data, setup DB as needed, and start cluster
 cockroachdb-reset: down
@@ -158,8 +160,8 @@ run-load-test:
 	-c 25 \
 	http://127.0.0.1/hashes
 
-## Build all and start
-up: bootstrap-node-modules build cockroachdb-setup
+## Build all and start (default)
+up: build cockroachdb-setup
 	docker-compose up -d --build
 
 ## Shutdown Application
@@ -184,4 +186,4 @@ prune: down
 ## Burn it all down and rise from the ashes
 phoenix: clean prune cockroachdb-reset up
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-load-test build-config build-base build-lib build up down clean prune phoenix
+.PHONY: all default cockroachdb-reset cockroachdb-setup run-api-test run-load-test build-config build-base build-lib build up down clean prune phoenix
