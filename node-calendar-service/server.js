@@ -7,7 +7,7 @@ const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 // load all environment variables into env object
-const env = require('./env.js')
+const env = require('./parse-env.js')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
