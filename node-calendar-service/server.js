@@ -58,7 +58,7 @@ const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpo
 const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
 // URLs for calendar stacks to use in proofs
-const CHAINPOINT_BASE_URI = env.CHAINPOINT_BASE_URI
+const CHAINPOINT_BASE_URI = [env.CHAINPOINT_BASE_URI]
 
 // Global service stack Id
 const CHAINPOINT_STACK_ID = env.CHAINPOINT_STACK_ID
