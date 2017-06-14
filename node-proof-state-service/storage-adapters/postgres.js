@@ -12,10 +12,15 @@ const POSTGRES_CONNECT_PORT = process.env.POSTGRES_CONNECT_PORT || 5432
 const POSTGRES_CONNECT_DB = process.env.POSTGRES_CONNECT_DB || 'chainpoint'
 const POSTGRES_CONNECT_URI = `${POSTGRES_CONNECT_PROTOCOL}//${POSTGRES_CONNECT_USER}:${POSTGRES_CONNECT_PW}@${POSTGRES_CONNECT_HOST}:${POSTGRES_CONNECT_PORT}/${POSTGRES_CONNECT_DB}`
 
-// Set the number of tracking log events to complete in order for the hash to be considered full processed
-// Currently, the value is set as 4 to represent splitter, aggregator, and calendar, and btc events
+// Enable or disable anchoring to external blockchains
+// This information in necessary here to determine the proper PROOF_STEP_COUNT defined below
+const ANCHOR_BTC = process.env.ANCHOR_BTC || false
+const ANCHOR_ETH = process.env.ANCHOR_ETH || false
+// Set the number of tracking log events to complete in order for the hash to be considered fully processed
+// The value is determined by the number of anchoring services enabled
+// The base of 3 represents the splitter, aggregator, and calendar events
 // This number will increase as additional anchor services are added
-const PROOF_STEP_COUNT = 4
+const PROOF_STEP_COUNT = 3 + (ANCHOR_BTC ? 1 : 0) + (ANCHOR_ETH ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 

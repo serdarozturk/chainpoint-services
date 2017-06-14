@@ -21,6 +21,10 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 // The frequency to generate new calendar trees : 1 every 10 seconds by default
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
+// Enable or disable anchoring to external blockchains
+const ANCHOR_BTC = process.env.ANCHOR_BTC || false
+const ANCHOR_ETH = process.env.ANCHOR_ETH || false
+
 // How often blocks on calendar should be aggregated and anchored
 const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
 const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
@@ -44,7 +48,7 @@ const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // URLs for calendar stacks to use in proofs
-const CHAINPOINT_BASE_ADDR = process.env.CHAINPOINT_BASE_ADDR ? [ process.env.CHAINPOINT_BASE_ADDR ] : [ 'http://127.0.0.1' ]
+const CHAINPOINT_BASE_ADDR = process.env.CHAINPOINT_BASE_ADDR ? [process.env.CHAINPOINT_BASE_ADDR] : ['http://127.0.0.1']
 
 // The consul key to watch to receive updated NIST object
 const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
@@ -92,6 +96,12 @@ let nistLatest = null
 
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
+
+// Variables holding the configured interval functions
+// The variables are set when intervals are created
+// The variables are used when deleting a timeout, if requested
+let anchorBtcInterval = null
+let anchorEthInterval = null
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
@@ -214,12 +224,22 @@ function processMessage (msg) {
         consumeAggRootMessage(msg)
         break
       case 'btctx':
-        // Consumes a tx  message from the btctx service
-        consumeBtcTxMessage(msg)
+        if (ANCHOR_BTC) {
+          // Consumes a tx  message from the btctx service
+          consumeBtcTxMessage(msg)
+        } else {
+          // BTC anchoring has been disabled, ack message and do nothing
+          amqpChannel.ack(msg)
+        }
         break
       case 'btcmon':
-        // Consumes a tx  message from the btctx service
-        consumeBtcMonMessage(msg)
+        if (ANCHOR_BTC) {
+          // Consumes a tx message from the btctx service
+          consumeBtcMonMessage(msg)
+        } else {
+          // BTC anchoring has been disabled, ack message and do nothing
+          amqpChannel.ack(msg)
+        }
         break
       default:
         // This is an unknown state type
@@ -832,6 +852,44 @@ registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
   ethConfirmLock.release()
 })
 
+// Set the BTC anchor interval defined by ANCHOR_BTC_INTERVAL_MS
+// and return a reference to that configured interval, enabling BTC anchoring
+let setBtcInterval = () => {
+  return setInterval(() => {
+    try {
+      // if the amqp channel is null (closed), processing should not continue, defer to next interval
+      if (amqpChannel === null) return
+      btcAnchorLock.acquire()
+    } catch (err) {
+      console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+    }
+  }, ANCHOR_BTC_INTERVAL_MS)
+}
+
+// Set the ETH anchor interval defined by ANCHOR_ETH_INTERVAL_MS
+// and return a reference to that configured interval, enabling ETH anchoring
+let setEthInterval = () => {
+  return setInterval(() => {
+    try {
+      // if the amqp channel is null (closed), processing should not continue, defer to next interval
+      if (amqpChannel === null) return
+      ethAnchorLock.acquire()
+    } catch (err) {
+      console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+    }
+  }, ANCHOR_ETH_INTERVAL_MS)
+}
+
+// Deletes the BTC anchoring interval, disabling BTC anchoring
+let deleteBtcInterval = () => {
+  clearInterval(anchorBtcInterval)
+}
+
+// Deletes the ETH anchoring interval, disabling ETH anchoring
+let deleteEthInterval = () => {
+  clearInterval(anchorEthInterval)
+}
+
 // This initalizes all the consul watches and JS intervals that fire all calendar events
 function startListening () {
   console.log('starting watches and intervals')
@@ -870,26 +928,20 @@ function startListening () {
   }, CALENDAR_INTERVAL_MS)
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
-  setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      btcAnchorLock.acquire()
-    } catch (err) {
-      console.error('btcAnchorLock.acquire() : caught err : ', err.message)
-    }
-  }, ANCHOR_BTC_INTERVAL_MS)
+  if (ANCHOR_BTC) { // Do this only if BTC anchoring is enabled
+    anchorBtcInterval = setBtcInterval()
+    console.log('BTC anchoring enabled')
+  } else {
+    console.log('BTC anchoring disabled')
+  }
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
-  setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      ethAnchorLock.acquire()
-    } catch (err) {
-      console.error('btcAnchorLock.acquire() : caught err : ', err.message)
-    }
-  }, ANCHOR_ETH_INTERVAL_MS)
+  if (ANCHOR_ETH) { // Do this only if ETH anchoring is enabled
+    anchorEthInterval = setEthInterval()
+    console.log('ETH anchoring enabled')
+  } else {
+    console.log('ETH anchoring disabled')
+  }
 }
 
 /**
