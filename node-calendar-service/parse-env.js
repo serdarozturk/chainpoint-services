@@ -16,7 +16,7 @@ module.exports = envalid.cleanEnv(process.env, {
   RMQ_WORK_OUT_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for outgoing message to the proof state service' }),
   RMQ_WORK_OUT_BTCTX_QUEUE: envalid.str({ default: 'work.btctx', desc: 'The queue name for outgoing message to the btc tx service' }),
   RMQ_WORK_OUT_BTCMON_QUEUE: envalid.str({ default: 'work.btcmon', desc: 'The queue name for outgoing message to the btc mon service' }),
-  RABBITMQ_CONNECT_URI: envalid.str({ default: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
+  RABBITMQ_CONNECT_URI: envalid.url({ default: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
   NIST_KEY: envalid.str({ default: 'service/nist/latest', desc: 'The consul key to watch to receive updated NIST object' }),
   NACL_KEYPAIR_SEED: envalid.str({ desc: 'The seed used for NaCl keypair generation' })
 }, {
