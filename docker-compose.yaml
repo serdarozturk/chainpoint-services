@@ -136,6 +136,10 @@ services:
     container_name: calendar
     environment:
       NACL_KEYPAIR_SEED: '+zy90opG2vQIUOL1rI6Ja3tN26QtE6AC5F5bP1j+NgM='
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_ADDR: ${CHAINPOINT_BASE_ADDR}
     depends_on:
       - roach1
       - roach2
@@ -219,6 +223,9 @@ services:
     image: quay.io/chainpoint/node-proof-state-service:latest
     build:
       context: ./node-proof-state-service
+    environment:
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
     depends_on:
       - rabbitmq
       - postgres
