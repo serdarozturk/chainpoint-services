@@ -6,62 +6,10 @@ const uuidv1 = require('uuid/v1')
 const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
-const envalid = require('envalid')
-const { str, bool, url } = envalid
-const env = envalid.cleanEnv(process.env, {
-  ANCHOR_BTC: bool(),
-  ANCHOR_ETH: bool(),
-  CHAINPOINT_STACK_ID: str(),
-  CHAINPOINT_BASE_URI: url()
-})
+// load all environment variables into env object
+const env = require('./env.js')
 
-const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
-const CONSUL_PORT = process.env.CONSUL_PORT || 8500
-const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
-
-// consul : uncomment to enable *very* detailed consul logging.
-// consul.on('log', console.log)
-
-// The consul key to hold for calendar blockchain DB locks
-const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blockchain/lock'
-
-// The frequency to generate new calendar trees : 1 every 10 seconds by default
-const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
-
-// Enable or disable anchoring to external blockchains
-const ANCHOR_BTC = env.ANCHOR_BTC
-const ANCHOR_ETH = env.ANCHOR_ETH
-
-// How often blocks on calendar should be aggregated and anchored
-const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
-const ANCHOR_ETH_INTERVAL_MS = process.env.ANCHOR_ETH_INTERVAL_MS || 600000 // 10 min
-
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the aggregator, btc-tx, and btc-mon services
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.cal'
-
-// The queue name for outgoing message to the proof state service
-const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
-
-// The queue name for outgoing message to the btc tx service
-const RMQ_WORK_OUT_BTCTX_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.btctx'
-
-// The queue name for outgoing message to the btc mon service
-const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.btcmon'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// The consul key to watch to receive updated NIST object
-const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
-
-// URLs for calendar stacks to use in proofs
-const CHAINPOINT_BASE_URI = [env.CHAINPOINT_BASE_URI]
-
-// Global service stack Id
-const CHAINPOINT_STACK_ID = env.CHAINPOINT_STACK_ID
+const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -74,13 +22,7 @@ nacl.util = require('tweetnacl-util')
 // created with:
 //   nacl.util.encodeBase64(nacl.randomBytes(32))
 //
-let naclKeypairSeed = null
-if (process.env.NACL_KEYPAIR_SEED) {
-  naclKeypairSeed = nacl.util.decodeBase64(process.env.NACL_KEYPAIR_SEED)
-} else {
-  console.error('Missing NACL_KEYPAIR_SEED environment variable')
-  process.exit(1)
-}
+const naclKeypairSeed = nacl.util.decodeBase64(env.NACL_KEYPAIR_SEED)
 
 const signingKeypair = nacl.sign.keyPair.fromSeed(naclKeypairSeed)
 
@@ -139,7 +81,7 @@ let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callbac
   b.id = height
   b.time = new Date().getTime()
   b.version = 1
-  b.stackId = CHAINPOINT_STACK_ID
+  b.stackId = env.CHAINPOINT_STACK_ID
   b.type = type
   b.dataId = dataId
   b.dataVal = dataVal
@@ -231,7 +173,7 @@ function processMessage (msg) {
         consumeAggRootMessage(msg)
         break
       case 'btctx':
-        if (ANCHOR_BTC) {
+        if (env.ANCHOR_BTC) {
           // Consumes a tx  message from the btctx service
           consumeBtcTxMessage(msg)
         } else {
@@ -240,7 +182,7 @@ function processMessage (msg) {
         }
         break
       case 'btcmon':
-        if (ANCHOR_BTC) {
+        if (env.ANCHOR_BTC) {
           // Consumes a tx message from the btctx service
           consumeBtcMonMessage(msg)
         } else {
@@ -286,30 +228,30 @@ function consumeBtcTxMessage (msg) {
           { op: 'sha-256-x2' }
         ]
 
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btctx' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btctx' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message nacked')
               return callback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message acked')
+              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message acked')
               return callback(null)
             }
           })
       },
       // inform btc-mon of new tx_id to watch, queue up message bound for btc mon
       (callback) => {
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCMON_QUEUE, Buffer.from(JSON.stringify({ tx_id: btcTxObj.btctx_id })), { persistent: true },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_BTCMON_QUEUE, Buffer.from(JSON.stringify({ tx_id: btcTxObj.btctx_id })), { persistent: true },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message nacked')
+              console.error(env.RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message nacked')
               return callback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message acked')
+              console.log(env.RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message acked')
               return callback(null)
             }
           })
@@ -317,10 +259,10 @@ function consumeBtcTxMessage (msg) {
     ], (err, results) => {
       if (err) {
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, '[btctx] consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, '[btctx] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, '[btctx] consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, '[btctx] consume message acked')
       }
     })
   }
@@ -427,22 +369,23 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
         // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
+        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
         let uris = []
-        for (let x = 0; x < CHAINPOINT_BASE_URI.length; x++) uris.push(`${CHAINPOINT_BASE_URI[x]}/calendar/${block.id}/hash`)
+        for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/hash`)
         stateObj.cal_state.anchor = {
           anchor_id: block.id,
           uris: uris
         }
 
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
               return eachCallback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
+              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
               return eachCallback(null)
             }
           })
@@ -464,7 +407,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         // nack consumption of all original hash messages part of this aggregation event
         if (message !== null) {
           amqpChannel.nack(message)
-          console.error(RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
+          console.error(env.RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
         }
       })
       return persistCallback(err)
@@ -473,7 +416,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         if (message !== null) {
           // ack consumption of all original hash messages part of this aggregation event
           amqpChannel.ack(message)
-          console.log(RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
+          console.log(env.RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
         }
       })
       return persistCallback(null)
@@ -556,15 +499,15 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
             stateObj.anchor_agg_state = {}
             stateObj.anchor_agg_state.ops = proofDataItem.proof
 
-            amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_agg' },
+            amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_agg' },
               (err, ok) => {
                 if (err !== null) {
                   // An error as occurred publishing a message
-                  console.error(RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message nacked')
+                  console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message nacked')
                   return eachCallback(err)
                 } else {
                   // New message has been published
-                  console.log(RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message acked')
+                  console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message acked')
                   return eachCallback(null)
                 }
               })
@@ -586,13 +529,13 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
           }
 
           // Send anchorData to the btc tx service for anchoring
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
             (err, ok) => {
               if (err !== null) {
-                console.error(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
+                console.error(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
                 return seriesCallback(err)
               } else {
-                console.log(RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+                console.log(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
                 return seriesCallback(null)
               }
             })
@@ -623,7 +566,7 @@ let aggregateAndAnchorETH = (lastEthAnchorBlockId, anchorCallback) => {
 // See also : https://github.com/hashicorp/consul/blob/master/api/lock.go#L21
 //
 var lockOpts = {
-  key: CALENDAR_LOCK_KEY,
+  key: env.CALENDAR_LOCK_KEY,
   lockwaittime: '60s',
   lockwaittimeout: '60s',
   lockretrytime: '100ms',
@@ -732,7 +675,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
       let lastBtcAnchorMS = lastBtcAnchorBlock.time
       let currentMS = Date.now()
       let ageMS = currentMS - lastBtcAnchorMS
-      if (ageMS < ANCHOR_BTC_INTERVAL_MS) {
+      if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
         console.log('aggregateAndAnchorBTC skipped, ANCHOR_BTC_INTERVAL_MS not elapsed since last btc anchor block')
         btcAnchorLock.release()
         return
@@ -782,22 +725,23 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
         stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
 
         // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
+        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
         let uris = []
-        for (let x = 0; x < CHAINPOINT_BASE_URI.length; x++) uris.push(`${CHAINPOINT_BASE_URI[x]}/calendar/${block.id}/data`)
+        for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/data`)
         stateObj.btchead_state.anchor = {
           anchor_id: btcheadHeight.toString(),
           uris: uris
         }
 
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
               return wfCallback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
               return wfCallback(null)
             }
           })
@@ -807,11 +751,11 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
         // nack consumption of all original message
         console.error(err)
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
       } else {
         // ack consumption of all original hash messages part of this aggregation event
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
       }
       return eachCallback(null)
     })
@@ -836,7 +780,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
       let lastEthAnchorMS = lastEthAnchorBlock.time
       let currentMS = Date.now()
       let ageMS = currentMS - lastEthAnchorMS
-      if (ageMS < ANCHOR_ETH_INTERVAL_MS) {
+      if (ageMS < env.ANCHOR_ETH_INTERVAL_MS) {
         console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
         ethAnchorLock.release()
         return
@@ -870,7 +814,7 @@ let setBtcInterval = () => {
     } catch (err) {
       console.error('btcAnchorLock.acquire() : caught err : ', err.message)
     }
-  }, ANCHOR_BTC_INTERVAL_MS)
+  }, env.ANCHOR_BTC_INTERVAL_MS)
 }
 
 // Set the ETH anchor interval defined by ANCHOR_ETH_INTERVAL_MS
@@ -884,7 +828,7 @@ let setEthInterval = () => {
     } catch (err) {
       console.error('ethAnchorLock.acquire() : caught err : ', err.message)
     }
-  }, ANCHOR_ETH_INTERVAL_MS)
+  }, env.ANCHOR_ETH_INTERVAL_MS)
 }
 
 // Deletes the BTC anchoring interval, disabling BTC anchoring
@@ -902,7 +846,7 @@ function startListening () {
   console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
-  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
+  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
 
   // Store the updated fee object on change
   nistWatch.on('change', function (data, res) {
@@ -932,10 +876,10 @@ function startListening () {
     } catch (err) {
       console.error('calendarLock.acquire() : caught err : ', err.message)
     }
-  }, CALENDAR_INTERVAL_MS)
+  }, env.CALENDAR_INTERVAL_MS)
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
-  if (ANCHOR_BTC) { // Do this only if BTC anchoring is enabled
+  if (env.ANCHOR_BTC) { // Do this only if BTC anchoring is enabled
     anchorBtcInterval = setBtcInterval()
     console.log('BTC anchoring enabled')
   } else {
@@ -943,7 +887,7 @@ function startListening () {
   }
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
-  if (ANCHOR_ETH) { // Do this only if ETH anchoring is enabled
+  if (env.ANCHOR_ETH) { // Do this only if ETH anchoring is enabled
     anchorEthInterval = setEthInterval()
     console.log('ETH anchoring enabled')
   } else {
@@ -981,14 +925,14 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
 
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           processMessage(msg)
         })
         return callback(null)
@@ -1026,7 +970,7 @@ function initConnectionsAndStart () {
     if (err) {
       console.error(err)
     } else {
-      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
       // Init intervals and watches
       startListening()
     }
