@@ -49,6 +49,9 @@ const CHAINPOINT_BASE_ADDR = process.env.CHAINPOINT_BASE_ADDR ? [ process.env.CH
 // The consul key to watch to receive updated NIST object
 const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
+// Global service stack Id
+const CHAINPOINT_STACK_ID = process.env.CHAINPOINT_STACK_ID || ''
+
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
 // see: https://github.com/dchest/tweetnacl-js#signatures
@@ -96,7 +99,7 @@ let CalendarBlock = calendarBlock.CalendarBlock
 
 // Calculate a deterministic block hash and return a Buffer hash value
 let calcBlockHash = (block) => {
-  let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.type.toString()}:${block.dataId.toString()}`
+  let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.stackId.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
   let dataValBuffer = Buffer.from(block.dataVal, 'hex')
   let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
@@ -119,6 +122,7 @@ let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callbac
   b.id = height
   b.time = new Date().getTime()
   b.version = 1
+  b.stackId = CHAINPOINT_STACK_ID
   b.type = type
   b.dataId = dataId
   b.dataVal = dataVal
@@ -391,7 +395,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         // add ops connecting agg_root to cal_root
         stateObj.cal_state.ops = proofDataItem.proof
         // add ops extending proof path beyond cal_root to calendar block's block_hash
-        stateObj.cal_state.ops.push({ l: `${block.id}:${block.time}:${block.version}:${block.type}:${block.dataId}` })
+        stateObj.cal_state.ops.push({ l: `${block.id}:${block.time}:${block.version}:${block.stackId}:${block.type}:${block.dataId}` })
         stateObj.cal_state.ops.push({ r: block.prevHash })
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
