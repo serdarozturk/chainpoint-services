@@ -48,7 +48,7 @@ const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
 // URLs for calendar stacks to use in proofs
-const CHAINPOINT_BASE_ADDR = process.env.CHAINPOINT_BASE_ADDR ? [process.env.CHAINPOINT_BASE_ADDR] : ['http://127.0.0.1']
+const CHAINPOINT_BASE_URI = process.env.CHAINPOINT_BASE_URI ? [process.env.CHAINPOINT_BASE_URI] : ['http://127.0.0.1']
 
 // The consul key to watch to receive updated NIST object
 const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
@@ -419,9 +419,9 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         stateObj.cal_state.ops.push({ r: block.prevHash })
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
-        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_ADDR
+        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
         let uris = []
-        for (let x = 0; x < CHAINPOINT_BASE_ADDR.length; x++) uris.push(`${CHAINPOINT_BASE_ADDR[x]}/calendar/${block.id}/hash`)
+        for (let x = 0; x < CHAINPOINT_BASE_URI.length; x++) uris.push(`${CHAINPOINT_BASE_URI[x]}/calendar/${block.id}/hash`)
         stateObj.cal_state.anchor = {
           anchor_id: block.id,
           uris: uris
@@ -774,9 +774,9 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
         stateObj.btchead_state = {}
         stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
 
-        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_ADDR
+        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
         let uris = []
-        for (let x = 0; x < CHAINPOINT_BASE_ADDR.length; x++) uris.push(`${CHAINPOINT_BASE_ADDR[x]}/calendar/${block.id}/data`)
+        for (let x = 0; x < CHAINPOINT_BASE_URI.length; x++) uris.push(`${CHAINPOINT_BASE_URI[x]}/calendar/${block.id}/data`)
         stateObj.btchead_state.anchor = {
           anchor_id: btcheadHeight.toString(),
           uris: uris

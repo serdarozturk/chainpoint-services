@@ -139,7 +139,7 @@ services:
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_ADDR: ${CHAINPOINT_BASE_ADDR}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
     depends_on:
       - roach1
       - roach2
