@@ -6,7 +6,14 @@ const uuidv1 = require('uuid/v1')
 const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
-require('dotenv').config()
+const envalid = require('envalid')
+const { str, bool, url } = envalid
+const env = envalid.cleanEnv(process.env, {
+  ANCHOR_BTC: bool(),
+  ANCHOR_ETH: bool(),
+  CHAINPOINT_STACK_ID: str(),
+  CHAINPOINT_BASE_URI: url()
+})
 
 const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
 const CONSUL_PORT = process.env.CONSUL_PORT || 8500
@@ -22,8 +29,8 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
 // Enable or disable anchoring to external blockchains
-const ANCHOR_BTC = process.env.ANCHOR_BTC ? JSON.parse(process.env.ANCHOR_BTC) : false
-const ANCHOR_ETH = process.env.ANCHOR_ETH ? JSON.parse(process.env.ANCHOR_ETH) : false
+const ANCHOR_BTC = env.ANCHOR_BTC
+const ANCHOR_ETH = env.ANCHOR_ETH
 
 // How often blocks on calendar should be aggregated and anchored
 const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
@@ -47,14 +54,14 @@ const RMQ_WORK_OUT_BTCMON_QUEUE = process.env.RMQ_WORK_OUT_BTCTX_QUEUE || 'work.
 // Connection string w/ credentials for RabbitMQ
 const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 
-// URLs for calendar stacks to use in proofs
-const CHAINPOINT_BASE_URI = process.env.CHAINPOINT_BASE_URI ? [process.env.CHAINPOINT_BASE_URI] : ['http://127.0.0.1']
-
 // The consul key to watch to receive updated NIST object
 const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
 
+// URLs for calendar stacks to use in proofs
+const CHAINPOINT_BASE_URI = env.CHAINPOINT_BASE_URI
+
 // Global service stack Id
-const CHAINPOINT_STACK_ID = process.env.CHAINPOINT_STACK_ID || ''
+const CHAINPOINT_STACK_ID = env.CHAINPOINT_STACK_ID
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
