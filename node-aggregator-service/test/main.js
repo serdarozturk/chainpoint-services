@@ -166,7 +166,7 @@ describe('Finalize', () => {
 
   it('should create one state object message for one tree with one proof', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
@@ -214,7 +214,7 @@ describe('Finalize', () => {
 
   it('should create two state object messages for one tree with two proofs', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
@@ -283,7 +283,7 @@ describe('Finalize', () => {
 
   it('should create two state object messages for two trees with one proof each', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
@@ -358,7 +358,7 @@ describe('Finalize', () => {
 
   it('should create four state object messages for two trees with two proofs each', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
