@@ -356,6 +356,9 @@ definitions:
       version:
         type: integer
         example: 1
+      stackId:
+        type: string
+        example: "chainpoint.calendar.a"
       type:
         type: string
         example: "btc-c"
@@ -388,6 +391,9 @@ definitions:
             version:
               type: integer
               example: 1
+            stackId:
+              type: string
+              example: "chainpoint.calendar.a"
             type:
               type: string
               example: "btc-c"
@@ -411,4 +417,4 @@ definitions:
         example: 729 
       height:
         type: integer
-        example: 32876         
+        example: 32876
