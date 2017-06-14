@@ -51,6 +51,12 @@ var CalendarBlock = sequelize.define(COCKROACH_TABLE_NAME,
       },
       allowNull: false
     },
+    stackId: {
+      comment: 'The Chainpoint stack identifier',
+      type: Sequelize.STRING,
+      field: 'stack_id',
+      allowNull: false
+    },
     type: {
       comment: 'Block type.',
       type: Sequelize.STRING,
