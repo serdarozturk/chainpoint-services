@@ -14,8 +14,8 @@ const POSTGRES_CONNECT_URI = `${POSTGRES_CONNECT_PROTOCOL}//${POSTGRES_CONNECT_U
 
 // Enable or disable anchoring to external blockchains
 // This information in necessary here to determine the proper PROOF_STEP_COUNT defined below
-const ANCHOR_BTC = process.env.ANCHOR_BTC || false
-const ANCHOR_ETH = process.env.ANCHOR_ETH || false
+const ANCHOR_BTC = process.env.ANCHOR_BTC ? JSON.parse(process.env.ANCHOR_BTC) : false
+const ANCHOR_ETH = process.env.ANCHOR_ETH ? JSON.parse(process.env.ANCHOR_ETH) : false
 // Set the number of tracking log events to complete in order for the hash to be considered fully processed
 // The value is determined by the number of anchoring services enabled
 // The base of 3 represents the splitter, aggregator, and calendar events

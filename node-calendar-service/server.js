@@ -22,8 +22,8 @@ const CALENDAR_LOCK_KEY = process.env.CALENDAR_LOCK_KEY || 'service/calendar/blo
 const CALENDAR_INTERVAL_MS = process.env.CALENDAR_INTERVAL_MS || 10000
 
 // Enable or disable anchoring to external blockchains
-const ANCHOR_BTC = process.env.ANCHOR_BTC || false
-const ANCHOR_ETH = process.env.ANCHOR_ETH || false
+const ANCHOR_BTC = process.env.ANCHOR_BTC ? JSON.parse(process.env.ANCHOR_BTC) : false
+const ANCHOR_ETH = process.env.ANCHOR_ETH ? JSON.parse(process.env.ANCHOR_ETH) : false
 
 // How often blocks on calendar should be aggregated and anchored
 const ANCHOR_BTC_INTERVAL_MS = process.env.ANCHOR_BTC_INTERVAL_MS || 1800000 // 30 min
