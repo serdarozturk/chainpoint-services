@@ -1,8 +1,8 @@
 const envalid = require('envalid')
 
 module.exports = envalid.cleanEnv(process.env, {
-  ANCHOR_BTC: envalid.bool({ desc: 'Boolean flag for enabling and disabling BTC anchoring' }),
-  ANCHOR_ETH: envalid.bool({ desc: 'Boolean flag for enabling and disabling ETH anchoring' }),
+  ANCHOR_BTC: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling BTC anchoring' }),
+  ANCHOR_ETH: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling ETH anchoring' }),
   CHAINPOINT_STACK_ID: envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' }),
   CHAINPOINT_BASE_URI: envalid.url({ desc: 'Base URI for this Chainpoint stack of services' }),
   CONSUL_HOST: envalid.str({ default: 'consul', desc: 'Consul server host' }),
