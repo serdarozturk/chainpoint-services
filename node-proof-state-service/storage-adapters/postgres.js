@@ -19,7 +19,7 @@ const ANCHOR_ETH = process.env.ANCHOR_ETH ? JSON.parse(process.env.ANCHOR_ETH) :
 // Set the number of tracking log events to complete in order for the hash to be considered fully processed
 // The value is determined by the number of anchoring services enabled
 // The base of 3 represents the splitter, aggregator, and calendar events
-// This number will increase as additional anchor services are added
+// This number will increase as additional anchor services are enabled
 const PROOF_STEP_COUNT = 3 + (ANCHOR_BTC ? 1 : 0) + (ANCHOR_ETH ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
