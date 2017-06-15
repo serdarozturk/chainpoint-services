@@ -149,7 +149,7 @@ In the event of any error occurring, the service will log that error to STDERR a
 ## Notable NPM packages
 | Name         | Description                                                            |
 | :---         |:-----------------------------------------------------------------------|
-| dotenv       | for managing and optionally overriding environment variables |
+| envalid       | for managing and validating environment variables |
 | merkle-tools | for constructing merkle tree and calculating merkle paths |
 | amqplib      | for communication between the service and RabbitMQ |
 | async      | for handling flow control for some asynchronous operations |
