@@ -2,33 +2,21 @@ const _ = require('lodash')
 const sb = require('satoshi-bitcoin')
 const coinTicker = require('coin-ticker')
 const Influx = require('influx')
-require('dotenv').config()
 
-const INFLUXDB_HOST = process.env.INFLUXDB_HOST || 'influxdb'
-const INFLUXDB_PORT = process.env.INFLUXDB_PORT || 8086
-const INFLUXDB_DB = process.env.INFLUXDB_DB || 'chainpoint_fees'
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
 // FIXME : Get rid of caching for http call so we can get rid of redis here?
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-const redis = r.createClient(REDIS_CONNECT_URI)
+const redis = r.createClient(env.REDIS_CONNECT_URI)
 
-const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
-const CONSUL_PORT = process.env.CONSUL_PORT || 8500
-const consul = require('consul')({host: CONSUL_HOST, port: CONSUL_PORT})
+const consul = require('consul')({host: env.CONSUL_HOST, port: env.CONSUL_PORT})
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify to use Redis caching layer.
 const requestify = require('requestify')
 const coreCacheTransporters = requestify.coreCacheTransporters
 requestify.cacheTransporter(coreCacheTransporters.redis(redis))
-
-// API Docs : https://bitcoinfees.21.co/api
-const REC_FEES_URI = process.env.REC_FEES_URI || 'https://bitcoinfees.21.co/api/v1/fees/recommended'
-
-// The published key location where recommended fee will be stored
-// for use by other services.
-const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'service/btc-fee/recommendation'
 
 // How long, in milliseconds, should cached values be kept for
 // until a new HTTP GET is issued?
@@ -41,9 +29,9 @@ const AVG_TX_BYTES = 235
 let exchangeTick = null
 
 const influx = new Influx.InfluxDB({
-  host: INFLUXDB_HOST,
-  database: INFLUXDB_DB,
-  port: INFLUXDB_PORT,
+  host: env.INFLUXDB_HOST,
+  database: env.INFLUXDB_DB,
+  port: env.INFLUXDB_PORT,
   schema: [
     {
       measurement: 'btc_fee_tick',
@@ -76,19 +64,19 @@ const influx = new Influx.InfluxDB({
 
 // Create InfluxDB database lazily
 influx.getDatabaseNames().then(names => {
-  if (!names.includes(INFLUXDB_DB)) {
-    return influx.createDatabase(INFLUXDB_DB)
+  if (!names.includes(env.INFLUXDB_DB)) {
+    return influx.createDatabase(env.INFLUXDB_DB)
   }
 })
 .then(created => {
   influx.createRetentionPolicy('90d', {
-    database: INFLUXDB_DB,
+    database: env.INFLUXDB_DB,
     duration: '90d',
     replication: 1,
     isDefault: true
   })
 })
-.catch(err => {
+.catch(() => {
   console.error(`Error creating Influx database!`)
 })
 
@@ -161,7 +149,7 @@ let genFeeRecObj = (recFeeInSatoshiPerByte) => {
 
 let getRecommendedFees = () => {
   // 21.co API Rate Limit : 5000/hour : https://bitcoinfees.21.co/api
-  requestify.get(REC_FEES_URI, {
+  requestify.get(env.REC_FEES_URI, {
     cache: {
       cache: true,
       expires: CACHE_TTL
@@ -184,7 +172,7 @@ let getRecommendedFees = () => {
 
       // Publish the recommended transaction fee data in a well known
       // location for use by any service with access to consul.
-      consul.kv.set(BTC_REC_FEE_KEY, JSON.stringify(feeRecObj), function (err, result) {
+      consul.kv.set(env.BTC_REC_FEE_KEY, JSON.stringify(feeRecObj), function (err, result) {
         if (err) throw err
       })
     } else {

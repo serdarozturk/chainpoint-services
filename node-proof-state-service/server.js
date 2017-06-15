@@ -3,28 +3,12 @@ const async = require('async')
 
 const storageClient = require('./storage-adapters/postgres.js')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 10
-
-// The queue name for message consumption originating from the splitter, aggregator, calendar, and proof state services
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.state'
-
-// The queue name for outgoing message to the proof state service
-const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
-
-// The queue name for outgoing message to the proof gen service
-const RMQ_WORK_OUT_GEN_QUEUE = process.env.RMQ_WORK_OUT_GEN_QUEUE || 'work.gen'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
-
-// The frequency, in minutes, that the proof state and hash tracker log tables have their old, unneeded data pruned
-const PRUNE_FREQUENCY_MINUTES = process.env.PRUNE_FREQUENCY_MINUTES || 1
 
 /**
 * Logs Splitter service event to hash tracker
@@ -128,15 +112,15 @@ function ConsumeCalendarMessage (msg) {
         dataOutObj.type = 'cal'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
               return eachCallback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
               return eachCallback(null)
             }
           })
@@ -266,15 +250,15 @@ function ConsumeBtcMonMessage (msg) {
         dataOutObj.type = 'btc'
         dataOutObj.hash_id = hashIdRow.hash_id
         // Publish a proof ready object for consumption by the proof state service
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'state' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message nacked')
               return eachCallback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+              console.log(env.MQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
               return eachCallback(null)
             }
           })
@@ -333,15 +317,15 @@ function ConsumeProofReadyMessage (msg) {
           dataOutObj.cal_state = JSON.parse(calStateObj.cal_state)
 
           // Publish a proof data object for consumption by the proof generation service
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'cal' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'cal' },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
+                console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
                 return callback(err)
               } else {
                 // New message has been published
-                console.log(RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
+                console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
                 return callback(null, aggStateObj.hash_id)
               }
             })
@@ -420,15 +404,15 @@ function ConsumeProofReadyMessage (msg) {
           dataOutObj.btchead_state = JSON.parse(btcHeadStateObj.btchead_state)
 
           // Publish a proof data object for consumption by the proof generation service
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'btc' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'btc' },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
+                console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
                 return callback(err)
               } else {
                 // New message has been published
-                console.log(RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
+                console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
                 return callback(null, aggStateObj.hash_id)
               }
             })
@@ -603,13 +587,13 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_GEN_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_GEN_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           processMessage(msg)
         })
         return callback(null)
@@ -650,8 +634,8 @@ openStorageConnection((err, result) => {
   if (err) {
     console.error(err)
   } else {
-    amqpOpenConnection(RABBITMQ_CONNECT_URI)
+    amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
     // Define and start pruning cycle
-    setInterval(PruneStateData, PRUNE_FREQUENCY_MINUTES * 60 * 1000)
+    setInterval(PruneStateData, env.PRUNE_FREQUENCY_MINUTES * 60 * 1000)
   }
 })

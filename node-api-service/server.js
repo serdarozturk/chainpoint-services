@@ -1,4 +1,3 @@
-require('dotenv').config()
 const _ = require('lodash')
 const restify = require('restify')
 const corsMiddleware = require('restify-cors-middleware')
@@ -11,9 +10,9 @@ const chpParse = require('chainpoint-parse')
 
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
 
 // Generate a v1 UUID (time-based)
@@ -21,30 +20,6 @@ const r = require('redis')
 const uuidv1 = require('uuid/v1')
 
 const uuidValidate = require('uuid-validate')
-
-// The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The exchange for receiving messages from proof gen service
-const RMQ_INCOMING_EXCHANGE = process.env.RMQ_INCOMING_EXCHANGE || 'exchange.headers'
-
-// The queue name for message consumption originating from proof gen service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.api'
-
-// The queue name for outgoing message to the splitter service
-const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.splitter'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// The lifespan of stored proofs, in minutes
-const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60 * 24
-
-// The maximum number of proofs that can be requested in one GET /proofs request
-const GET_PROOFS_MAX_REST = process.env.GET_PROOFS_MAX_REST || 250
-
-// The maximum number of proofs that can be requested/subscribed to in one call
-const GET_PROOFS_MAX_WS = process.env.GET_PROOFS_MAX_WS || 250
 
 // The custom MIME type for JSON proof array results containing Base64 encoded proof data
 const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
@@ -55,18 +30,6 @@ const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
 // Set a unique identifier for this instance of API Service
 // This is used to associate API Service instances with websocket connections
 const APIServiceInstanceId = uuidv1()
-
-// Mox body size in bytes for incoming requests
-const MAX_BODY_SIZE = process.env.MAX_BODY_SIZE || 131072
-
-// The maximum number of hashes allowed to be submitted in one request
-const POST_HASHES_MAX = process.env.POST_HASHES_MAX || 1000
-
-// The maximum number of proofs allowed to be verified in one request
-const POST_VERIFY_PROOFS_MAX = process.env.POST_VERIFY_PROOFS_MAX || 1000
-
-// The maximum number of calendar blocks allowed to be retrieved in one request
-const GET_CALENDAR_BLOCKS_MAX = process.env.GET_CALENDAR_BLOCKS_MAX || 1000
 
 // Initial an object that will hold all open websocket connections
 let WebSocketConnections = {}
@@ -130,16 +93,16 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_OUT_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_OUT_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
 
-        chan.assertExchange(RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
+        chan.assertExchange(env.RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
         chan.assertQueue('', { durable: true }, (err, q) => {
           if (err) return callback(err)
           // Continuously load the HASHES from RMQ with proof ready hash objects to process)
           let opts = { 'api_id': APIServiceInstanceId, 'x-match': 'all' }
-          chan.bindQueue(q.queue, RMQ_INCOMING_EXCHANGE, '', opts)
+          chan.bindQueue(q.queue, env.RMQ_INCOMING_EXCHANGE, '', opts)
           chan.consume(q.queue, (msg) => {
             processProofMessage(msg)
           })
@@ -189,10 +152,10 @@ function processProofMessage (msg) {
       if (err) {
         console.error(err)
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
     })
   }
@@ -315,8 +278,8 @@ function postHashesV1 (req, res, next) {
   }
 
   // validate hashes param Array is not larger than allowed max length
-  if (_.size(req.params.hashes) > POST_HASHES_MAX) {
-    return next(new restify.InvalidArgumentError(`invalid JSON body, hashes Array max size of ${POST_HASHES_MAX} exceeded`))
+  if (_.size(req.params.hashes) > env.POST_HASHES_MAX) {
+    return next(new restify.InvalidArgumentError(`invalid JSON body, hashes Array max size of ${env.POST_HASHES_MAX} exceeded`))
   }
 
   // validate hashes are individually well formed
@@ -336,13 +299,13 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
     (err, ok) => {
       if (err !== null) {
-        console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+        console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
+        console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
       }
     })
 
@@ -379,8 +342,8 @@ function getProofsByIDV1 (req, res, next) {
   }
 
   // ensure that the request count does not exceed the maximum setting
-  if (hashIdResults.length > GET_PROOFS_MAX_REST) {
-    return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + GET_PROOFS_MAX_REST + ' max)'))
+  if (hashIdResults.length > env.GET_PROOFS_MAX_REST) {
+    return next(new restify.InvalidArgumentError('invalid request, too many hash ids (' + env.GET_PROOFS_MAX_REST + ' max)'))
   }
 
   // prepare results array to hold proof results
@@ -397,7 +360,7 @@ function getProofsByIDV1 (req, res, next) {
     let uuidEpoch = uuidTime.v1(hashIdResult.hash_id)
     var nowEpoch = new Date().getTime()
     let uuidDiff = nowEpoch - uuidEpoch
-    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+    let maxDiff = env.PROOF_EXPIRE_MINUTES * 60 * 1000
     if (uuidDiff > maxDiff) return callback(null)
     // retrieve proof from storage
     redis.get(hashIdResult.hash_id, (err, proofBase64) => {
@@ -455,8 +418,8 @@ function postProofsForVerificationV1 (req, res, next) {
   }
 
   // validate proofs param Array is not larger than allowed max length
-  if (_.size(req.params.proofs) > POST_VERIFY_PROOFS_MAX) {
-    return next(new restify.InvalidArgumentError(`invalid JSON body, proofs Array max size of ${POST_VERIFY_PROOFS_MAX} exceeded`))
+  if (_.size(req.params.proofs) > env.POST_VERIFY_PROOFS_MAX) {
+    return next(new restify.InvalidArgumentError(`invalid JSON body, proofs Array max size of ${env.POST_VERIFY_PROOFS_MAX} exceeded`))
   }
 
   let verifyTasks = BuildVerifyTaskList(req.params.proofs)
@@ -673,8 +636,8 @@ function getCalBlockRangeV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid request, toHeight must be greater or equal to fromHeight'))
   }
   // ensure the requested range does not exceed GET_CALENDAR_BLOCKS_MAX
-  if ((toHeight - fromHeight + 1) > GET_CALENDAR_BLOCKS_MAX) {
-    return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${GET_CALENDAR_BLOCKS_MAX} blocks`))
+  if ((toHeight - fromHeight + 1) > env.GET_CALENDAR_BLOCKS_MAX) {
+    return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${env.GET_CALENDAR_BLOCKS_MAX} blocks`))
   }
 
   async.waterfall([
@@ -789,7 +752,7 @@ function rootV1 (req, res, next) {
 
 function subscribeForProofs (ws, wsConnectionId, hashIds) {
   // build an array of hash_ids, ignoring any hash_ids above the GET_PROOFS_MAX_WS limit
-  let hashIdResults = hashIds.split(',').slice(0, GET_PROOFS_MAX_WS).map((hashId) => {
+  let hashIdResults = hashIds.split(',').slice(0, env.GET_PROOFS_MAX_WS).map((hashId) => {
     return { hash_id: hashId.trim(), proof: null }
   })
 
@@ -800,7 +763,7 @@ function subscribeForProofs (ws, wsConnectionId, hashIds) {
     let uuidEpoch = uuidTime.v1(hashIdResult.hash_id)
     var nowEpoch = new Date().getTime()
     let uuidDiff = nowEpoch - uuidEpoch
-    let maxDiff = PROOF_EXPIRE_MINUTES * 60 * 1000
+    let maxDiff = env.PROOF_EXPIRE_MINUTES * 60 * 1000
     let uuidValidTime = (uuidDiff <= maxDiff)
     if (isValidUUID && uuidValidTime) {
       createProofSubscription(APIServiceInstanceId, wsConnectionId, hashIdResult.hash_id, (err, proofBase64) => {
@@ -915,7 +878,7 @@ server.use(cors.actual)
 server.use(restify.gzipResponse())
 server.use(restify.queryParser())
 server.use(restify.bodyParser({
-  maxBodySize: MAX_BODY_SIZE
+  maxBodySize: env.MAX_BODY_SIZE
 }))
 
 // API RESOURCES
@@ -964,16 +927,16 @@ function openStorageConnection (callback) {
 }
 
 function initConnectionsAndStart () {
-  if (process.env.NODE_ENV === 'test') return
+  if (env.NODE_ENV === 'test') return
   // Open storage connection and then amqp connection
   openStorageConnection((err, result) => {
     if (err) {
       console.error(err)
     } else {
       // AMQP initialization
-      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
       // REDIS initialization
-      openRedisConnection(REDIS_CONNECT_URI)
+      openRedisConnection(env.REDIS_CONNECT_URI)
       // Init intervals and watches
       startListening()
     }

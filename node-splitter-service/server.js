@@ -1,22 +1,8 @@
 const amqp = require('amqplib/callback_api')
 const async = require('async')
 
-require('dotenv').config()
-
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the api service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.splitter'
-
-// The queue name for outgoing message to the aggregator service
-const RMQ_WORK_OUT_AGG_QUEUE = process.env.RMQ_WORK_OUT_AGG_QUEUE || 'work.agg'
-
-// The queue name for outgoing message to the proof state service
-const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -50,13 +36,13 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_AGG_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_AGG_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           consumeHashMessage(msg)
         })
         return callback(null)
@@ -82,26 +68,26 @@ function consumeHashMessage (msg) {
       async.series([
         (seriesCallback) => {
           // Send this hash object message to the aggregator service
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
             (err, ok) => {
               if (err !== null) {
-                console.error(RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
+                console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
                 return seriesCallback(err)
               } else {
-                console.log(RMQ_WORK_OUT_AGG_QUEUE, 'publish message acked')
+                console.log(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message acked')
                 return seriesCallback(null)
               }
             })
         },
         // Send this hash object message to the proof state service for the tracking log
         (seriesCallback) => {
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true, type: 'splitter' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true, type: 'splitter' },
             (err, ok) => {
               if (err !== null) {
-                console.error(RMQ_WORK_OUT_STATE_QUEUE, '[splitter] publish message nacked')
+                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[splitter] publish message nacked')
                 return callback(err)
               } else {
-                console.log(RMQ_WORK_OUT_STATE_QUEUE, '[splitter] publish message acked')
+                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[splitter] publish message acked')
                 return callback(null)
               }
             })
@@ -114,17 +100,17 @@ function consumeHashMessage (msg) {
       if (err) {
         // An error has occurred publishing a message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
     })
   }
 }
 
 // Start reading from queue and splitting hashes
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
 
 // export these functions for testing purposes
 module.exports = {

@@ -2,9 +2,9 @@ const MerkleTools = require('merkle-tools')
 const amqp = require('amqplib/callback_api')
 const async = require('async')
 const request = require('request')
-const _ = require('lodash')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
 // An array of all Bitcoin transaction id objects needing to be monitored.
 // Will be filled as new trasnactions ids arrive on the queue.
@@ -16,42 +16,6 @@ const merkleTools = new MerkleTools()
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
-
-// Using DotEnv : https://github.com/motdotla/dotenv
-// Expects MONITOR_INTERVAL environment variable
-// Defaults to 30 seconds if not present. Can set vars in
-// `.env` file (do NOT commit to repo) or on command
-// line:
-//   MONITOR_INTERVAL=200 node server.js
-//
-const MONITOR_INTERVAL_SECONDS = process.env.MONITOR_INTERVAL_SECONDS || 30
-
-// The number of confirmations needed before the transaction is considered ready for proof delivery
-const MIN_BTC_CONFIRMS = process.env.MIN_BTC_CONFIRMS || 6
-
-// The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the calendar service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.btcmon'
-
-// The queue name for outgoing message to the calendar service
-const RMQ_WORK_OUT_CAL_QUEUE = process.env.RMQ_WORK_OUT_CAL_QUEUE || 'work.cal'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// BCOIN REST API
-// These values are private and are accessed from environment variables only
-const BCOIN_API_BASE_URI = process.env.BCOIN_API_BASE_URI
-const BCOIN_API_USERNAME = process.env.BCOIN_API_USERNAME
-const BCOIN_API_PASS = process.env.BCOIN_API_PASS
-
-// Validate env variables and exit if values are out of bounds
-var envErrors = []
-if (!_.inRange(MONITOR_INTERVAL_SECONDS, 10, 601)) envErrors.push('Bad MONITOR_INTERVAL_SECONDS')
-if (!_.inRange(MIN_BTC_CONFIRMS, 1, 16)) envErrors.push('Bad MONITOR_INTERVAL_SECONDS')
-if (envErrors.length > 0) throw new Error(envErrors)
 
 /**
  * Opens an AMPQ connection and channel
@@ -83,12 +47,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           consumeBtcTxIdMessage(msg)
         })
         return callback(null)
@@ -129,12 +93,12 @@ const getBTCTxById = (id, callback) => {
       }
     ],
     method: 'GET',
-    uri: BCOIN_API_BASE_URI + '/tx/' + id,
+    uri: env.BCOIN_API_BASE_URI + '/tx/' + id,
     json: true,
     gzip: true,
     auth: {
-      user: BCOIN_API_USERNAME,
-      pass: BCOIN_API_PASS
+      user: env.BCOIN_API_USERNAME,
+      pass: env.BCOIN_API_PASS
     }
   }
   request(options, function (err, response, body) {
@@ -159,12 +123,12 @@ const getChainState = (callback) => {
       }
     ],
     method: 'GET',
-    uri: BCOIN_API_BASE_URI + '/',
+    uri: env.BCOIN_API_BASE_URI + '/',
     json: true,
     gzip: true,
     auth: {
-      user: BCOIN_API_USERNAME,
-      pass: BCOIN_API_PASS
+      user: env.BCOIN_API_USERNAME,
+      pass: env.BCOIN_API_PASS
     }
   }
   request(options, function (err, response, body) {
@@ -191,7 +155,7 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
       }
     ],
     method: 'POST',
-    uri: BCOIN_API_BASE_URI + '/',
+    uri: env.BCOIN_API_BASE_URI + '/',
     body: {
       method: 'getblock',
       params: [blockHash]
@@ -199,8 +163,8 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
     json: true,
     gzip: true,
     auth: {
-      user: BCOIN_API_USERNAME,
-      pass: BCOIN_API_PASS
+      user: env.BCOIN_API_USERNAME,
+      pass: env.BCOIN_API_PASS
     }
   }
   request(options, function (err, response, body) {
@@ -213,7 +177,7 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
 }
 
 // AMQP initialization
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
 
 // Iterate through all BTCTXIDS objects, checking the confirmation count for each transaction
 // If MIN_BTC_CONFIRMS is reached for a given transaction, retrieve the state data needed
@@ -254,7 +218,7 @@ let monitorTransactions = () => {
         // calculate confirmations
         let confirmCount = chainHeight - blockHeight + 1
         // if confirmation count < MIN_BTC_CONFIRMS, this transaction is not ready
-        if (confirmCount < MIN_BTC_CONFIRMS) return wfCallback(btcTxIdObj.tx_id + ' not ready')
+        if (confirmCount < env.MIN_BTC_CONFIRMS) return wfCallback(btcTxIdObj.tx_id + ' not ready')
         // retrieve btc block transactions ids and build state data object
         getBlockInfoForBlockHash(blockHash, (err, blockInfo) => {
           if (err) return wfCallback(err)
@@ -284,13 +248,13 @@ let monitorTransactions = () => {
         messageObj.btchead_height = blockHeight
         messageObj.btchead_root = rootValueHex
         messageObj.path = proofPath
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' },
           (err, ok) => {
             if (err !== null) {
-              console.error(RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message nacked')
               return wfCallback(err)
             } else {
-              console.log(RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message acked')
+              console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message acked')
               return wfCallback(null)
             }
           })
@@ -300,12 +264,12 @@ let monitorTransactions = () => {
         console.error(err)
         // nack consumption of this message
         amqpChannel.nack(btcTxIdObj.msg)
-        console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
       } else {
         // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
         amqpChannel.ack(btcTxIdObj.msg)
         console.log(btcTxIdObj.tx_id + ' confirmed and processed')
-        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
       return eachCallback(null)
     })
@@ -319,7 +283,7 @@ let monitorTransactions = () => {
   })
 }
 
-setInterval(() => monitorTransactions(), MONITOR_INTERVAL_SECONDS * 1000)
+setInterval(() => monitorTransactions(), env.MONITOR_INTERVAL_SECONDS * 1000)
 
 // export these functions for unit tests
 module.exports = {

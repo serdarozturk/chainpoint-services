@@ -4,28 +4,10 @@ const async = require('async')
 const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
-const REDIS_CONNECT_URI = process.env.REDIS_CONNECT_URI || 'redis://redis:6379'
 const r = require('redis')
-
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the proof state service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.gen'
-
-// The exchange for publishing messages bound for API Service instances
-const RMQ_OUTGOING_EXCHANGE = process.env.RMQ_OUTGOING_EXCHANGE || 'exchange.headers'
-
-// The queue name for outgoing message to the api service
-const RMQ_WORK_OUT_QUEUE = process.env.RMQ_WORK_OUT_QUEUE || 'work.api'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// Lifespan of stored proofs, in minutes
-const PROOF_EXPIRE_MINUTES = process.env.PROOF_EXPIRE_MINUTES || 60 * 24
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -78,7 +60,7 @@ function generateCALProof (msg) {
     // We are not nacking here because the poorly formatted proof would just be
     // re-qeueud and re-processed on and on forever
     amqpChannel.ack(msg)
-    console.error(RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
+    console.error(env.RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
     return
   }
 
@@ -92,7 +74,7 @@ function generateCALProof (msg) {
     },
     // save proof to redis
     (proofBase64, callback) => {
-      redis.set(messageObj.hash_id, proofBase64, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
+      redis.set(messageObj.hash_id, proofBase64, 'EX', env.PROOF_EXPIRE_MINUTES * 60, (err, res) => {
         if (err) return callback(err)
         return callback(null)
       })
@@ -119,15 +101,15 @@ function generateCALProof (msg) {
         cx_id: wsConnectionId,
         hash_id: messageObj.hash_id
       }
-      amqpChannel.publish(RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
+      amqpChannel.publish(env.RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
-            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+            console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
             return callback(err)
           } else {
             // New message has been published
-            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
+            console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -137,10 +119,10 @@ function generateCALProof (msg) {
       if (err) {
         // An error has occurred saving the proof and publishing the ready message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, '[cal] consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, '[cal] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, '[cal] consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, '[cal] consume message acked')
       }
     })
 }
@@ -160,7 +142,7 @@ function generateBTCProof (msg) {
     // We are not nacking here because the poorly formatted proof would just be
     // re-qeueud and re-processed on and on forever
     amqpChannel.ack(msg)
-    console.error(RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
+    console.error(env.RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
     return
   }
 
@@ -174,7 +156,7 @@ function generateBTCProof (msg) {
     },
     // save proof to redis
     (proofBase64, callback) => {
-      redis.set(messageObj.hash_id, proofBase64, 'EX', PROOF_EXPIRE_MINUTES * 60, (err, res) => {
+      redis.set(messageObj.hash_id, proofBase64, 'EX', env.PROOF_EXPIRE_MINUTES * 60, (err, res) => {
         if (err) return callback(err)
         return callback(null)
       })
@@ -201,15 +183,15 @@ function generateBTCProof (msg) {
         cx_id: wsConnectionId,
         hash_id: messageObj.hash_id
       }
-      amqpChannel.publish(RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
+      amqpChannel.publish(env.RMQ_OUTGOING_EXCHANGE, '', Buffer.from(JSON.stringify(message)), opts,
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
-            console.error(RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+            console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
             return callback(err)
           } else {
             // New message has been published
-            console.log(RMQ_WORK_OUT_QUEUE, 'publish message acked')
+            console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -219,10 +201,10 @@ function generateBTCProof (msg) {
       if (err) {
         // An error has occurred saving the proof and publishing the ready message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(RMQ_WORK_IN_QUEUE, '[btc] consume message nacked')
+        console.error(env.RMQ_WORK_IN_QUEUE, '[btc] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, '[btc] consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, '[btc] consume message acked')
       }
     })
 }
@@ -327,12 +309,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertExchange(RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertExchange(env.RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           processMessage(msg)
         })
         return callback(null)
@@ -348,7 +330,7 @@ function amqpOpenConnection (connectionString) {
 }
 
 // Open amqp connection
-amqpOpenConnection(RABBITMQ_CONNECT_URI)
+amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
 
 // REDIS initialization
-openRedisConnection(REDIS_CONNECT_URI)
+openRedisConnection(env.REDIS_CONNECT_URI)

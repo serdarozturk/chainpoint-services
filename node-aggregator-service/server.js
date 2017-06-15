@@ -5,11 +5,10 @@ const crypto = require('crypto')
 const async = require('async')
 const uuidv1 = require('uuid/v1')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
-const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
-const CONSUL_PORT = process.env.CONSUL_PORT || 8500
-const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
+const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -29,51 +28,9 @@ const merkleTools = new MerkleTools()
 // This value is set once the connection has been established
 var amqpChannel = null
 
-// Using DotEnv : https://github.com/motdotla/dotenv
-// Expects AGGREGATION_INTERVAL environment variable
-// Defaults to 1000ms if not present. Can set vars in
-// `.env` file (do NOT commit to repo) or on command
-// line:
-//   AGGREGATION_INTERVAL=200 node server.js
-//
-const AGGREGATION_INTERVAL = process.env.AGGREGATION_INTERVAL || 1000
-
-// How often should aggregated hashes be finalized by writing
-// the Merkle tree root and all proofs to Proof service?
-const FINALIZATION_INTERVAL = process.env.FINALIZE_INTERVAL || 250
-
-// How many hashes to process as nodes on a new Merkle tree
-// during each AGGREGATION_INTERVAL.
-const HASHES_PER_MERKLE_TREE = process.env.HASHES_PER_MERKLE_TREE || 25000
-
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the splitter service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.agg'
-
-// The queue name for outgoing message to the calendar service
-const RMQ_WORK_OUT_CAL_QUEUE = process.env.RMQ_WORK_OUT_CAL_QUEUE || 'work.cal'
-
-// The queue name for outgoing message to the proof state service
-const RMQ_WORK_OUT_STATE_QUEUE = process.env.RMQ_WORK_OUT_STATE_QUEUE || 'work.state'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// The consul key to watch to receive updated NIST object
-const NIST_KEY = process.env.NIST_KEY || 'service/nist/latest'
-
 // The latest NIST data
 // This value is updated from consul events as changes are detected
 let nistLatest = null
-
-// Validate env variables and exit if values are out of bounds
-var envErrors = []
-if (!_.inRange(AGGREGATION_INTERVAL, 250, 10001)) envErrors.push('Bad AGGREGATION_INTERVAL')
-if (!_.inRange(FINALIZATION_INTERVAL, 250, 10001)) envErrors.push('Bad FINALIZATION_INTERVAL')
-if (!_.inRange(HASHES_PER_MERKLE_TREE, 100, 25001)) envErrors.push('Bad HASHES_PER_MERKLE_TREE')
-if (envErrors.length > 0) throw new Error(envErrors)
 
 function consumeHashMessage (msg) {
   if (msg !== null) {
@@ -111,7 +68,7 @@ function formatAsChainpointV3Ops (proof, op) {
 
 // Take work off of the HASHES array and build Merkle tree
 let aggregate = () => {
-  let hashesForTree = HASHES.splice(0, HASHES_PER_MERKLE_TREE)
+  let hashesForTree = HASHES.splice(0, env.HASHES_PER_MERKLE_TREE)
 
   // get snapshot of last NIST data and determine if it is valid and available to use for this aggregation
   let nistLastestString = nistLatest
@@ -197,15 +154,15 @@ let finalize = () => {
           stateObj.agg_state = {}
           stateObj.agg_state.ops = proofDataItem.proof
 
-          amqpChannel.sendToQueue(RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'aggregator' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'aggregator' },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
+                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message acked')
+                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -229,15 +186,15 @@ let finalize = () => {
         aggObj.agg_root = treeDataObj.agg_root
         aggObj.agg_hash_count = treeDataObj.agg_hash_count
 
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(aggObj)), { persistent: true, type: 'aggregator' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(aggObj)), { persistent: true, type: 'aggregator' },
           (err, ok) => {
             if (err !== null) {
               // An error as occurred publishing a message
-              console.error(RMQ_WORK_OUT_CAL_QUEUE, 'publish message nacked')
+              console.error(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message nacked')
               return callback(err)
             } else {
               // New message has been published
-              console.log(RMQ_WORK_OUT_CAL_QUEUE, 'publish message acked')
+              console.log(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message acked')
               return callback(null)
             }
           })
@@ -249,7 +206,7 @@ let finalize = () => {
           // nack consumption of all original hash messages part of this aggregation event
           if (message !== null) {
             amqpChannel.nack(message)
-            console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+            console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
           }
         })
       } else {
@@ -257,7 +214,7 @@ let finalize = () => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+            console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
           }
         })
       }
@@ -270,7 +227,7 @@ function startListening () {
   console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
-  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: NIST_KEY } })
+  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
 
   // Store the updated fee object on change
   nistWatch.on('change', function (data, res) {
@@ -286,9 +243,9 @@ function startListening () {
 
   // PERIODIC TIMERS
 
-  setInterval(() => finalize(), FINALIZATION_INTERVAL)
+  setInterval(() => finalize(), env.FINALIZATION_INTERVAL)
 
-  setInterval(() => aggregate(), AGGREGATION_INTERVAL)
+  setInterval(() => aggregate(), env.AGGREGATION_INTERVAL)
 }
 
 /**
@@ -321,13 +278,13 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           consumeHashMessage(msg)
         })
         return callback(null)
@@ -343,7 +300,7 @@ function amqpOpenConnection (connectionString) {
 }
 
 function initConnectionsAndStart () {
-  amqpOpenConnection(RABBITMQ_CONNECT_URI)
+  amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
   // Init intervals and watches
   startListening()
 }

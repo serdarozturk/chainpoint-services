@@ -4,50 +4,15 @@ const bcoin = require('bcoin')
 const request = require('request')
 const sb = require('satoshi-bitcoin')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
-require('dotenv').config()
 
-const CONSUL_HOST = process.env.CONSUL_HOST || 'consul'
-const CONSUL_PORT = process.env.CONSUL_PORT || 8500
-const consul = require('consul')({ host: CONSUL_HOST, port: CONSUL_PORT })
+// load all environment variables into env object
+const env = require('./parse-env.js')
 
-// THE maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit
-const RMQ_PREFETCH_COUNT = process.env.RMQ_PREFETCH_COUNT || 0
-
-// The queue name for message consumption originating from the calendar service
-const RMQ_WORK_IN_QUEUE = process.env.RMQ_WORK_IN_QUEUE || 'work.btctx'
-
-// The queue name for outgoing message to the calendar service
-const RMQ_WORK_OUT_CAL_QUEUE = process.env.RMQ_WORK_OUT_CAL_QUEUE || 'work.cal'
-
-// Connection string w/ credentials for RabbitMQ
-const RABBITMQ_CONNECT_URI = process.env.RABBITMQ_CONNECT_URI || 'amqp://chainpoint:chainpoint@rabbitmq'
-
-// Global service stack Id
-const CHAINPOINT_STACK_ID = process.env.CHAINPOINT_STACK_ID || ''
+const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
-
-// The consul key to watch to receive updated fee object
-const BTC_REC_FEE_KEY = process.env.BTC_REC_FEE_KEY || 'service/btc-fee/recommendation'
-
-// The mamimum recFeeInSatPerByte value accepted.
-// This is to safeguard against the service returning a very high value in error
-// and to impose a common sense limit on the highest fee per byte to allow.
-// MAX BTC to spend = AverageTxSizeBytes * BTC_MAX_FEE_SAT_PER_BYTE / 100000000
-// If we are to limit the maximum fee per transaction to 0.01 BTC, then
-// 0.01 = 235 * BTC_MAX_FEE_SAT_PER_BYTE / 100000000
-// BTC_MAX_FEE_SAT_PER_BYTE = 0.01 *  100000000 / 235
-// BTC_MAX_FEE_SAT_PER_BYTE = 4255
-const BTC_MAX_FEE_SAT_PER_BYTE = process.env.BTC_MAX_FEE_SAT_PER_BYTE || 4255
-
-// BCOIN REST API
-// These values are private and are accessed from environment variables only
-const BCOIN_API_BASE_URI = process.env.BCOIN_API_BASE_URI
-const BCOIN_API_WALLET_ID = process.env.BCOIN_API_WALLET_ID
-const BCOIN_API_USERNAME = process.env.BCOIN_API_USERNAME
-const BCOIN_API_PASS = process.env.BCOIN_API_PASS
 
 // The local variable holding the Bitcoin recommended fee value, from Consul at key BTC_REC_FEE_KEY,
 // pushed from consul and refreshed automatically when any update in value is made
@@ -70,7 +35,7 @@ let logBtcTxData = (txObj, callback) => {
   row.inputAddress = txObj.inputs[0].address
   row.outputAddress = txObj.outputs[1].address
   row.balanceBtc = parseFloat(txObj.outputs[1].value)
-  row.stackId = CHAINPOINT_STACK_ID
+  row.stackId = env.CHAINPOINT_STACK_ID
 
   BtcTxLog.create(row)
     .then((newRow) => {
@@ -106,9 +71,9 @@ const genTxScript = (hash) => {
 */
 const genTxBody = (feeSatPerByte, hash) => {
   // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
-  if (feeSatPerByte > BTC_MAX_FEE_SAT_PER_BYTE) {
-    console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${BTC_MAX_FEE_SAT_PER_BYTE}`)
-    feeSatPerByte = BTC_MAX_FEE_SAT_PER_BYTE
+  if (feeSatPerByte > env.BTC_MAX_FEE_SAT_PER_BYTE) {
+    console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${env.BTC_MAX_FEE_SAT_PER_BYTE}`)
+    feeSatPerByte = env.BTC_MAX_FEE_SAT_PER_BYTE
   }
   // bcoin wants the rate as a string representing btc per kb
   let feeBtcPerByte = sb.toBitcoin(feeSatPerByte)
@@ -141,13 +106,13 @@ const sendTxToBTC = (hash, callback) => {
       }
     ],
     method: 'POST',
-    uri: BCOIN_API_BASE_URI + '/wallet/' + BCOIN_API_WALLET_ID + '/send',
+    uri: env.BCOIN_API_BASE_URI + '/wallet/' + env.BCOIN_API_WALLET_ID + '/send',
     body: body,
     json: true,
     gzip: true,
     auth: {
-      user: BCOIN_API_USERNAME,
-      pass: BCOIN_API_PASS
+      user: env.BCOIN_API_USERNAME,
+      pass: env.BCOIN_API_PASS
     }
   }
   request(options, function (err, response, body) {
@@ -193,13 +158,13 @@ function processIncomingAnchorJob (msg) {
         // adding btc transaction id and full transaction body to original message and returning
         messageObj.btctx_id = body.hash
         messageObj.btctx_body = body.tx
-        amqpChannel.sendToQueue(RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
           (err, ok) => {
             if (err !== null) {
-              console.error(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
+              console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
               return callback(err)
             } else {
-              console.log(RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+              console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
               return callback(null)
             }
           })
@@ -211,11 +176,11 @@ function processIncomingAnchorJob (msg) {
         // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
         setTimeout(() => {
           amqpChannel.nack(msg)
-          console.error(RMQ_WORK_IN_QUEUE, 'consume message nacked')
+          console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
         }, 30000)
       } else {
         amqpChannel.ack(msg)
-        console.log(RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
       }
     })
   }
@@ -249,12 +214,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(RMQ_WORK_IN_QUEUE, { durable: true })
-        chan.assertQueue(RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
-        chan.consume(RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
           console.log('processing incoming message')
           processIncomingAnchorJob(msg)
         })
@@ -274,7 +239,7 @@ function amqpOpenConnection (connectionString) {
 function startListening () {
   console.log('starting watches and intervals')
   // Continuous watch on the consul key holding the fee object.
-  var watch = consul.watch({ method: consul.kv.get, options: { key: BTC_REC_FEE_KEY } })
+  var watch = consul.watch({ method: consul.kv.get, options: { key: env.BTC_REC_FEE_KEY } })
 
   // Store the updated fee object on change
   watch.on('change', function (data, res) {
@@ -311,7 +276,7 @@ function initConnectionsAndStart () {
     if (err) {
       console.error(err)
     } else {
-      amqpOpenConnection(RABBITMQ_CONNECT_URI)
+      amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
       // Init intervals and watches
       startListening()
     }
