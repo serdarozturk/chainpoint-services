@@ -7,7 +7,7 @@ const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
@@ -16,6 +16,9 @@ const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT 
 // see: https://github.com/dchest/tweetnacl-js#signatures
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
+
+console.log(env.NACL_KEYPAIR_SEED)
+console.log(JSON.stringify(env))
 
 // Instantiate signing keypair from a 32 byte random hex secret
 // passed in via env var. The Base64 encoded random seed can be
@@ -259,10 +262,10 @@ function consumeBtcTxMessage (msg) {
     ], (err, results) => {
       if (err) {
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, '[btctx] consume message nacked')
+        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[btctx] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, '[btctx] consume message acked')
+        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btctx] consume message acked')
       }
     })
   }
@@ -407,7 +410,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         // nack consumption of all original hash messages part of this aggregation event
         if (message !== null) {
           amqpChannel.nack(message)
-          console.error(env.RMQ_WORK_IN_QUEUE, '[aggregator] consume message nacked')
+          console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message nacked')
         }
       })
       return persistCallback(err)
@@ -416,7 +419,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         if (message !== null) {
           // ack consumption of all original hash messages part of this aggregation event
           amqpChannel.ack(message)
-          console.log(env.RMQ_WORK_IN_QUEUE, '[aggregator] consume message acked')
+          console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
         }
       })
       return persistCallback(null)
@@ -751,11 +754,11 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
         // nack consumption of all original message
         console.error(err)
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, '[btcmon] consume message nacked')
+        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message nacked')
       } else {
         // ack consumption of all original hash messages part of this aggregation event
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, '[btcmon] consume message acked')
+        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message acked')
       }
       return eachCallback(null)
     })
@@ -929,14 +932,14 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_CAL_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
         chan.prefetch(env.RMQ_PREFETCH_COUNT)
         amqpChannel = chan
 
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_CAL_QUEUE, (msg) => {
           processMessage(msg)
         })
         return callback(null)

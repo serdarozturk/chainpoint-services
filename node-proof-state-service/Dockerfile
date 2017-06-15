@@ -7,7 +7,6 @@ RUN yarn
 RUN mkdir /home/node/app/storage-adapters
 COPY ./storage-adapters/*.js /home/node/app/storage-adapters/
 
-COPY parse-env.js /home/node/app/
 COPY server.js /home/node/app/
 
 CMD ["yarn", "start"]

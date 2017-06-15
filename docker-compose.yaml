@@ -33,6 +33,33 @@ services:
     networks:
       - chainpoint
 
+
+  # Aggregator
+  #
+  # SCALED: true
+  #
+  # PORTS : none
+  #
+  aggregator:
+    restart: always
+    image: quay.io/chainpoint/node-aggregator-service:latest
+    build:
+      context: ./node-aggregator-service
+    environment: &base_env
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
+      NACL_KEYPAIR_SEED: ${NACL_KEYPAIR_SEED}
+    depends_on:
+      - rabbitmq
+      - influxdb
+      - nist-beacon
+    networks:
+      - chainpoint
+
   # HTTP API
   # Restify Node public web API service.
   #
@@ -54,6 +81,9 @@ services:
     image: quay.io/chainpoint/node-api-service:latest
     build:
       context: ./node-api-service
+    environment:  
+      <<: *base_env
+      VIRTUAL_HOST: api.local
     depends_on:
       - roach1
       - roach2
@@ -63,8 +93,6 @@ services:
       - influxdb
     networks:
       - chainpoint
-    environment:
-      VIRTUAL_HOST: api.local
 
   # Splitter
   #
@@ -77,27 +105,11 @@ services:
     image: quay.io/chainpoint/node-splitter-service:latest
     build:
       context: ./node-splitter-service
+    environment:  
+      <<: *base_env
     depends_on:
       - rabbitmq
       - influxdb
-    networks:
-      - chainpoint
-
-  # Aggregator
-  #
-  # SCALED: true
-  #
-  # PORTS : none
-  #
-  aggregator:
-    restart: always
-    image: quay.io/chainpoint/node-aggregator-service:latest
-    build:
-      context: ./node-aggregator-service
-    depends_on:
-      - rabbitmq
-      - influxdb
-      - nist-beacon
     networks:
       - chainpoint
 
@@ -113,6 +125,8 @@ services:
     image: quay.io/chainpoint/node-nist-beacon-service:latest
     build:
       context: ./node-nist-beacon-service
+    environment:  
+      <<: *base_env
     container_name: nist-beacon
     depends_on:
       - redis
@@ -134,12 +148,10 @@ services:
     build:
       context: ./node-calendar-service
     container_name: calendar
-    environment:
-      NACL_KEYPAIR_SEED: '+zy90opG2vQIUOL1rI6Ja3tN26QtE6AC5F5bP1j+NgM='
+    environment:  
+      <<: *base_env
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
     depends_on:
       - roach1
       - roach2
@@ -161,6 +173,8 @@ services:
     image: quay.io/chainpoint/node-btc-fee-service:latest
     build:
       context: ./node-btc-fee-service
+    environment:  
+      <<: *base_env
     container_name: btc-fee
     depends_on:
       - consul
@@ -178,12 +192,8 @@ services:
     build:
       context: ./node-btc-tx-service
     container_name: btc-tx
-    environment:
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+    environment:  
+      <<: *base_env
     depends_on:
       - roach1
       - roach2
@@ -204,11 +214,8 @@ services:
     build:
       context: ./node-btc-mon-service
     container_name: btc-mon
-    environment:
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
+    environment:  
+      <<: *base_env
     depends_on:
       - rabbitmq
       - influxdb
@@ -223,7 +230,8 @@ services:
     image: quay.io/chainpoint/node-proof-state-service:latest
     build:
       context: ./node-proof-state-service
-    environment:
+    environment:  
+      <<: *base_env
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
     depends_on:
@@ -242,6 +250,8 @@ services:
     image: quay.io/chainpoint/node-proof-gen-service:latest
     build:
       context: ./node-proof-gen-service
+    environment:  
+      <<: *base_env
     depends_on:
       - rabbitmq
       - influxdb

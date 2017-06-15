@@ -2,7 +2,7 @@ const amqp = require('amqplib/callback_api')
 const async = require('async')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -36,13 +36,13 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_SPLITTER_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_AGG_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_SPLITTER)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_SPLITTER_QUEUE, (msg) => {
           consumeHashMessage(msg)
         })
         return callback(null)
@@ -100,10 +100,10 @@ function consumeHashMessage (msg) {
       if (err) {
         // An error has occurred publishing a message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        console.error(env.RMQ_WORK_IN_SPLITTER_QUEUE, 'consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_SPLITTER_QUEUE, 'consume message acked')
       }
     })
   }

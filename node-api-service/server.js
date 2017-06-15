@@ -11,7 +11,7 @@ const chpParse = require('chainpoint-parse')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const r = require('redis')
 
@@ -93,8 +93,8 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_OUT_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.assertQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, { durable: true })
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_API)
         amqpChannel = chan
 
         chan.assertExchange(env.RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
@@ -152,10 +152,10 @@ function processProofMessage (msg) {
       if (err) {
         console.error(err)
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message acked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message acked')
       }
     })
   }
@@ -299,13 +299,13 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
     (err, ok) => {
       if (err !== null) {
-        console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+        console.error(env.RMQ_WORK_OUT_SPLITTER_QUEUE, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
+        console.log(env.RMQ_WORK_OUT_SPLITTER_QUEUE, 'publish message acked')
       }
     })
 

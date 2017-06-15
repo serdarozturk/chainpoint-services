@@ -1,5 +1,5 @@
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const BEACON = require('nist-randomness-beacon')
 

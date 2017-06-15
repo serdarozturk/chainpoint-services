@@ -4,7 +4,7 @@ const async = require('async')
 const request = require('request')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 // An array of all Bitcoin transaction id objects needing to be monitored.
 // Will be filled as new trasnactions ids arrive on the queue.
@@ -47,12 +47,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_BTCMON_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCMON)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_BTCMON_QUEUE, (msg) => {
           consumeBtcTxIdMessage(msg)
         })
         return callback(null)
@@ -264,12 +264,12 @@ let monitorTransactions = () => {
         console.error(err)
         // nack consumption of this message
         amqpChannel.nack(btcTxIdObj.msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
+        console.error(env.RMQ_WORK_IN_BTCMON_QUEUE, 'consume message nacked')
       } else {
         // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
         amqpChannel.ack(btcTxIdObj.msg)
         console.log(btcTxIdObj.tx_id + ' confirmed and processed')
-        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_BTCMON_QUEUE, 'consume message acked')
       }
       return eachCallback(null)
     })

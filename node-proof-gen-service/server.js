@@ -5,7 +5,7 @@ const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const r = require('redis')
 
@@ -60,7 +60,7 @@ function generateCALProof (msg) {
     // We are not nacking here because the poorly formatted proof would just be
     // re-qeueud and re-processed on and on forever
     amqpChannel.ack(msg)
-    console.error(env.RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
+    console.error(env.RMQ_WORK_IN_GEN_QUEUE, 'consume message acked, but with invalid JSON schema error')
     return
   }
 
@@ -105,11 +105,11 @@ function generateCALProof (msg) {
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
-            console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+            console.error(env.RMQ_WORK_OUT_API_QUEUE, 'publish message nacked')
             return callback(err)
           } else {
             // New message has been published
-            console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
+            console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -119,10 +119,10 @@ function generateCALProof (msg) {
       if (err) {
         // An error has occurred saving the proof and publishing the ready message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, '[cal] consume message nacked')
+        console.error(env.RMQ_WORK_IN_GEN_QUEUE, '[cal] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, '[cal] consume message acked')
+        console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[cal] consume message acked')
       }
     })
 }
@@ -142,7 +142,7 @@ function generateBTCProof (msg) {
     // We are not nacking here because the poorly formatted proof would just be
     // re-qeueud and re-processed on and on forever
     amqpChannel.ack(msg)
-    console.error(env.RMQ_WORK_IN_QUEUE, 'consume message acked, but with invalid JSON schema error')
+    console.error(env.RMQ_WORK_IN_GEN_QUEUE, 'consume message acked, but with invalid JSON schema error')
     return
   }
 
@@ -187,11 +187,11 @@ function generateBTCProof (msg) {
         (err, ok) => {
           if (err !== null) {
             // An error as occurred publishing a message
-            console.error(env.RMQ_WORK_OUT_QUEUE, 'publish message nacked')
+            console.error(env.RMQ_WORK_OUT_API_QUEUE, 'publish message nacked')
             return callback(err)
           } else {
             // New message has been published
-            console.log(env.RMQ_WORK_OUT_QUEUE, 'publish message acked')
+            console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -201,10 +201,10 @@ function generateBTCProof (msg) {
       if (err) {
         // An error has occurred saving the proof and publishing the ready message, nack consumption of message
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_QUEUE, '[btc] consume message nacked')
+        console.error(env.RMQ_WORK_IN_GEN_QUEUE, '[btc] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, '[btc] consume message acked')
+        console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[btc] consume message acked')
       }
     })
 }
@@ -309,12 +309,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_GEN_QUEUE, { durable: true })
         chan.assertExchange(env.RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_GEN)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_GEN_QUEUE, (msg) => {
           processMessage(msg)
         })
         return callback(null)

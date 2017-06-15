@@ -6,7 +6,7 @@ const async = require('async')
 const uuidv1 = require('uuid/v1')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
@@ -206,7 +206,7 @@ let finalize = () => {
           // nack consumption of all original hash messages part of this aggregation event
           if (message !== null) {
             amqpChannel.nack(message)
-            console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
+            console.error(env.RMQ_WORK_IN_AGG_QUEUE, 'consume message nacked')
           }
         })
       } else {
@@ -214,7 +214,7 @@ let finalize = () => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+            console.log(env.RMQ_WORK_IN_AGG_QUEUE, 'consume message acked')
           }
         })
       }
@@ -278,13 +278,13 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_AGG_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_AGG)
         amqpChannel = chan
         // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_AGG_QUEUE, (msg) => {
           consumeHashMessage(msg)
         })
         return callback(null)

@@ -6,7 +6,7 @@ const sb = require('satoshi-bitcoin')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
 
 // load all environment variables into env object
-const env = require('./parse-env.js')
+const env = require('./lib/parse-env.js')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
@@ -176,11 +176,11 @@ function processIncomingAnchorJob (msg) {
         // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
         setTimeout(() => {
           amqpChannel.nack(msg)
-          console.error(env.RMQ_WORK_IN_QUEUE, 'consume message nacked')
+          console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
         }, 30000)
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_QUEUE, 'consume message acked')
+        console.log(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message acked')
       }
     })
   }
@@ -214,12 +214,12 @@ function amqpOpenConnection (connectionString) {
         // the connection and channel have been established
         // set 'amqpChannel' so that publishers have access to the channel
         console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_QUEUE, { durable: true })
+        chan.assertQueue(env.RMQ_WORK_IN_BTCTX_QUEUE, { durable: true })
         chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
+        chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCTX)
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
-        chan.consume(env.RMQ_WORK_IN_QUEUE, (msg) => {
+        chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
           console.log('processing incoming message')
           processIncomingAnchorJob(msg)
         })
