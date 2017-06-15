@@ -1,26 +1,17 @@
 // PostgreSQL DB storage adapter
 var Sequelize = require('sequelize')
 
-require('dotenv').config()
+// load all environment variables into env object
+const env = require('../parse-env.js')
 
 // Connection URI for Postgres
-const POSTGRES_CONNECT_PROTOCOL = process.env.POSTGRES_CONNECT_PROTOCOL || 'postgres:'
-const POSTGRES_CONNECT_USER = process.env.POSTGRES_CONNECT_USER || 'chainpoint'
-const POSTGRES_CONNECT_PW = process.env.POSTGRES_CONNECT_PW || 'chainpoint'
-const POSTGRES_CONNECT_HOST = process.env.POSTGRES_CONNECT_HOST || 'postgres'
-const POSTGRES_CONNECT_PORT = process.env.POSTGRES_CONNECT_PORT || 5432
-const POSTGRES_CONNECT_DB = process.env.POSTGRES_CONNECT_DB || 'chainpoint'
-const POSTGRES_CONNECT_URI = `${POSTGRES_CONNECT_PROTOCOL}//${POSTGRES_CONNECT_USER}:${POSTGRES_CONNECT_PW}@${POSTGRES_CONNECT_HOST}:${POSTGRES_CONNECT_PORT}/${POSTGRES_CONNECT_DB}`
+const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_CONNECT_USER}:${env.POSTGRES_CONNECT_PW}@${env.POSTGRES_CONNECT_HOST}:${env.POSTGRES_CONNECT_PORT}/${env.POSTGRES_CONNECT_DB}`
 
-// Enable or disable anchoring to external blockchains
-// This information in necessary here to determine the proper PROOF_STEP_COUNT defined below
-const ANCHOR_BTC = process.env.ANCHOR_BTC ? JSON.parse(process.env.ANCHOR_BTC) : false
-const ANCHOR_ETH = process.env.ANCHOR_ETH ? JSON.parse(process.env.ANCHOR_ETH) : false
 // Set the number of tracking log events to complete in order for the hash to be considered fully processed
 // The value is determined by the number of anchoring services enabled
 // The base of 3 represents the splitter, aggregator, and calendar events
 // This number will increase as additional anchor services are enabled
-const PROOF_STEP_COUNT = 3 + (ANCHOR_BTC ? 1 : 0) + (ANCHOR_ETH ? 1 : 0)
+const PROOF_STEP_COUNT = 3 + (env.ANCHOR_BTC ? 1 : 0) + (env.ANCHOR_ETH ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
