@@ -161,15 +161,15 @@ build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-
 
 ## Run API test suite with Mocha
 run-api-test: build-api-test
-	docker run --rm quay.io/chainpoint/node-api-service-test
+	docker run --tty=true --rm quay.io/chainpoint/node-api-service-test
 
 ## Run aggregator test suite with Mocha
 run-aggregator-test: build-aggregator-test
-	docker run --rm quay.io/chainpoint/node-aggregator-service-test
+	docker run --tty=true --rm quay.io/chainpoint/node-aggregator-service-test
 
 ## Run splitter test suite with Mocha
 run-splitter-test: build-splitter-test
-	docker run --rm quay.io/chainpoint/node-splitter-service-test
+	docker run --tty=true --rm quay.io/chainpoint/node-splitter-service-test
 
 ## Run a small load test submitting hashes
 run-load-test:
