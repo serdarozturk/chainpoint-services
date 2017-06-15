@@ -246,6 +246,7 @@ function addBtcBranch (proof, anchorAggState, btcTxState, btcHeadState) {
   let btcAnchor = {}
   btcAnchor.type = 'btc'
   btcAnchor.anchor_id = btcHeadState.anchor.anchor_id
+  btcAnchor.uris = btcHeadState.anchor.uris
 
   btcBranch.ops.push({ anchors: [btcAnchor] })
 
