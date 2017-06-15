@@ -10,6 +10,7 @@ module.exports = envalid.cleanEnv(process.env, {
   BCOIN_API_BASE_URI: envalid.url({ desc: 'The Bcoin base URI' }),
   BCOIN_API_WALLET_ID: envalid.str({ desc: 'The wallet Id to be used' }),
   BCOIN_API_USERNAME: envalid.str({ desc: 'The API username for the Bcoin instance' }),
+  BCOIN_API_PASS: envalid.str({ desc: 'The API password for the Bcoin instance' }),
   RMQ_WORK_IN_QUEUE: envalid.str({ default: 'work.btctx', desc: 'The queue name for message consumption originating from the calendar service' }),
   RMQ_WORK_OUT_CAL_QUEUE: envalid.str({ default: 'work.cal', desc: 'The queue name for outgoing message to the calendar service' }),
   BTC_MAX_FEE_SAT_PER_BYTE: envalid.num({ default: 4255, desc: 'The maximum recFeeInSatPerByte value accepted' })
