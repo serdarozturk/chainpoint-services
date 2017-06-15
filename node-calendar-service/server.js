@@ -872,7 +872,11 @@ function startListening () {
     try {
       // if the amqp channel is null (closed), processing should not continue, defer to next interval
       if (amqpChannel === null) return
-      calendarLock.acquire()
+      if (AGGREGATION_ROOTS.length > 0) { // there will be data to process, acquire lock and continue
+        calendarLock.acquire()
+      } else { // there will not be any data to process, do nothing
+        console.log('calendar interval elapsed, no data')
+      }
     } catch (err) {
       console.error('calendarLock.acquire() : caught err : ', err.message)
     }
