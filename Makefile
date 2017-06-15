@@ -71,6 +71,12 @@ build-aggregator: build-lib
 	docker build -t quay.io/chainpoint/node-aggregator-service:$(VERSION) --no-cache=$(NO_CACHE) . \
 	&& docker tag quay.io/chainpoint/node-aggregator-service:$(VERSION) quay.io/chainpoint/node-aggregator-service:latest
 
+## Build aggregator test runner
+build-aggregator-test: build-aggregator
+	@cd node-aggregator-service; \
+	docker build -t quay.io/chainpoint/node-aggregator-service-test:$(VERSION) -f Dockerfile.test --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-aggregator-service-test:$(VERSION) quay.io/chainpoint/node-aggregator-service-test:latest
+
 ## Build API
 build-api: build-lib
 	@cd node-api-service; \
@@ -131,6 +137,12 @@ build-splitter: build-lib
 	docker build -t quay.io/chainpoint/node-splitter-service:$(VERSION) --no-cache=$(NO_CACHE) . \
 	&& docker tag quay.io/chainpoint/node-splitter-service:$(VERSION) quay.io/chainpoint/node-splitter-service:latest
 
+## Build splitter test runner
+build-splitter-test: build-splitter
+	@cd node-splitter-service; \
+	docker build -t quay.io/chainpoint/node-splitter-service-test:$(VERSION) -f Dockerfile.test --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-splitter-service-test:$(VERSION) quay.io/chainpoint/node-splitter-service-test:latest
+
 ## Build redis
 build-redis: build-lib
 	@cd redis; \
@@ -150,6 +162,14 @@ build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-
 ## Run API test suite with Mocha
 run-api-test: build-api-test
 	docker run --rm quay.io/chainpoint/node-api-service-test
+
+## Run aggregator test suite with Mocha
+run-aggregator-test: build-aggregator-test
+	docker run --rm quay.io/chainpoint/node-aggregator-service-test
+
+## Run splitter test suite with Mocha
+run-splitter-test: build-splitter-test
+	docker run --rm quay.io/chainpoint/node-splitter-service-test
 
 ## Run a small load test submitting hashes
 run-load-test:
@@ -186,4 +206,4 @@ prune: down
 ## Burn it all down and rise from the ashes
 phoenix: clean prune cockroachdb-reset up
 
-.PHONY: all default cockroachdb-reset cockroachdb-setup run-api-test run-load-test build-config build-base build-lib build up down clean prune phoenix
+.PHONY: all default cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build-base build-lib build up down clean prune phoenix

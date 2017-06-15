@@ -4,11 +4,9 @@ const amqp = require('amqplib/callback_api')
 const crypto = require('crypto')
 const async = require('async')
 const uuidv1 = require('uuid/v1')
-
+const cnsl = require('consul')
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')
-
-const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -23,6 +21,8 @@ let TREES = []
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
+
+let consul = null
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -300,6 +300,8 @@ function amqpOpenConnection (connectionString) {
 }
 
 function initConnectionsAndStart () {
+  if (env.NODE_ENV === 'test') return
+  consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
   amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
   // Init intervals and watches
   startListening()
