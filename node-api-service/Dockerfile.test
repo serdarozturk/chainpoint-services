@@ -1,7 +1,7 @@
 # Mocha Test Runner for API test suite
 # See : https://dzone.com/articles/testing-nodejs-application-using-mocha-and-docker
 
-FROM chainpoint/node-api-service
+FROM quay.io/chainpoint/node-api-service
 
 # Copy the test files
 COPY test test
