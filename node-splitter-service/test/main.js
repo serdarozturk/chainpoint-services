@@ -8,7 +8,7 @@ var server = require('../server')
 describe('Consume Hash Messages', () => {
   it('should do nothing with null message', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
@@ -23,7 +23,7 @@ describe('Consume Hash Messages', () => {
 
   it('should generate one hash object with a one hash message', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
@@ -50,7 +50,7 @@ describe('Consume Hash Messages', () => {
 
   it('should generate three state objects with a three hash messages', (done) => {
     server.setAMQPChannel({
-      publish: function (ex, key, message, opt) {
+      sendToQueue: function (q, message, opt, callback) {
         this.results.push(JSON.parse(message.toString()))
       },
       results: []
