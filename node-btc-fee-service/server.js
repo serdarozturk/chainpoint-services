@@ -6,21 +6,17 @@ const Influx = require('influx')
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('btc-fee')
 
-// FIXME : Get rid of caching for http call so we can get rid of redis here?
-const r = require('redis')
-const redis = r.createClient(env.REDIS_CONNECT_URI)
-
 const consul = require('consul')({host: env.CONSUL_HOST, port: env.CONSUL_PORT})
 
 // See : https://github.com/ranm8/requestify
-// Setup requestify to use Redis caching layer.
+// Setup requestify and its caching layer.
 const requestify = require('requestify')
 const coreCacheTransporters = requestify.coreCacheTransporters
-requestify.cacheTransporter(coreCacheTransporters.redis(redis))
+requestify.cacheTransporter(coreCacheTransporters.inMemory())
 
 // How long, in milliseconds, should cached values be kept for
 // until a new HTTP GET is issued?
-const CACHE_TTL = 1000 * 60 * 10 // in ms, cache response for 10 min
+const CACHE_TTL = 1000 * 60 * 5 // in ms, cache response for 5 min
 
 // The average size, in Bytes, for BTC transactions for anchoring
 const AVG_TX_BYTES = 235
@@ -192,6 +188,6 @@ getExchangeTick()
 setInterval(() => getExchangeTick(), 1000 * 60) // 1 min
 
 // get recommended fees at startup and periodically
-// most calls served from cache and don't hit external API
+// most calls are served from cache and don't hit external API
 getRecommendedFees()
 setInterval(() => getRecommendedFees(), 1000 * 60) // 1 min

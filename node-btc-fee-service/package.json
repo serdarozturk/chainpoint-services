@@ -14,7 +14,6 @@
     "envalid": "^3.0.0",
     "influx": "^5.0.7",
     "lodash": "^4.17.4",
-    "redis": "^2.7.1",
     "requestify": "^0.2.5",
     "satoshi-bitcoin": "^1.0.4"
   }
