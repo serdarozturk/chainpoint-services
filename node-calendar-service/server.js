@@ -7,7 +7,7 @@ const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('cal')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
@@ -16,9 +16,6 @@ const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT 
 // see: https://github.com/dchest/tweetnacl-js#signatures
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
-
-console.log(env.NACL_KEYPAIR_SEED)
-console.log(JSON.stringify(env))
 
 // Instantiate signing keypair from a 32 byte random hex secret
 // passed in via env var. The Base64 encoded random seed can be

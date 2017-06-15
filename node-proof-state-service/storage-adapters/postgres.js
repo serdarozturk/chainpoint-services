@@ -2,7 +2,7 @@
 var Sequelize = require('sequelize')
 
 // load all environment variables into env object
-const env = require('../lib/parse-env.js')
+const env = require('../lib/parse-env.js')('postgres-adapter')
 
 // Connection URI for Postgres
 const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_CONNECT_USER}:${env.POSTGRES_CONNECT_PW}@${env.POSTGRES_CONNECT_HOST}:${env.POSTGRES_CONNECT_PORT}/${env.POSTGRES_CONNECT_DB}`

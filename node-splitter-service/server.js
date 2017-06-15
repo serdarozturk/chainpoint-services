@@ -2,7 +2,7 @@ const amqp = require('amqplib/callback_api')
 const async = require('async')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('splitter')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established

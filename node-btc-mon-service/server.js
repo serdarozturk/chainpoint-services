@@ -4,7 +4,7 @@ const async = require('async')
 const request = require('request')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('btc-mon')
 
 // An array of all Bitcoin transaction id objects needing to be monitored.
 // Will be filled as new trasnactions ids arrive on the queue.

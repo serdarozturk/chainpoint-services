@@ -5,7 +5,7 @@ const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('gen')
 
 const r = require('redis')
 

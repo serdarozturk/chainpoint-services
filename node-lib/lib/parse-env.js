@@ -21,11 +21,13 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
   else throw new Error('Value must be between 1 and 16, inclusive')
 })
 
-module.exports = envalid.cleanEnv(process.env, {
+let envDefinitions = {
+
+  // ***********************************************************************
+  // * Global variables with default values
+  // ***********************************************************************
 
   // Chainpoint stack relates variables
-  CHAINPOINT_STACK_ID: envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' }),
-  CHAINPOINT_BASE_URI: envalid.url({ desc: 'Base URI for this Chainpoint stack of services' }),
   NODE_ENV: envalid.str({ default: 'production', desc: 'The type of environment in which the service is running' }),
 
   // Proof retention setting
@@ -69,15 +71,7 @@ module.exports = envalid.cleanEnv(process.env, {
   POSTGRES_CONNECT_PORT: envalid.num({ default: 5432, desc: 'Postgres server connection port' }),
   POSTGRES_CONNECT_DB: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection database name' }),
 
-  // Bcoin related variables
-  BCOIN_API_BASE_URI: envalid.url({ desc: 'The Bcoin base URI' }),
-  BCOIN_API_WALLET_ID: envalid.str({ desc: 'The wallet Id to be used' }),
-  BCOIN_API_USERNAME: envalid.str({ desc: 'The API username for the Bcoin instance' }),
-  BCOIN_API_PASS: envalid.str({ desc: 'The API password for the Bcoin instance' }),
-
-  // ***********************************************************************
-  // * Service Specific Variables
-  // ***********************************************************************
+  // Service Specific Variables
 
   // Aggregator service specific variables
   RMQ_PREFETCH_COUNT_AGG: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
@@ -124,7 +118,6 @@ module.exports = envalid.cleanEnv(process.env, {
   CALENDAR_INTERVAL_MS: envalid.num({ default: 10000, desc: 'The frequency to generate new calendar blocks, defaults to 10 seconds' }),
   ANCHOR_BTC_INTERVAL_MS: envalid.num({ default: 1800000, desc: 'The frequency to generate new btc-a blocks and btc anchoring, defaults to 30 minutes' }),
   ANCHOR_ETH_INTERVAL_MS: envalid.num({ default: 600000, desc: 'The frequency to generate new eth-a blocks and eth anchoring, defaults to 10 minutes' }),
-  NACL_KEYPAIR_SEED: envalid.str({ desc: 'The seed used for NaCl keypair generation' }),
 
   // NIST beacon service specific variables
   NIST_INTERVAL_MS: envalid.num({ default: 60000, desc: 'The frequency to get latest NIST beacon data, in milliseconds' }),
@@ -143,6 +136,31 @@ module.exports = envalid.cleanEnv(process.env, {
   RMQ_PREFETCH_COUNT_SPLITTER: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_SPLITTER_QUEUE: envalid.str({ default: 'work.splitter', desc: 'The queue name for message consumption originating from the api service' })
 
-}, {
-  strict: true
-})
+}
+
+module.exports = (service) => {
+  console.log(`Loading env variables for ${service}`)
+  // Load and validate service specific require variables as needed
+  switch (service) {
+    case 'cal':
+      envDefinitions.CHAINPOINT_STACK_ID = envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' })
+      envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
+      envDefinitions.NACL_KEYPAIR_SEED = envalid.str({ desc: 'The seed used for NaCl keypair generation' })
+      break
+    case 'btc-mon':
+      envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })
+      envDefinitions.BCOIN_API_USERNAME = envalid.str({ desc: 'The API username for the Bcoin instance' })
+      envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
+      break
+    case 'btc-tx':
+      envDefinitions.CHAINPOINT_STACK_ID = envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' })
+      envDefinitions.BCOIN_API_WALLET_ID = envalid.str({ desc: 'The wallet Id to be used' })
+      envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })
+      envDefinitions.BCOIN_API_USERNAME = envalid.str({ desc: 'The API username for the Bcoin instance' })
+      envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
+      break
+  }
+  return envalid.cleanEnv(process.env, envDefinitions, {
+    strict: true
+  })
+}

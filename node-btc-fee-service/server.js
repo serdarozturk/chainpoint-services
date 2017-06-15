@@ -4,7 +4,7 @@ const coinTicker = require('coin-ticker')
 const Influx = require('influx')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('btc-fee')
 
 // FIXME : Get rid of caching for http call so we can get rid of redis here?
 const r = require('redis')

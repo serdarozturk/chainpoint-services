@@ -11,7 +11,7 @@ const chpParse = require('chainpoint-parse')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('api')
 
 const r = require('redis')
 

@@ -4,7 +4,7 @@ const async = require('async')
 const storageClient = require('./storage-adapters/postgres.js')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('state')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established

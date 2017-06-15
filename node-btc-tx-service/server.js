@@ -6,7 +6,7 @@ const sb = require('satoshi-bitcoin')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
 
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')
+const env = require('./lib/parse-env.js')('btc-tx')
 
 const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 
