@@ -413,7 +413,7 @@ services:
   #
   consul:
     restart: always
-    image: consul:0.8.3
+    image: consul:0.8.4
     container_name: consul
     ports:
       - "8300:8300"
