@@ -11,6 +11,10 @@ FROM node:8.1.2-alpine
 
 LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 
+RUN apk update && \
+    apk upgrade && \
+    rm -rf /var/cache/apk/*
+
 # tini
 #   A tiny but valid `init` for containers
 #   see: https://github.com/krallin/tini
