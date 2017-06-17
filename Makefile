@@ -113,6 +113,12 @@ build-calendar: build-lib
 	docker build -t quay.io/chainpoint/node-calendar-service:$(VERSION) --no-cache=$(NO_CACHE) . \
 	&& docker tag quay.io/chainpoint/node-calendar-service:$(VERSION) quay.io/chainpoint/node-calendar-service:latest
 
+## Build cockroach-health-proxy
+build-cockroach-health-proxy: build-base
+	@cd cockroach-health-proxy; \
+	docker build -t quay.io/chainpoint/node-cockroach-health-proxy-service:$(VERSION) --no-cache=$(NO_CACHE) . \
+	&& docker tag quay.io/chainpoint/node-cockroach-health-proxy-service:$(VERSION) quay.io/chainpoint/node-cockroach-health-proxy-service:latest
+
 ## Build NIST
 build-nist: build-lib
 	@cd node-nist-beacon-service; \
