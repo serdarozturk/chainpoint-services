@@ -115,7 +115,7 @@ build-calendar: build-lib
 
 ## Build cockroach-health-proxy
 build-cockroach-health-proxy: build-base
-	@cd cockroach-health-proxy; \
+	@cd node-cockroach-health-proxy-service; \
 	docker build -t quay.io/chainpoint/node-cockroach-health-proxy-service:$(VERSION) --no-cache=$(NO_CACHE) . \
 	&& docker tag quay.io/chainpoint/node-cockroach-health-proxy-service:$(VERSION) quay.io/chainpoint/node-cockroach-health-proxy-service:latest
 
