@@ -162,7 +162,7 @@ build-telegraf: build-lib
 	&& docker tag quay.io/chainpoint/telegraf:$(VERSION) quay.io/chainpoint/telegraf:latest
 
 ## Build all
-build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-mon build-btc-tx build-calendar build-nist build-proof-gen build-proof-state build-splitter build-redis build-telegraf
+build: build-lib build-bcoin build-aggregator build-api build-btc-fee build-btc-mon build-btc-tx build-calendar build-cockroach-health-proxy build-nist build-proof-gen build-proof-state build-splitter build-redis build-telegraf
 	docker-compose build
 
 ## Run API test suite with Mocha
