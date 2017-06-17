@@ -11,6 +11,7 @@ FROM node:8.1.2-alpine
 
 LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 
+# Upgrade packages to latest
 RUN apk update && \
     apk upgrade && \
     rm -rf /var/cache/apk/*
