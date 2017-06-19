@@ -20,6 +20,8 @@ tags:
   description: "Verification process for your proofs"
 - name: "calendar"
   description: "Chainpoint calendar block data"
+- name: "config"
+  description: "Configuration information about the Chainpoint stack"
 externalDocs:
   description: "Find out more about Chainpoint"
   url: "https://chainpoint.org"
@@ -234,6 +236,21 @@ paths:
           description: "invalid argument in request"
           schema:
             $ref: "#/definitions/ErrorResponse"
+  '/config':
+    get:
+      tags:
+      - "config"
+      summary: "Retrieves the configuration information for this stack"
+      description: ""
+      produces:
+      - "application/json"
+      responses:
+        '200':
+          description: "successful operation"
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/GetConfigResponse"
 definitions:
   PostHashesRequest:
     type: object
@@ -418,3 +435,36 @@ definitions:
       height:
         type: integer
         example: 32876
+  GetConfigResponse:
+    type: object
+    properties:
+      CHAINPOINT_STACK_ID:
+        type: string
+        example: production          
+      CHAINPOINT_BASE_URI:
+        type: string
+        example: https://a.prod.server.com
+      ANCHOR_BTC:
+        type: boolean
+        example: true
+      ANCHOR_ETH:
+        type: boolean
+        example: false
+      PROOF_EXPIRE_MINUTES:
+        type: integer
+        example: 1440
+      GET_PROOFS_MAX_REST:
+        type: integer
+        example: 250
+      GET_PROOFS_MAX_WS:
+        type: integer
+        example: 250
+      POST_HASHES_MAX:
+        type: integer
+        example: 1000
+      POST_VERIFY_PROOFS_MAX:
+        type: integer
+        example: 1000
+      GET_CALENDAR_BLOCKS_MAX:
+        type: integer
+        example: 1000

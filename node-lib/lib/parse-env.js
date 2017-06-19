@@ -23,6 +23,20 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
 
 let envDefinitions = {
 
+  // The following variables are exposed by this stack's /config endpoint
+  //
+  // CHAINPOINT_STACK_ID: Unique identifier for this Chainpoint stack of services
+  // CHAINPOINT_BASE_URI: Base URI for this Chainpoint stack of services
+  // ANCHOR_BTC: Boolean flag for enabling and disabling BTC anchoring
+  // ANCHOR_ETH: Boolean flag for enabling and disabling ETH anchoring
+  // PROOF_EXPIRE_MINUTES: The lifespan of stored proofs, in minutes
+  // GET_PROOFS_MAX_REST: The maximum number of proofs that can be requested in one GET /proofs request
+  // GET_PROOFS_MAX_WS: The maximum number of proofs that can be requested/subscribed to in one call
+  // POST_HASHES_MAX: The maximum number of hashes allowed to be submitted in one request
+  // POST_VERIFY_PROOFS_MAX: The maximum number of proofs allowed to be verified in one request
+  // GET_CALENDAR_BLOCKS_MAX: The maximum number of calendar blocks allowed to be retrieved in one request
+  //
+
   // ***********************************************************************
   // * Global variables with default values
   // ***********************************************************************
@@ -86,7 +100,7 @@ let envDefinitions = {
   RMQ_INCOMING_EXCHANGE: envalid.str({ default: 'exchange.headers', desc: 'The exchange for receiving messages from proof gen service' }),
   GET_PROOFS_MAX_REST: envalid.num({ default: 250, desc: 'The maximum number of proofs that can be requested in one GET /proofs request' }),
   GET_PROOFS_MAX_WS: envalid.num({ default: 250, desc: 'The maximum number of proofs that can be requested/subscribed to in one call' }),
-  MAX_BODY_SIZE: envalid.num({ default: 131072, desc: 'Mox body size in bytes for incoming requests' }),
+  MAX_BODY_SIZE: envalid.num({ default: 131072, desc: 'Max body size in bytes for incoming requests' }),
   POST_HASHES_MAX: envalid.num({ default: 1000, desc: 'The maximum number of hashes allowed to be submitted in one request' }),
   POST_VERIFY_PROOFS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of proofs allowed to be verified in one request' }),
   GET_CALENDAR_BLOCKS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of calendar blocks allowed to be retrieved in one request' }),
@@ -142,6 +156,10 @@ module.exports = (service) => {
   console.log(`Loading env variables for ${service}`)
   // Load and validate service specific require variables as needed
   switch (service) {
+    case 'api':
+      envDefinitions.CHAINPOINT_STACK_ID = envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' })
+      envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
+      break
     case 'cal':
       envDefinitions.CHAINPOINT_STACK_ID = envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' })
       envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
