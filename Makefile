@@ -50,6 +50,10 @@ build:
 	./bin/docker-make --no-push
 	docker-compose build
 
+## Pull Docker images
+pull:
+	docker-compose pull
+
 ## Push Docker images using docker-make
 push:
 	./bin/docker-make
@@ -85,9 +89,9 @@ test: test-api test-aggregator test-splitter
 up: build cockroachdb-setup
 	docker-compose up -d --build
 
-## Startup without performing any builds, rely on published images.
-up-no-build: cockroachdb-setup
-	docker-compose up -d
+## Startup without performing builds, rely on pull of images. Set DOCKER_TAG
+up-no-build: pull cockroachdb-setup
+	docker-compose up -d --no-build
 
 ## Shutdown Application
 down:
