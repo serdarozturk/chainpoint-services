@@ -119,7 +119,11 @@ prune-oldskool: down
 	docker rmi $(docker images -f dangling=true -q)
 	docker volume rm $(docker volume ls -f dangling=true -q)
 
-## Burn it all down and rise from the ashes
-phoenix: clean prune cockroachdb-reset up
+## Burn it all down and destroy the data. Start it again yourself!
+burn: clean prune
+	@echo ""
+	@echo "****************************************************************************"
+	@echo "Services stopped, and data pruned. Run 'make up' or 'make up-no-build' now."
+	@echo "****************************************************************************"
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool phoenix
+.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool burn
