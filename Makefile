@@ -86,6 +86,10 @@ test: test-api test-aggregator test-splitter
 up: build cockroachdb-setup
 	docker-compose up -d --build
 
+## Startup without performing any builds, rely on published images.
+up-no-build: cockroachdb-setup
+	docker-compose up -d
+
 ## Shutdown Application
 down:
 	docker-compose down
@@ -104,9 +108,14 @@ prune: down
 	docker image prune -f -a
 	docker volume prune -f
 	docker network prune -f
-	# docker rmi $(docker images -a -q)
+
+## Shutdown and destroy all docker assets using the older method
+prune-oldskool: down
+	docker rm $(docker ps -a -f status=exited -q)
+	docker rmi $(docker images -f dangling=true -q)
+	docker volume rm $(docker volume ls -f dangling=true -q)
 
 ## Burn it all down and rise from the ashes
 phoenix: clean prune cockroachdb-reset up
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune phoenix
+.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool phoenix
