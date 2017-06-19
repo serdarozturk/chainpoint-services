@@ -413,7 +413,7 @@ services:
   #
   consul:
     restart: always
-    image: consul:0.8.3
+    image: consul:0.8.4
     container_name: consul
     ports:
       - "8300:8300"
@@ -430,7 +430,7 @@ services:
   #
   roach1:
     restart: always
-    image: cockroachdb/cockroach:v1.0.1
+    image: cockroachdb/cockroach:v1.0.2
     container_name: roach1
     ports:
       - "26257:26257"
@@ -445,7 +445,7 @@ services:
 
   roach2:
     restart: always
-    image: cockroachdb/cockroach:v1.0.1
+    image: cockroachdb/cockroach:v1.0.2
     container_name: roach2
     depends_on:
       - roach1
@@ -463,7 +463,7 @@ services:
 
   roach3:
     restart: always
-    image: cockroachdb/cockroach:v1.0.1
+    image: cockroachdb/cockroach:v1.0.2
     container_name: roach3
     depends_on:
       - roach1
@@ -477,6 +477,57 @@ services:
       - --insecure
       - --join
       - roach1
+    networks:
+      - chainpoint
+
+  # Test : curl -s  http://127.0.0.1:8091/health | jq
+  #
+  roach1-health-proxy:
+    restart: always
+    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
+    build:
+      context: ./node-cockroach-health-proxy-service
+    container_name: roach1-health-proxy
+    depends_on:
+      - roach1
+    ports:
+      - "8091:8080"
+    environment:
+      COCKROACH_HEALTH_CHECK_URI: http://roach1:8080/health
+    networks:
+      - chainpoint
+
+  # Test : curl -s  http://127.0.0.1:8092/health | jq
+  #
+  roach2-health-proxy:
+    restart: always
+    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
+    build:
+      context: ./node-cockroach-health-proxy-service
+    container_name: roach2-health-proxy
+    depends_on:
+      - roach2
+    ports:
+      - "8092:8080"
+    environment:
+      COCKROACH_HEALTH_CHECK_URI: http://roach2:8080/health
+    networks:
+      - chainpoint
+
+  # Test : curl -s  http://127.0.0.1:8093/health | jq
+  #
+  roach3-health-proxy:
+    restart: always
+    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
+    build:
+      context: ./node-cockroach-health-proxy-service
+    container_name: roach3-health-proxy
+    depends_on:
+      - roach3
+    ports:
+      - "8093:8080"
+    environment:
+      COCKROACH_HEALTH_CHECK_URI: http://roach3:8080/health
     networks:
       - chainpoint
 

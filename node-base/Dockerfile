@@ -7,9 +7,14 @@
 # see: https://github.com/nodejs/LTS
 # see: https://hub.docker.com/_/node/
 # see: https://alpinelinux.org/
-FROM node:7.10.0-alpine
+FROM node:8.1.2-alpine
 
 LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
+
+# Upgrade packages to latest
+RUN apk update && \
+    apk upgrade && \
+    rm -rf /var/cache/apk/*
 
 # tini
 #   A tiny but valid `init` for containers
