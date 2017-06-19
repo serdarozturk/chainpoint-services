@@ -84,12 +84,12 @@ paths:
     get:
       tags:
       - "proofs"
-      summary: "Retrieves one or more proofs by hash_ids supplied in header"
+      summary: "Retrieves one or more proofs by hashids supplied in header"
       description: ""
       produces:
       - "application/json"
       parameters:
-        - name: "hash_ids"
+        - name: "hashids"
           in: "header"
           required: true
           description: "Comma separated hash_id list of the proofs to retrieve"
