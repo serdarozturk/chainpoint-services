@@ -61,7 +61,8 @@ push:
 ## Run API test suite with Mocha
 test-api:
 	./bin/docker-make --no-push node-api-service-test
-	docker run --tty=true --rm quay.io/chainpoint/node-api-service-test:$(TAG)
+	docker run -e "CHAINPOINT_STACK_ID=test" -e "CHAINPOINT_BASE_URI=http://test.chainpoint.org" --tty=true --rm quay.io/chainpoint/node-api-service-test:$(TAG)
+
 
 ## Run aggregator test suite with Mocha
 test-aggregator:

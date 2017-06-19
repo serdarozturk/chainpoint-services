@@ -64,6 +64,8 @@ services:
     networks:
       - chainpoint
     environment:
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
       VIRTUAL_HOST: api.local
 
   # Splitter

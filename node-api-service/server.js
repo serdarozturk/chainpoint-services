@@ -683,6 +683,27 @@ function getCalBlockRangeV1 (req, res, next) {
 }
 
 /**
+ * GET /config handler
+ *
+ * Returns a configuration information object
+ */
+function getConfigInfoV1 (req, res, next) {
+  res.send({
+    CHAINPOINT_STACK_ID: env.CHAINPOINT_STACK_ID,
+    CHAINPOINT_BASE_URI: env.CHAINPOINT_BASE_URI,
+    ANCHOR_BTC: env.ANCHOR_BTC,
+    ANCHOR_ETH: env.ANCHOR_ETH,
+    PROOF_EXPIRE_MINUTES: env.PROOF_EXPIRE_MINUTES,
+    GET_PROOFS_MAX_REST: env.GET_PROOFS_MAX_REST,
+    GET_PROOFS_MAX_WS: env.GET_PROOFS_MAX_WS,
+    POST_HASHES_MAX: env.POST_HASHES_MAX,
+    POST_VERIFY_PROOFS_MAX: env.POST_VERIFY_PROOFS_MAX,
+    GET_CALENDAR_BLOCKS_MAX: env.GET_CALENDAR_BLOCKS_MAX
+  })
+  return next()
+}
+
+/**
  * GET /calendar/:height/data handler
  *
  * Expects a path parameter 'height' as an integer
@@ -899,6 +920,8 @@ server.get({ path: '/calendar/:height/data', version: '1.0.0' }, getCalBlockData
 server.get({ path: '/calendar/:height', version: '1.0.0' }, getCalBlockByHeightV1)
 // get the block objects for the calendar in the specified range, incusive
 server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, getCalBlockRangeV1)
+// get configuration information for this stack
+server.get({ path: '/config', version: '1.0.0' }, getConfigInfoV1)
 // teapot
 server.get({ path: '/', version: '1.0.0' }, rootV1)
 
