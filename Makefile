@@ -50,6 +50,10 @@ build:
 	./bin/docker-make --no-push
 	docker-compose build
 
+## Pull Docker images
+pull:
+	docker-compose pull
+
 ## Push Docker images using docker-make
 push:
 	./bin/docker-make
@@ -86,9 +90,9 @@ test: test-api test-aggregator test-splitter
 up: build cockroachdb-setup
 	docker-compose up -d --build
 
-## Startup without performing any builds, rely on published images.
-up-no-build: cockroachdb-setup
-	docker-compose up -d
+## Startup without performing builds, rely on pull of images. Set DOCKER_TAG
+up-no-build: pull cockroachdb-setup
+	docker-compose up -d --no-build
 
 ## Shutdown Application
 down:
@@ -115,7 +119,11 @@ prune-oldskool: down
 	docker rmi $(docker images -f dangling=true -q)
 	docker volume rm $(docker volume ls -f dangling=true -q)
 
-## Burn it all down and rise from the ashes
-phoenix: clean prune cockroachdb-reset up
+## Burn it all down and destroy the data. Start it again yourself!
+burn: clean prune
+	@echo ""
+	@echo "****************************************************************************"
+	@echo "Services stopped, and data pruned. Run 'make up' or 'make up-no-build' now."
+	@echo "****************************************************************************"
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool phoenix
+.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool burn
