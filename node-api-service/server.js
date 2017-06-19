@@ -689,16 +689,16 @@ function getCalBlockRangeV1 (req, res, next) {
  */
 function getConfigInfoV1 (req, res, next) {
   res.send({
-    CHAINPOINT_STACK_ID: env.CHAINPOINT_STACK_ID,
-    CHAINPOINT_BASE_URI: env.CHAINPOINT_BASE_URI,
-    ANCHOR_BTC: env.ANCHOR_BTC,
-    ANCHOR_ETH: env.ANCHOR_ETH,
-    PROOF_EXPIRE_MINUTES: env.PROOF_EXPIRE_MINUTES,
-    GET_PROOFS_MAX_REST: env.GET_PROOFS_MAX_REST,
-    GET_PROOFS_MAX_WS: env.GET_PROOFS_MAX_WS,
-    POST_HASHES_MAX: env.POST_HASHES_MAX,
-    POST_VERIFY_PROOFS_MAX: env.POST_VERIFY_PROOFS_MAX,
-    GET_CALENDAR_BLOCKS_MAX: env.GET_CALENDAR_BLOCKS_MAX
+    chainpoint_stack_id: env.CHAINPOINT_STACK_ID,
+    chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
+    anchor_btc: env.ANCHOR_BTC,
+    anchor_eth: env.ANCHOR_ETH,
+    proof_expire_minutes: env.PROOF_EXPIRE_MINUTES,
+    get_proofs_max_rest: env.GET_PROOFS_MAX_REST,
+    get_proofs_max_ws: env.GET_PROOFS_MAX_WS,
+    post_hashes_max: env.POST_HASHES_MAX,
+    post_verify_proofs_max: env.POST_VERIFY_PROOFS_MAX,
+    get_calendar_blocks_max: env.GET_CALENDAR_BLOCKS_MAX
   })
   return next()
 }
