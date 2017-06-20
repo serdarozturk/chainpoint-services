@@ -66,6 +66,8 @@ services:
     environment:
       CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
       CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
 
   # Splitter
@@ -136,12 +138,6 @@ services:
     build:
       context: ./node-calendar-service
     container_name: calendar
-    environment:
-      NACL_KEYPAIR_SEED: ${NACL_KEYPAIR_SEED}
-      ANCHOR_BTC: ${ANCHOR_BTC}
-      ANCHOR_ETH: ${ANCHOR_ETH}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
     depends_on:
       - roach1
       - roach2
@@ -150,6 +146,12 @@ services:
       - influxdb
     networks:
       - chainpoint
+    environment:
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
+      NACL_KEYPAIR_SEED: ${NACL_KEYPAIR_SEED}
 
   # Bitcoin Fees
   # Retrieve and store recommended transaction fees for Bitcoin
@@ -180,12 +182,6 @@ services:
     build:
       context: ./node-btc-tx-service
     container_name: btc-tx
-    environment:
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
     depends_on:
       - roach1
       - roach2
@@ -196,6 +192,12 @@ services:
       - influxdb
     networks:
       - chainpoint
+    environment:
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
@@ -206,16 +208,16 @@ services:
     build:
       context: ./node-btc-mon-service
     container_name: btc-mon
-    environment:
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
     depends_on:
       - rabbitmq
       - influxdb
     networks:
       - chainpoint
+    environment:
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
@@ -225,15 +227,15 @@ services:
     image: quay.io/chainpoint/node-proof-state-service:${DOCKER_TAG}
     build:
       context: ./node-proof-state-service
-    environment:
-      ANCHOR_BTC: ${ANCHOR_BTC}
-      ANCHOR_ETH: ${ANCHOR_ETH}
     depends_on:
       - rabbitmq
       - postgres
       - influxdb
     networks:
       - chainpoint
+    environment:
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
 
   # Proof Generation
   # Responsible for constructing, signing, and validating Chainpoint proofs
