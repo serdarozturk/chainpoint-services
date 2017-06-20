@@ -48,6 +48,7 @@ build-config:
 ## Build all
 build:
 	./bin/docker-make --no-push
+	docker container prune -f
 	docker-compose build
 
 ## Pull Docker images
