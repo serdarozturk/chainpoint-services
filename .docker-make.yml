@@ -158,21 +158,6 @@ builds:
       - 'org.chainpoint.git.commitid={fcommitid}'
       - 'org.chainpoint.git.branch={git_branch}'
 
-  node-cockroach-health-proxy-service:
-    context: node-cockroach-health-proxy-service
-    dockerfile: Dockerfile
-    rewrite_from: node-base
-    depends_on:
-      - node-base
-    pushes:
-      - 'on_tag=quay.io/chainpoint/node-cockroach-health-proxy-service:{git_tag}'
-      - 'on_branch:master=quay.io/chainpoint/node-cockroach-health-proxy-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-cockroach-health-proxy-service:{date}'
-      - 'on_branch:master=quay.io/chainpoint/node-cockroach-health-proxy-service:{fcommitid}'
-    labels:
-      - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
-
   node-nist-beacon-service:
     context: node-nist-beacon-service
     dockerfile: Dockerfile

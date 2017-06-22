@@ -486,57 +486,6 @@ services:
     networks:
       - chainpoint
 
-  # Test : curl -s  http://127.0.0.1:8091/health | jq
-  #
-  roach1-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:${DOCKER_TAG}
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach1-health-proxy
-    depends_on:
-      - roach1
-    ports:
-      - "8091:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach1:8080/health
-    networks:
-      - chainpoint
-
-  # Test : curl -s  http://127.0.0.1:8092/health | jq
-  #
-  roach2-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:${DOCKER_TAG}
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach2-health-proxy
-    depends_on:
-      - roach2
-    ports:
-      - "8092:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach2:8080/health
-    networks:
-      - chainpoint
-
-  # Test : curl -s  http://127.0.0.1:8093/health | jq
-  #
-  roach3-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:${DOCKER_TAG}
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach3-health-proxy
-    depends_on:
-      - roach3
-    ports:
-      - "8093:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach3:8080/health
-    networks:
-      - chainpoint
-
   # bcoin:
   #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
   #   build:
