@@ -7,8 +7,7 @@ const uuidTime = require('uuid-time')
 const webSocket = require('ws')
 const chpBinary = require('chainpoint-binary')
 const chpParse = require('chainpoint-parse')
-
-const calendarBlock = require('./lib/models/CalendarBlock.js')
+const cachedCalendarBlock = require('./storage-adapters/CachedCalendarBlock.js')
 
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('api')
@@ -43,10 +42,6 @@ var amqpChannel = null
 // This value is set once the connection has been established
 let redis = null
 
-// pull in variables defined in shared CalendarBlock module
-let sequelize = calendarBlock.sequelize
-let CalendarBlock = calendarBlock.CalendarBlock
-
 /**
  * Opens a Redis connection
  *
@@ -57,10 +52,12 @@ function openRedisConnection (redisURI) {
   redis.on('error', () => {
     redis.quit()
     redis = null
+    cachedCalendarBlock.setRedis(null)
     console.error('Cannot connect to Redis. Attempting in 5 seconds...')
     setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
   })
   redis.on('ready', () => {
+    cachedCalendarBlock.setRedis(redis)
     console.log('Redis connected')
   })
 }
@@ -438,27 +435,17 @@ function confirmExpectedValue (anchorInfo, callback) {
   let expectedValue = anchorInfo.expected_value
   switch (anchorInfo.type) {
     case 'cal':
-      CalendarBlock.findOne({ where: { type: 'cal', data_id: anchorId }, attributes: ['hash'] }).then(block => {
-        if (block) {
-          return callback(null, block.hash === expectedValue)
-        } else {
-          return callback(null, false)
-        }
-      }).catch((err) => {
-        return callback(err)
+      cachedCalendarBlock.getCalBlockConfirmDataByDataId(anchorId, (err, hash) => {
+        if (err) return callback(err)
+        return callback(null, hash === expectedValue)
       })
       break
     case 'btc':
-      CalendarBlock.findOne({ where: { type: 'btc-c', dataId: anchorId }, attributes: ['dataVal'] }).then(block => {
-        if (block) {
-          console.log(JSON.stringify(block))
-          let blockRoot = block.dataVal.match(/.{2}/g).reverse().join('')
-          return callback(null, blockRoot === expectedValue)
-        } else {
-          return callback(null, false)
-        }
-      }).catch((err) => {
-        return callback(err)
+      cachedCalendarBlock.getBtcCBlockConfirmDataByDataId(anchorId, (err, dataVal) => {
+        if (err) return callback(err)
+        if (!dataVal) return callback(null, null)
+        let blockRoot = dataVal.match(/.{2}/g).reverse().join('')
+        return callback(null, blockRoot === expectedValue)
       })
       break
     case 'eth':
@@ -592,23 +579,15 @@ function getCalBlockByHeightV1 (req, res, next) {
   if (!_.isInteger(height) || height < 0) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
-
-  CalendarBlock.findOne({ where: { id: height } }).then(block => {
-    if (block) {
-      res.contentType = 'application/json'
-      // getting the plain object allows id conversion to int below
-      block = block.get({ plain: true })
-      block.id = parseInt(block.id, 10)
-      block.time = parseInt(block.time, 10)
-      block.version = parseInt(block.version, 10)
-      res.send(block)
-      return next()
-    } else {
-      return next(new restify.NotFoundError())
-    }
-  }).catch((err) => {
-    console.error(err)
-    return next(new restify.InternalError(err))
+  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
+    if (err) return next(new restify.InternalError(err))
+    if (!block) return next(new restify.NotFoundError())
+    res.contentType = 'application/json'
+    block.id = parseInt(block.id, 10)
+    block.time = parseInt(block.time, 10)
+    block.version = parseInt(block.version, 10)
+    res.send(block)
+    return next()
   })
 }
 
@@ -642,34 +621,23 @@ function getCalBlockRangeV1 (req, res, next) {
 
   async.waterfall([
     (callback) => {
-      CalendarBlock.findOne({ attributes: ['id'], order: 'id DESC' }).then(lastBlock => {
-        if (lastBlock) {
-          // getting the plain object allows id conversion to int below
-          lastBlock = lastBlock.get({ plain: true })
-          lastBlock.id = parseInt(lastBlock.id, 10)
-          return callback(null, lastBlock.id)
-        } else {
-          return callback('notfound')
-        }
-      }).catch((err) => {
-        return callback(err)
+      cachedCalendarBlock.getLatestBlock((err, lastBlock) => {
+        if (err) return callback(err)
+        if (!lastBlock) return callback('no_blocks')
+        lastBlock.id = parseInt(lastBlock.id, 10)
+        return callback(null, lastBlock.id)
       })
     },
     (blockHeight, callback) => {
-      CalendarBlock.findAll({ where: { id: { $between: [fromHeight, toHeight] } }, order: 'id ASC' }).then(blocks => {
-        if (blocks.length) {
-          // getting the plain object allows id conversion to int below
-          let results = {}
-          results.blocks = blocks
-          results.start = fromHeight
-          results.end = toHeight
-          results.height = blockHeight
-          return callback(null, results)
-        } else {
-          return callback('notfound')
-        }
-      }).catch((err) => {
-        return callback(err)
+      cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
+        if (err) return callback(err)
+        if (!blocks || blocks.length === 0) blocks = []
+        let results = {}
+        results.blocks = blocks
+        results.start = fromHeight
+        results.end = toHeight
+        results.height = blockHeight
+        return callback(null, results)
       })
     }
   ], (err, results) => {
@@ -717,18 +685,12 @@ function getCalBlockDataByHeightV1 (req, res, next) {
   if (!_.isInteger(height) || height < 0) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
-
-  CalendarBlock.findOne({ where: { id: height }, attributes: ['dataVal'] }).then(result => {
-    if (result) {
-      res.contentType = 'text/plain'
-      res.send(result.dataVal)
-      return next()
-    } else {
-      return next(new restify.NotFoundError())
-    }
-  }).catch((err) => {
-    console.error(err)
-    return next(new restify.InternalError(err))
+  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
+    if (err) return next(new restify.InternalError(err))
+    if (!block) return next(new restify.NotFoundError())
+    res.contentType = 'text/plain'
+    res.send(block.dataVal)
+    return next()
   })
 }
 
@@ -747,17 +709,12 @@ function getCalBlockHashByHeightV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
 
-  CalendarBlock.findOne({ where: { id: height }, attributes: ['hash'] }).then(result => {
-    if (result) {
-      res.contentType = 'text/plain'
-      res.send(result.hash)
-      return next()
-    } else {
-      return next(new restify.NotFoundError())
-    }
-  }).catch((err) => {
-    console.error(err)
-    return next(new restify.InternalError(err))
+  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
+    if (err) return next(new restify.InternalError(err))
+    if (!block) return next(new restify.NotFoundError())
+    res.contentType = 'text/plain'
+    res.send(block.hash)
+    return next()
   })
 }
 
@@ -938,7 +895,7 @@ function startListening () {
  **/
 function openStorageConnection (callback) {
   // Confirm connection to DB
-  sequelize.authenticate()
+  cachedCalendarBlock.getSequelize().authenticate()
     .then(() => {
       console.log('Connection to database has been established successfully.')
       return callback(null)
