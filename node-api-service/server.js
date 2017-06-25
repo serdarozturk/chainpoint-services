@@ -895,15 +895,15 @@ function startListening () {
  **/
 function openStorageConnection (callback) {
   // Confirm connection to DB
-  cachedCalendarBlock.getSequelize().authenticate()
-    .then(() => {
-      console.log('Connection to database has been established successfully.')
-      return callback(null)
-    })
-    .catch(err => {
+  cachedCalendarBlock.getSequelize().authenticate().nodeify((err) => {
+    if (err) {
       console.error('Unable to connect to the database:', err)
       setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
-    })
+    } else {
+      console.log('Connection to database has been established successfully.')
+      return callback(null)
+    }
+  })
 }
 
 function initConnectionsAndStart () {

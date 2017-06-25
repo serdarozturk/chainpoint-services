@@ -37,14 +37,11 @@ let logBtcTxData = (txObj, callback) => {
   row.balanceBtc = parseFloat(txObj.outputs[1].value)
   row.stackId = env.CHAINPOINT_STACK_ID
 
-  BtcTxLog.create(row)
-    .then((newRow) => {
-      console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
-      return callback(null, newRow.get({ plain: true }))
-    })
-    .catch(err => {
-      return callback(`BTC log create error: ${err.message} : ${err.stack}`)
-    })
+  BtcTxLog.create(row).nodeify((err, newRow) => {
+    if (err) return callback(`BTC log create error: ${err.message} : ${err.stack}`)
+    console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
+    return callback(null, newRow.get({ plain: true }))
+  })
 }
 
 /**
@@ -261,12 +258,14 @@ function startListening () {
 function openStorageConnection (callback) {
   // Sync models to DB tables and trigger check
   // if a new genesis block is needed.
-  sequelize.sync({ logging: console.log }).then(() => {
-    console.log('BtcTxLog sequelize database table synchronized')
-    return callback(null, true)
-  }).catch((err) => {
-    console.error('sequelize.sync() error: ' + err.stack)
-    setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+  sequelize.sync({ logging: console.log }).nodeify((err) => {
+    if (err) {
+      console.error('sequelize.sync() error: ' + err.stack)
+      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+    } else {
+      console.log('BtcTxLog sequelize database table synchronized')
+      return callback(null, true)
+    }
   })
 }
 
