@@ -583,8 +583,6 @@ function getCalBlockByHeightV1 (req, res, next) {
     if (err) return next(new restify.InternalError(err))
     if (!block) return next(new restify.NotFoundError())
     res.contentType = 'application/json'
-    // getting the plain object allows id conversion to int below
-    block = block.get({ plain: true })
     block.id = parseInt(block.id, 10)
     block.time = parseInt(block.time, 10)
     block.version = parseInt(block.version, 10)
@@ -626,8 +624,6 @@ function getCalBlockRangeV1 (req, res, next) {
       cachedCalendarBlock.getLatestBlock((err, lastBlock) => {
         if (err) return callback(err)
         if (!lastBlock) return callback('no_blocks')
-        // getting the plain object allows id conversion to int below
-        lastBlock = lastBlock.get({ plain: true })
         lastBlock.id = parseInt(lastBlock.id, 10)
         return callback(null, lastBlock.id)
       })
@@ -635,7 +631,7 @@ function getCalBlockRangeV1 (req, res, next) {
     (blockHeight, callback) => {
       cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
         if (err) return callback(err)
-        if (!blocks || blocks.length === 0) return callback('no_blocks')
+        if (!blocks || blocks.length === 0) blocks = []
         let results = {}
         results.blocks = blocks
         results.start = fromHeight
