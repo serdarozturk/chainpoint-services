@@ -22,7 +22,6 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
 })
 
 let envDefinitions = {
-
   // The following variables are exposed by this stack's /config endpoint
   //
   // CHAINPOINT_STACK_ID: Unique identifier for this Chainpoint stack of services
@@ -35,13 +34,12 @@ let envDefinitions = {
   // POST_HASHES_MAX: The maximum number of hashes allowed to be submitted in one request
   // POST_VERIFY_PROOFS_MAX: The maximum number of proofs allowed to be verified in one request
   // GET_CALENDAR_BLOCKS_MAX: The maximum number of calendar blocks allowed to be retrieved in one request
-  //
 
   // ***********************************************************************
   // * Global variables with default values
   // ***********************************************************************
 
-  // Chainpoint stack relates variables
+  // Chainpoint stack related variables
   NODE_ENV: envalid.str({ default: 'production', desc: 'The type of environment in which the service is running' }),
 
   // Proof retention setting
@@ -51,15 +49,15 @@ let envDefinitions = {
   ANCHOR_BTC: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling BTC anchoring' }),
   ANCHOR_ETH: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling ETH anchoring' }),
 
-  // Consule related variables and keys
-  CONSUL_HOST: envalid.str({ default: 'consul', desc: 'Consul server host' }),
+  // Consul related variables and keys
+  CONSUL_HOST: envalid.str({ devDefault: 'consul', desc: 'Consul server host' }),
   CONSUL_PORT: envalid.num({ default: 8500, desc: 'Consul server port' }),
   BTC_REC_FEE_KEY: envalid.str({ default: 'service/btc-fee/recommendation', desc: 'The consul key to write to, watch to receive updated fee object' }),
   NIST_KEY: envalid.str({ default: 'service/nist/latest', desc: 'The consul key to write to, watch to receive updated NIST object' }),
   CALENDAR_LOCK_KEY: envalid.str({ default: 'service/calendar/blockchain/lock', desc: 'Key used for acquiring calendar write locks' }),
 
   // RabbitMQ related variables
-  RABBITMQ_CONNECT_URI: envalid.url({ default: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
+  RABBITMQ_CONNECT_URI: envalid.url({ devDefault: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
   RMQ_WORK_OUT_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for outgoing message to the proof state service' }),
   RMQ_WORK_OUT_CAL_QUEUE: envalid.str({ default: 'work.cal', desc: 'The queue name for outgoing message to the calendar service' }),
   RMQ_WORK_OUT_AGG_QUEUE: envalid.str({ default: 'work.agg', desc: 'The queue name for outgoing message to the aggregator service' }),
@@ -70,18 +68,18 @@ let envDefinitions = {
   RMQ_WORK_OUT_API_QUEUE: envalid.str({ default: 'work.api', desc: 'The queue name for outgoing message to the api service' }),
 
   // Redis related variables
-  REDIS_CONNECT_URI: envalid.url({ default: 'redis://redis:6379', desc: 'The Redis server connection URI' }),
+  REDIS_CONNECT_URI: envalid.url({ devDefault: 'redis://redis:6379', desc: 'The Redis server connection URI' }),
 
   // Influx DB related variables
-  INFLUXDB_HOST: envalid.str({ default: 'influxdb', desc: 'The Influx server host' }),
+  INFLUXDB_HOST: envalid.str({ devDefault: 'influxdb', desc: 'The Influx server host' }),
   INFLUXDB_PORT: envalid.num({ default: 8086, desc: 'The Influx server port' }),
-  INFLUXDB_DB: envalid.str({ default: 'chainpoint_fees', desc: 'The Influx server database name' }),
+  INFLUXDB_DB: envalid.str({ default: 'chainpoint', desc: 'The Influx server database name' }),
 
   // Postgres related variables
   POSTGRES_CONNECT_PROTOCOL: envalid.str({ default: 'postgres:', desc: 'Postgres server connection protocol' }),
   POSTGRES_CONNECT_USER: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection user name' }),
-  POSTGRES_CONNECT_PW: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection password' }),
-  POSTGRES_CONNECT_HOST: envalid.str({ default: 'postgres', desc: 'Postgres server connection host' }),
+  POSTGRES_CONNECT_PW: envalid.str({ devDefault: 'chainpoint', desc: 'Postgres server connection password' }),
+  POSTGRES_CONNECT_HOST: envalid.str({ devDefault: 'postgres', desc: 'Postgres server connection host' }),
   POSTGRES_CONNECT_PORT: envalid.num({ default: 5432, desc: 'Postgres server connection port' }),
   POSTGRES_CONNECT_DB: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection database name' }),
 
@@ -149,7 +147,6 @@ let envDefinitions = {
   // Splitter service specific variables
   RMQ_PREFETCH_COUNT_SPLITTER: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_SPLITTER_QUEUE: envalid.str({ default: 'work.splitter', desc: 'The queue name for message consumption originating from the api service' })
-
 }
 
 module.exports = (service) => {
