@@ -123,10 +123,10 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       unique: true
     },
     sig: {
-      comment: 'Base64 encoded signature over block hash',
+      comment: 'Truncated SHA256 hash of Signing PubKey bytes, colon separated, plus Base64 encoded signature over block hash',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-zA-Z0-9=+/]{1,255}$', 'i']
+        is: ['^[a-zA-Z0-9:=+/]{1,255}$', 'i']
       },
       allowNull: false,
       unique: true

@@ -51,6 +51,18 @@ let anchorEthInterval = null
 let sequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 
+// Calculate the hash of the signing public key bytes
+// to allow lookup of which pubkey was used to sign
+// a block. Handles different organizations signing blocks
+// with different keys and key rotation by those orgs.
+// When a Base64 pubKey is published publicly it should also
+// be accompanied by this hash of its bytes to serve
+// as a fingerprint.
+let calcSigningPubKeyHash = (pubKey) => {
+  return crypto.createHash('sha256').update(pubKey).digest('hex')
+}
+const signingPubKeyHash = calcSigningPubKeyHash(signingKeypair.publicKey)
+
 // Calculate a deterministic block hash and return a Buffer hash value
 let calcBlockHash = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.stackId.toString()}:${block.type.toString()}:${block.dataId.toString()}`
@@ -84,7 +96,10 @@ let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callbac
 
   let bh = calcBlockHash(b)
   b.hash = bh.toString('hex')
-  b.sig = calcBlockHashSig(bh)
+
+  // pre-pend Base64 signature with truncated chars of SHA256 hash of the
+  // pubkey bytes, joined with ':', to allow for lookup of signing pubkey.
+  b.sig = [signingPubKeyHash.slice(0, 12), calcBlockHashSig(bh)].join(':')
 
   CalendarBlock.create(b).nodeify((err, block) => {
     if (err) return callback(`${friendlyName} BLOCK create error: ${err.message} : ${err.stack}`)
