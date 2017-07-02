@@ -25,6 +25,7 @@
 // keypair is compromised, but the master passphrase is safe, you can just
 // rotate to the next keypair in line and discontinue use of the previous.
 
+const crypto = require('crypto')
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
 
@@ -44,6 +45,13 @@ let username = 'ops@tierion.com'
 let passphrase = args.join(' ').trim()
 let date = new Date()
 
+// Calculate the hash of the signing public key bytes
+// to allow lookup of the pubKey using all or part
+// of the hash.
+let calcSigningPubKeyHash = (pubKey) => {
+  return crypto.createHash('sha256').update(pubKey).digest('hex')
+}
+
 sessionKeys.generate(username, passphrase, function (err, keys) {
   if (err) {
     console.error('sessionKeys error : ', err)
@@ -61,9 +69,12 @@ sessionKeys.generate(username, passphrase, function (err, keys) {
   console.log('--------------')
   console.log()
 
-  keys.naclSigningKeyPairsBase64.forEach(function (keypair, index) {
-    console.log('secret key ', index, ' : ', keypair.secretKey)
-    console.log('public key ', index, ' : ', keypair.publicKey)
+  var i
+  for (i = 0; i < 8; i++) {
+    console.log('secret key      (b64)', i, ' : ', keys.naclSigningKeyPairsBase64[i].secretKey)
+    console.log('public key      (b64)', i, ' : ', keys.naclSigningKeyPairsBase64[i].publicKey)
+    // calculate the hash of the public key bytes for key lookup fingerprint
+    console.log('public key hash (hex)', i, ' : ', calcSigningPubKeyHash(keys.naclSigningKeyPairs[i].publicKey))
     console.log('')
-  })
+  }
 })
