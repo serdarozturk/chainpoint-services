@@ -475,7 +475,7 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
         if (err) {
           return wfCallback('createBtcAnchorBlock error - ' + err)
         } else {
-          console.log('createBtcAnchorBlock succeeded')
+          // console.log('createBtcAnchorBlock succeeded')
           return wfCallback(null, treeData, block)
         }
       })
@@ -596,9 +596,9 @@ function registerLockEvents (lock, lockName, acquireFunction) {
     console.log(`${lockName} release`)
   })
 
-  lock.on('end', () => {
-    console.log(`${lockName} end`)
-  })
+  // lock.on('end', () => {
+  //   console.log(`${lockName} end`)
+  // })
 }
 
 // LOCK HANDLERS : genesis
@@ -653,7 +653,7 @@ registerLockEvents(nistLock, 'nistLock', () => {
       if (err) {
         console.error('createNistBlock error - ' + err)
       } else {
-        console.log('createNistBlock succeeded')
+        // console.log('createNistBlock succeeded')
       }
       nistLock.release()
     })
@@ -690,7 +690,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
         if (err) {
           console.error('aggregateAndAnchorBTC error - ' + err)
         } else {
-          console.log('aggregateAndAnchorBTC succeeded')
+          // console.log('aggregateAndAnchorBTC succeeded')
         }
         btcAnchorLock.release()
       })
@@ -800,7 +800,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
         if (err) {
           console.error('aggregateAndAnchorETH error - ' + err)
         } else {
-          console.log('aggregateAndAnchorETH succeeded')
+          // console.log('aggregateAndAnchorETH succeeded')
         }
         ethAnchorLock.release()
       })
@@ -853,7 +853,7 @@ let deleteEthInterval = () => {
 
 // This initalizes all the consul watches and JS intervals that fire all calendar events
 function startListening () {
-  console.log('starting watches and intervals')
+  // console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
@@ -885,7 +885,7 @@ function startListening () {
       if (AGGREGATION_ROOTS.length > 0) { // there will be data to process, acquire lock and continue
         calendarLock.acquire()
       } else { // there will not be any data to process, do nothing
-        console.log('calendar interval elapsed, no data')
+        // console.log('calendar interval elapsed, no data')
       }
     } catch (err) {
       console.error('calendarLock.acquire() : caught err : ', err.message)
@@ -967,7 +967,7 @@ function amqpOpenConnection (connectionString) {
 function openStorageConnection (callback) {
   // Sync models to DB tables and trigger check
   // if a new genesis block is needed.
-  sequelize.sync({ logging: console.log }).nodeify((err) => {
+  sequelize.sync({ logging: false }).nodeify((err) => {
     if (err) {
       console.error('sequelize.sync() error: ' + err.stack)
       setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
