@@ -160,7 +160,7 @@ module.exports = (service) => {
     case 'cal':
       envDefinitions.CHAINPOINT_STACK_ID = envalid.str({ desc: 'Unique identifier for this Chainpoint stack of services' })
       envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
-      envDefinitions.NACL_KEYPAIR_SEED = envalid.str({ desc: 'The seed used for NaCl keypair generation' })
+      envDefinitions.SIGNING_SECRET_KEY = envalid.str({ desc: 'A Base64 encoded NaCl secret signing key' })
       break
     case 'btc-mon':
       envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })

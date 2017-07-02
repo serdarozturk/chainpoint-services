@@ -17,14 +17,9 @@ const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT 
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
 
-// Instantiate signing keypair from a 32 byte random hex secret
-// passed in via env var. The Base64 encoded random seed can be
-// created with:
-//   nacl.util.encodeBase64(nacl.randomBytes(32))
-//
-const naclKeypairSeed = nacl.util.decodeBase64(env.NACL_KEYPAIR_SEED)
-
-const signingKeypair = nacl.sign.keyPair.fromSeed(naclKeypairSeed)
+// Pass SIGNING_SECRET_KEY as Base64 encoded bytes
+const signingSecretKeyBytes = nacl.util.decodeBase64(env.SIGNING_SECRET_KEY)
+const signingKeypair = nacl.sign.keyPair.fromSecretKey(signingSecretKeyBytes)
 
 const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
 

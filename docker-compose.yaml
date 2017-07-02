@@ -161,7 +161,7 @@ services:
       CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
-      NACL_KEYPAIR_SEED: ${NACL_KEYPAIR_SEED}
+      SIGNING_SECRET_KEY: ${SIGNING_SECRET_KEY}
 
   # Bitcoin Fees
   # Retrieve and store recommended transaction fees for Bitcoin
