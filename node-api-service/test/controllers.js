@@ -660,6 +660,32 @@ describe('Verify Controller', () => {
   })
 })
 
+describe('Config Controller', () => {
+  describe('GET /config', () => {
+    it('should return proper config object', (done) => {
+      request(server)
+        .get('/config')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('chainpoint_stack_id').and.to.equal('test')
+          expect(res.body).to.have.property('chainpoint_base_uri').and.to.equal('http://test.chainpoint.org')
+          expect(res.body).to.have.property('anchor_btc').and.to.equal(false)
+          expect(res.body).to.have.property('anchor_eth').and.to.equal(false)
+          expect(res.body).to.have.property('proof_expire_minutes').and.to.equal(1440)
+          expect(res.body).to.have.property('get_proofs_max_rest').and.to.equal(250)
+          expect(res.body).to.have.property('get_proofs_max_ws').and.to.equal(250)
+          expect(res.body).to.have.property('post_hashes_max').and.to.equal(1000)
+          expect(res.body).to.have.property('post_verify_proofs_max').and.to.equal(1000)
+          expect(res.body).to.have.property('get_calendar_blocks_max').and.to.equal(1000)
+          done()
+        })
+    })
+  })
+})
+
 describe('Functions', () => {
   describe('calling generatePostHashesResponse with one hash', () => {
     it('should return proper repsonse object', (done) => {

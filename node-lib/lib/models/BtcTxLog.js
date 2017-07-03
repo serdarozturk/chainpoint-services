@@ -1,23 +1,43 @@
-// CockroachDB Sequelize ORM
-let Sequelize = require('sequelize-cockroachdb')
+const Sequelize = require('sequelize-cockroachdb')
 
-const COCKROACH_HOST = process.env.COCKROACH_HOST || 'roach1'
-const COCKROACH_PORT = process.env.COCKROACH_PORT || 26257
-const COCKROACH_DB_NAME = process.env.COCKROACH_DB_NAME || 'chainpoint'
-const COCKROACH_DB_USER = process.env.COCKROACH_DB_USER || 'chainpoint'
-const COCKROACH_DB_PASS = process.env.COCKROACH_DB_PASS || ''
-const COCKROACH_TABLE_NAME = process.env.COCKROACH_TABLE_NAME || 'chainpoint_btc_tx_log'
+const envalid = require('envalid')
 
-// Connect to CockroachDB through Sequelize.
-let sequelize = new Sequelize(COCKROACH_DB_NAME, COCKROACH_DB_USER, COCKROACH_DB_PASS, {
-  dialect: 'postgres',
-  host: COCKROACH_HOST,
-  port: COCKROACH_PORT,
-  logging: false
+const env = envalid.cleanEnv(process.env, {
+  COCKROACH_HOST: envalid.str({ devDefault: 'roach1', desc: 'CockroachDB host or IP' }),
+  COCKROACH_PORT: envalid.num({ default: 26257, desc: 'CockroachDB port' }),
+  COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
+  COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
+  COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
+  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_btc_tx_log', desc: 'CockroachDB table name' }),
+  COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
+  COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
+  COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
 })
 
+// Connect to CockroachDB through Sequelize.
+let sequelizeOptions = {
+  dialect: 'postgres',
+  host: env.COCKROACH_HOST,
+  port: env.COCKROACH_PORT,
+  logging: false
+}
+
+// Present TLS client certificate to production cluster
+if (env.isProduction) {
+  sequelizeOptions.dialectOptions = {
+    ssl: {
+      rejectUnauthorized: false,
+      ca: env.COCKROACH_TLS_CA_CRT,
+      key: env.COCKROACH_TLS_CLIENT_KEY,
+      cert: env.COCKROACH_TLS_CLIENT_CRT
+    }
+  }
+}
+
+let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
+
 // Define the model and the table it will be stored in.
-var BtcTxLog = sequelize.define(COCKROACH_TABLE_NAME,
+var BtcTxLog = sequelize.define(env.COCKROACH_TABLE_NAME,
   {
     txId: {
       comment: 'The bitcoin transaction id hash.',

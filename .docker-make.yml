@@ -1,0 +1,218 @@
+builds:
+  bcoin:
+    context: bcoin
+    dockerfile: Dockerfile
+    pushes:
+      - 'on_tag=quay.io/chainpoint/bcoin:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/bcoin:latest'
+      - 'on_branch:master=quay.io/chainpoint/bcoin:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/bcoin:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-base:
+    context: node-base
+    dockerfile: Dockerfile
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-base:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-base:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-base:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-base:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-lib:
+    context: node-lib
+    dockerfile: Dockerfile
+    rewrite_from: node-base
+    depends_on:
+      - node-base
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-lib:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-lib:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-lib:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-lib:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-aggregator-service:
+    context: node-aggregator-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-aggregator-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-aggregator-service-test:
+    context: node-aggregator-service
+    dockerfile: Dockerfile.test
+    rewrite_from: node-aggregator-service
+    depends_on:
+      - node-aggregator-service
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-aggregator-service-test:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-api-service:
+    context: node-api-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-api-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-api-service-test:
+    context: node-api-service
+    dockerfile: Dockerfile.test
+    rewrite_from: node-api-service
+    depends_on:
+      - node-api-service
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-api-service-test:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service-test:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service-test:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service-test:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-btc-fee-service:
+    context: node-btc-fee-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-btc-fee-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-btc-mon-service:
+    context: node-btc-mon-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-btc-mon-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-btc-tx-service:
+    context: node-btc-tx-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-btc-tx-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-calendar-service:
+    context: node-calendar-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-calendar-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-calendar-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-calendar-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-calendar-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-nist-beacon-service:
+    context: node-nist-beacon-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-nist-beacon-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-proof-gen-service:
+    context: node-proof-gen-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-proof-gen-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-proof-state-service:
+    context: node-proof-state-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-proof-state-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-splitter-service:
+    context: node-splitter-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-splitter-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-splitter-service-test:
+    context: node-splitter-service
+    dockerfile: Dockerfile.test
+    rewrite_from: node-splitter-service
+    depends_on:
+      - node-splitter-service
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-splitter-service-test:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:{git_branch}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'

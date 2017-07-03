@@ -1,7 +1,6 @@
 const _ = require('lodash')
 const sb = require('satoshi-bitcoin')
 const coinTicker = require('coin-ticker')
-const Influx = require('influx')
 
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('btc-fee')
@@ -24,97 +23,20 @@ const AVG_TX_BYTES = 235
 // Most current tick from current coin-ticker BTC Exchange
 let exchangeTick = null
 
-const influx = new Influx.InfluxDB({
-  host: env.INFLUXDB_HOST,
-  database: env.INFLUXDB_DB,
-  port: env.INFLUXDB_PORT,
-  schema: [
-    {
-      measurement: 'btc_fee_tick',
-      fields: {
-        last: Influx.FieldType.FLOAT,
-        ask: Influx.FieldType.FLOAT,
-        bid: Influx.FieldType.FLOAT,
-        low: Influx.FieldType.FLOAT,
-        high: Influx.FieldType.FLOAT,
-        vol: Influx.FieldType.FLOAT,
-        timestamp: Influx.FieldType.FLOAT,
-        exchange: Influx.FieldType.STRING,
-        pair: Influx.FieldType.STRING
-      },
-      tags: ['exchange']
-    },
-    {
-      measurement: 'btc_fee_rec',
-      fields: {
-        recFeeInSatPerByte: Influx.FieldType.INTEGER,
-        recFeeInSatForAvgTx: Influx.FieldType.INTEGER,
-        recFeeInBtcForAvgTx: Influx.FieldType.FLOAT,
-        recFeeInUsdForAvgTx: Influx.FieldType.FLOAT,
-        avgTxSizeBytes: Influx.FieldType.INTEGER
-      },
-      tags: []
-    }
-  ]
-})
-
-// Create InfluxDB database lazily
-influx.getDatabaseNames().then(names => {
-  if (!names.includes(env.INFLUXDB_DB)) {
-    return influx.createDatabase(env.INFLUXDB_DB)
-  }
-})
-.then(created => {
-  influx.createRetentionPolicy('90d', {
-    database: env.INFLUXDB_DB,
-    duration: '90d',
-    replication: 1,
-    isDefault: true
-  })
-})
-.catch(() => {
-  console.error(`Error creating Influx database!`)
-})
-
-let influxLogTick = (tick) => {
-  influx.writePoints([
-    {
-      measurement: 'btc_fee_tick',
-      fields: tick,
-      tags: { exchange: tick.exchange }
-    }
-  ]).catch(err => {
-    console.error(`Error saving data to InfluxDB! ${err.stack}`)
-  })
-}
-
-let influxLogFeeRec = (feeRecObj) => {
-  influx.writePoints([
-    {
-      measurement: 'btc_fee_rec',
-      fields: feeRecObj
-    }
-  ]).catch(err => {
-    console.error(`Error saving data to InfluxDB! ${err.stack}`)
-  })
-}
-
 // Exchange API request limits:
 //   bitfinex : 90/min : http://docs.bitfinex.com/docs
 //   bitstamp : 600/10min : https://www.bitstamp.net/api/
 let getExchangeTick = () => {
-  coinTicker('bitfinex', 'btcusd')
+  coinTicker('bitfinex', 'BTC_USD')
   .then((tick) => {
-    // console.log('bitfinex exchange tick : %s', JSON.stringify(tick))
+    console.log('exchange tick : %s', JSON.stringify(tick))
     exchangeTick = tick
-    influxLogTick(tick)
   }).catch((err) => {
     console.error('bitfinex call failed, failing over to bitstamp : %s', JSON.stringify(err))
 
-    coinTicker('bitstamp', 'btcusd').then((tick) => {
-      // console.log('bitstamp exchange tick : %s', JSON.stringify(tick))
+    coinTicker('bitstamp', 'BTC_USD').then((tick) => {
+      console.log('exchange tick : %s', JSON.stringify(tick))
       exchangeTick = tick
-      influxLogTick(tick)
     }).catch((err) => {
       // Could not reach two exchanges. Something is very wrong.
       console.error('bitstamp call failed : %s', JSON.stringify(err))
@@ -164,7 +86,6 @@ let getRecommendedFees = () => {
       let feeRecObj = genFeeRecObj(selectedFee)
 
       // console.log('fee recommendations %s', JSON.stringify(feeRecObj))
-      influxLogFeeRec(feeRecObj)
 
       // Publish the recommended transaction fee data in a well known
       // location for use by any service with access to consul.

@@ -17,14 +17,9 @@ const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT 
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
 
-// Instantiate signing keypair from a 32 byte random hex secret
-// passed in via env var. The Base64 encoded random seed can be
-// created with:
-//   nacl.util.encodeBase64(nacl.randomBytes(32))
-//
-const naclKeypairSeed = nacl.util.decodeBase64(env.NACL_KEYPAIR_SEED)
-
-const signingKeypair = nacl.sign.keyPair.fromSeed(naclKeypairSeed)
+// Pass SIGNING_SECRET_KEY as Base64 encoded bytes
+const signingSecretKeyBytes = nacl.util.decodeBase64(env.SIGNING_SECRET_KEY)
+const signingKeypair = nacl.sign.keyPair.fromSecretKey(signingSecretKeyBytes)
 
 const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -55,6 +50,18 @@ let anchorEthInterval = null
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
+
+// Calculate the hash of the signing public key bytes
+// to allow lookup of which pubkey was used to sign
+// a block. Handles different organizations signing blocks
+// with different keys and key rotation by those orgs.
+// When a Base64 pubKey is published publicly it should also
+// be accompanied by this hash of its bytes to serve
+// as a fingerprint.
+let calcSigningPubKeyHash = (pubKey) => {
+  return crypto.createHash('sha256').update(pubKey).digest('hex')
+}
+const signingPubKeyHash = calcSigningPubKeyHash(signingKeypair.publicKey)
 
 // Calculate a deterministic block hash and return a Buffer hash value
 let calcBlockHash = (block) => {
@@ -89,16 +96,16 @@ let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callbac
 
   let bh = calcBlockHash(b)
   b.hash = bh.toString('hex')
-  b.sig = calcBlockHashSig(bh)
 
-  CalendarBlock.create(b)
-    .then((block) => {
-      console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
-      return callback(null, block.get({ plain: true }))
-    })
-    .catch(err => {
-      return callback(`${friendlyName} BLOCK create error: ${err.message} : ${err.stack}`)
-    })
+  // pre-pend Base64 signature with truncated chars of SHA256 hash of the
+  // pubkey bytes, joined with ':', to allow for lookup of signing pubkey.
+  b.sig = [signingPubKeyHash.slice(0, 12), calcBlockHashSig(bh)].join(':')
+
+  CalendarBlock.create(b).nodeify((err, block) => {
+    if (err) return callback(`${friendlyName} BLOCK create error: ${err.message} : ${err.stack}`)
+    console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
+    return callback(null, block.get({ plain: true }))
+  })
 }
 
 let createGenesisBlock = (callback) => {
@@ -108,7 +115,8 @@ let createGenesisBlock = (callback) => {
 let createCalendarBlock = (root, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
+    if (err) return callback('could not write block')
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       return writeBlock(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL', callback)
@@ -121,7 +129,8 @@ let createCalendarBlock = (root, callback) => {
 let createNistBlock = (nistDataObj, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
+    if (err) return callback('could not write block')
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       let dataId = nistDataObj.split(':')[0].toString() // the epoch timestamp for this NIST entry
@@ -136,7 +145,8 @@ let createNistBlock = (nistDataObj, callback) => {
 let createBtcAnchorBlock = (root, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
+    if (err) return callback('could not write block')
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
@@ -150,7 +160,8 @@ let createBtcAnchorBlock = (root, callback) => {
 let createBtcConfirmBlock = (height, root, callback) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(prevBlock => {
+  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
+    if (err) return callback('could not write block')
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       return writeBlock(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM', callback)
@@ -173,7 +184,7 @@ function processMessage (msg) {
         consumeAggRootMessage(msg)
         break
       case 'btctx':
-        if (env.ANCHOR_BTC) {
+        if (env.ANCHOR_BTC === 'enabled') {
           // Consumes a tx  message from the btctx service
           consumeBtcTxMessage(msg)
         } else {
@@ -182,7 +193,7 @@ function processMessage (msg) {
         }
         break
       case 'btcmon':
-        if (env.ANCHOR_BTC) {
+        if (env.ANCHOR_BTC === 'enabled') {
           // Consumes a tx message from the btctx service
           consumeBtcMonMessage(msg)
         } else {
@@ -431,10 +442,9 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
     (wfCallback) => {
       // Retrieve calendar blocks since last anchor block
       if (!lastBtcAnchorBlockId) lastBtcAnchorBlockId = -1
-      CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: 'id ASC' }).then(blocks => {
+      CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: 'id ASC' }).nodeify((err, blocks) => {
+        if (err) return wfCallback(err)
         return wfCallback(null, blocks)
-      }).catch((err) => {
-        return wfCallback(err)
       })
     },
     (blocks, wfCallback) => {
@@ -480,7 +490,7 @@ let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
         if (err) {
           return wfCallback('createBtcAnchorBlock error - ' + err)
         } else {
-          console.log('createBtcAnchorBlock succeeded')
+          // console.log('createBtcAnchorBlock succeeded')
           return wfCallback(null, treeData, block)
         }
       })
@@ -601,28 +611,33 @@ function registerLockEvents (lock, lockName, acquireFunction) {
     console.log(`${lockName} release`)
   })
 
-  lock.on('end', () => {
-    console.log(`${lockName} end`)
-  })
+  // lock.on('end', () => {
+  //   console.log(`${lockName} end`)
+  // })
 }
 
 // LOCK HANDLERS : genesis
 registerLockEvents(genesisLock, 'genesisLock', () => {
   // The value of the lock determines what function it triggers
   // Is a genesis block needed? If not release lock and move on.
-  CalendarBlock.count().then(c => {
-    if (c === 0) {
-      createGenesisBlock((err, block) => {
-        if (err) {
-          console.error('createGenesisBlock error - ' + err)
-        } else {
-          console.log('createGenesisBlock succeeded')
-        }
-        genesisLock.release()
-      })
-    } else {
+  CalendarBlock.count().nodeify((err, c) => {
+    if (err) {
       genesisLock.release()
-      console.log(`No genesis block needed : ${c} block(s) found.`)
+      console.log(`Unable to count calendar blocks`)
+    } else {
+      if (c === 0) {
+        createGenesisBlock((err, block) => {
+          if (err) {
+            console.error('createGenesisBlock error - ' + err)
+          } else {
+            console.log('createGenesisBlock succeeded')
+          }
+          genesisLock.release()
+        })
+      } else {
+        genesisLock.release()
+        console.log(`No genesis block needed : ${c} block(s) found.`)
+      }
     }
   })
 })
@@ -653,7 +668,7 @@ registerLockEvents(nistLock, 'nistLock', () => {
       if (err) {
         console.error('createNistBlock error - ' + err)
       } else {
-        console.log('createNistBlock succeeded')
+        // console.log('createNistBlock succeeded')
       }
       nistLock.release()
     })
@@ -668,28 +683,33 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
   // checks if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   let lastBtcAnchorBlockId = null
-  CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).then(lastBtcAnchorBlock => {
-    if (lastBtcAnchorBlock) {
+  CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, lastBtcAnchorBlock) => {
+    if (err) {
+      btcAnchorLock.release()
+      console.log(`Unable to query calendar blocks`)
+    } else {
+      if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
       // if not, release lock and return
-      let lastBtcAnchorMS = lastBtcAnchorBlock.time
-      let currentMS = Date.now()
-      let ageMS = currentMS - lastBtcAnchorMS
-      if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
-        console.log('aggregateAndAnchorBTC skipped, ANCHOR_BTC_INTERVAL_MS not elapsed since last btc anchor block')
+        let lastBtcAnchorMS = lastBtcAnchorBlock.time
+        let currentMS = Date.now()
+        let ageMS = currentMS - lastBtcAnchorMS
+        if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
+          console.log('aggregateAndAnchorBTC skipped, ANCHOR_BTC_INTERVAL_MS not elapsed since last btc anchor block')
+          btcAnchorLock.release()
+          return
+        }
+        lastBtcAnchorBlockId = parseInt(lastBtcAnchorBlock.id, 10)
+      }
+      aggregateAndAnchorBTC(lastBtcAnchorBlockId, (err) => {
+        if (err) {
+          console.error('aggregateAndAnchorBTC error - ' + err)
+        } else {
+          // console.log('aggregateAndAnchorBTC succeeded')
+        }
         btcAnchorLock.release()
-        return
-      }
-      lastBtcAnchorBlockId = parseInt(lastBtcAnchorBlock.id, 10)
+      })
     }
-    aggregateAndAnchorBTC(lastBtcAnchorBlockId, (err) => {
-      if (err) {
-        console.error('aggregateAndAnchorBTC error - ' + err)
-      } else {
-        console.log('aggregateAndAnchorBTC succeeded')
-      }
-      btcAnchorLock.release()
-    })
   })
 })
 
@@ -773,28 +793,33 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
   // checks if the eth last anchor block is at least ANCHOR_ETH_INTERVAL_MS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   let lastEthAnchorBlockId = null
-  CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).then(lastEthAnchorBlock => {
-    if (lastEthAnchorBlock) {
+  CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, lastEthAnchorBlock) => {
+    if (err) {
+      ethAnchorLock.release()
+      console.log(`Unable to query calendar blocks`)
+    } else {
+      if (lastEthAnchorBlock) {
       // check if the last eth anchor block is at least ANCHOR_ETH_INTERVAL_MS old
       // if not, release lock and return
-      let lastEthAnchorMS = lastEthAnchorBlock.time
-      let currentMS = Date.now()
-      let ageMS = currentMS - lastEthAnchorMS
-      if (ageMS < env.ANCHOR_ETH_INTERVAL_MS) {
-        console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
+        let lastEthAnchorMS = lastEthAnchorBlock.time
+        let currentMS = Date.now()
+        let ageMS = currentMS - lastEthAnchorMS
+        if (ageMS < env.ANCHOR_ETH_INTERVAL_MS) {
+          console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
+          ethAnchorLock.release()
+          return
+        }
+        lastEthAnchorBlockId = parseInt(lastEthAnchorBlock.id, 10)
+      }
+      aggregateAndAnchorETH(lastEthAnchorBlockId, (err) => {
+        if (err) {
+          console.error('aggregateAndAnchorETH error - ' + err)
+        } else {
+          // console.log('aggregateAndAnchorETH succeeded')
+        }
         ethAnchorLock.release()
-        return
-      }
-      lastEthAnchorBlockId = parseInt(lastEthAnchorBlock.id, 10)
+      })
     }
-    aggregateAndAnchorETH(lastEthAnchorBlockId, (err) => {
-      if (err) {
-        console.error('aggregateAndAnchorETH error - ' + err)
-      } else {
-        console.log('aggregateAndAnchorETH succeeded')
-      }
-      ethAnchorLock.release()
-    })
   })
 })
 
@@ -843,7 +868,7 @@ let deleteEthInterval = () => {
 
 // This initalizes all the consul watches and JS intervals that fire all calendar events
 function startListening () {
-  console.log('starting watches and intervals')
+  // console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
@@ -875,7 +900,7 @@ function startListening () {
       if (AGGREGATION_ROOTS.length > 0) { // there will be data to process, acquire lock and continue
         calendarLock.acquire()
       } else { // there will not be any data to process, do nothing
-        console.log('calendar interval elapsed, no data')
+        // console.log('calendar interval elapsed, no data')
       }
     } catch (err) {
       console.error('calendarLock.acquire() : caught err : ', err.message)
@@ -883,7 +908,7 @@ function startListening () {
   }, env.CALENDAR_INTERVAL_MS)
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
-  if (env.ANCHOR_BTC) { // Do this only if BTC anchoring is enabled
+  if (env.ANCHOR_BTC === 'enabled') { // Do this only if BTC anchoring is enabled
     anchorBtcInterval = setBtcInterval()
     console.log('BTC anchoring enabled')
   } else {
@@ -891,7 +916,7 @@ function startListening () {
   }
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
-  if (env.ANCHOR_ETH) { // Do this only if ETH anchoring is enabled
+  if (env.ANCHOR_ETH === 'enabled') { // Do this only if ETH anchoring is enabled
     anchorEthInterval = setEthInterval()
     console.log('ETH anchoring enabled')
   } else {
@@ -957,14 +982,16 @@ function amqpOpenConnection (connectionString) {
 function openStorageConnection (callback) {
   // Sync models to DB tables and trigger check
   // if a new genesis block is needed.
-  sequelize.sync({ logging: console.log }).then(() => {
-    console.log('CalendarBlock sequelize database synchronized')
+  sequelize.sync({ logging: false }).nodeify((err) => {
+    if (err) {
+      console.error('sequelize.sync() error: ' + err.stack)
+      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+    } else {
+      console.log('CalendarBlock sequelize database synchronized')
     // trigger creation of the genesis block
-    genesisLock.acquire()
-    return callback(null, true)
-  }).catch((err) => {
-    console.error('sequelize.sync() error: ' + err.stack)
-    setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
+      genesisLock.acquire()
+      return callback(null, true)
+    }
   })
 }
 

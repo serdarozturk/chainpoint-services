@@ -20,6 +20,7 @@ services:
   # http : 80
   #
   nginx-proxy:
+    restart: always
     image: jwilder/nginx-proxy
     container_name: nginx-proxy
     ports:
@@ -27,6 +28,7 @@ services:
     volumes:
       - /var/run/docker.sock:/tmp/docker.sock:ro
     environment:
+      NODE_ENV: development
       DEFAULT_HOST: api.local
     depends_on:
       - api
@@ -51,7 +53,7 @@ services:
   #
   api:
     restart: always
-    image: quay.io/chainpoint/node-api-service:latest
+    image: quay.io/chainpoint/node-api-service:${DOCKER_TAG}
     build:
       context: ./node-api-service
     depends_on:
@@ -60,10 +62,14 @@ services:
       - roach3
       - redis
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
+      NODE_ENV: development
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
 
   # Splitter
@@ -74,14 +80,15 @@ services:
   #
   splitter:
     restart: always
-    image: quay.io/chainpoint/node-splitter-service:latest
+    image: quay.io/chainpoint/node-splitter-service:${DOCKER_TAG}
     build:
       context: ./node-splitter-service
     depends_on:
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
 
   # Aggregator
   #
@@ -91,15 +98,16 @@ services:
   #
   aggregator:
     restart: always
-    image: quay.io/chainpoint/node-aggregator-service:latest
+    image: quay.io/chainpoint/node-aggregator-service:${DOCKER_TAG}
     build:
       context: ./node-aggregator-service
     depends_on:
       - rabbitmq
-      - influxdb
       - nist-beacon
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
 
   # NIST Beacon
   # Retrieve and store current NIST Beacon records
@@ -110,15 +118,16 @@ services:
   #
   nist-beacon:
     restart: always
-    image: quay.io/chainpoint/node-nist-beacon-service:latest
+    image: quay.io/chainpoint/node-nist-beacon-service:${DOCKER_TAG}
     build:
       context: ./node-nist-beacon-service
     container_name: nist-beacon
     depends_on:
       - redis
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
 
   # Calendar
   # Aggregate Merkle roots from the `aggregator` service instances
@@ -130,24 +139,24 @@ services:
   #
   calendar:
     restart: always
-    image: quay.io/chainpoint/node-calendar-service:latest
+    image: quay.io/chainpoint/node-calendar-service:${DOCKER_TAG}
     build:
       context: ./node-calendar-service
     container_name: calendar
-    environment:
-      NACL_KEYPAIR_SEED: ${NACL_KEYPAIR_SEED}
-      ANCHOR_BTC: ${ANCHOR_BTC}
-      ANCHOR_ETH: ${ANCHOR_ETH}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
     depends_on:
       - roach1
       - roach2
       - roach3
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
+      SIGNING_SECRET_KEY: ${SIGNING_SECRET_KEY}
 
   # Bitcoin Fees
   # Retrieve and store recommended transaction fees for Bitcoin
@@ -158,32 +167,27 @@ services:
   #
   btc-fee:
     restart: always
-    image: quay.io/chainpoint/node-btc-fee-service:latest
+    image: quay.io/chainpoint/node-btc-fee-service:${DOCKER_TAG}
     build:
       context: ./node-btc-fee-service
     container_name: btc-fee
     depends_on:
       - consul
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
 
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
   # 
   btc-tx:
     restart: always
-    image: quay.io/chainpoint/node-btc-tx-service:latest
+    image: quay.io/chainpoint/node-btc-tx-service:${DOCKER_TAG}
     build:
       context: ./node-btc-tx-service
     container_name: btc-tx
-    environment:
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
     depends_on:
       - roach1
       - roach2
@@ -191,47 +195,53 @@ services:
       - consul
       - rabbitmq
       - btc-fee
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
+      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
+      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
+      BCOIN_API_PASS: ${BCOIN_API_PASS}
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
   #
   btc-mon:
     restart: always
-    image: quay.io/chainpoint/node-btc-mon-service:latest
+    image: quay.io/chainpoint/node-btc-mon-service:${DOCKER_TAG}
     build:
       context: ./node-btc-mon-service
     container_name: btc-mon
+    depends_on:
+      - rabbitmq
+    networks:
+      - chainpoint
     environment:
+      NODE_ENV: development
       BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
       BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
       BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
       BCOIN_API_PASS: ${BCOIN_API_PASS}
-    depends_on:
-      - rabbitmq
-      - influxdb
-    networks:
-      - chainpoint
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
   # 
   proof-state:
     restart: always
-    image: quay.io/chainpoint/node-proof-state-service:latest
+    image: quay.io/chainpoint/node-proof-state-service:${DOCKER_TAG}
     build:
       context: ./node-proof-state-service
-    environment:
-      ANCHOR_BTC: ${ANCHOR_BTC}
-      ANCHOR_ETH: ${ANCHOR_ETH}
     depends_on:
       - rabbitmq
       - postgres
-      - influxdb
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
 
   # Proof Generation
   # Responsible for constructing, signing, and validating Chainpoint proofs
@@ -239,107 +249,15 @@ services:
   # 
   proof-gen:
     restart: always
-    image: quay.io/chainpoint/node-proof-gen-service:latest
+    image: quay.io/chainpoint/node-proof-gen-service:${DOCKER_TAG}
     build:
       context: ./node-proof-gen-service
     depends_on:
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
-
-  # InfluxDB Telegraf service
-  #
-  telegraf:
-    image: quay.io/chainpoint/telegraf:latest
-    build:
-      context: ./telegraf
-    ports:
-      - "8092:8092/udp"
-      - "8094:8094"
-      # - "8125:8125/udp"
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Chronograf service (Visualization)
-  #
-  # Admin Page
-  # http://127.0.0.1:8888/
-  #  
-  chronograf:
-    restart: always
-    image: chronograf:1.3.2.1-alpine
-    container_name: chronograf
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./data/chronograf:/var/lib/chronograf
     environment:
-        INFLUXDB_URL: http://influxdb:8086
-        KAPACITOR_URL: http://kapacitor:9092
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Kapacitor service (Alerting)
-  #
-  kapacitor:
-    image: kapacitor:1.3.1-alpine
-    environment:
-      KAPACITOR_HOSTNAME: kapacitor
-      KAPACITOR_INFLUXDB_0_URLS_0: http://influxdb:8086
-    volumes:
-      - ./data/kapacitor:/var/lib/kapacitor
-    ports:
-      - "9092:9092"
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB
-  #
-  influxdb:
-    restart: always
-    image: influxdb:1.2.4-alpine
-    container_name: influxdb
-    ports:
-      - "8086:8086"
-    volumes:
-      - ./data/influxdb:/var/lib/influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB CLI
-  #   docker-compose run influxdb-cli
-  #
-  influxdb-cli:
-    image: influxdb:1.1.5-alpine
-    entrypoint:
-      - influx
-      - -host
-      - influxdb
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Kapacitor CLI
-  #   docker-compose run kapacitor-cli
-  #
-  kapacitor-cli:
-    image: kapacitor:1.2.1-alpine
-    entrypoint: ash
-    environment:
-      KAPACITOR_URL: http://kapacitor:9092
-    depends_on:
-      - influxdb
-      - kapacitor
-    networks:
-      - chainpoint
+      NODE_ENV: development
 
   # Postgres
   #
@@ -396,16 +314,18 @@ services:
   #
   redis:
     restart: always
-    image: quay.io/chainpoint/redis:latest
-    build:
-      context: ./redis
+    image: redis:3.2.9-alpine
     container_name: redis
     ports:
       - "6380:6379"
     volumes:
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - ./data/redis:/data
     networks:
       - chainpoint
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
 
   # Consul
   #
@@ -413,7 +333,7 @@ services:
   #
   consul:
     restart: always
-    image: consul:0.8.4
+    image: consul:0.8.5
     container_name: consul
     ports:
       - "8300:8300"
@@ -480,59 +400,8 @@ services:
     networks:
       - chainpoint
 
-  # Test : curl -s  http://127.0.0.1:8091/health | jq
-  #
-  roach1-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach1-health-proxy
-    depends_on:
-      - roach1
-    ports:
-      - "8091:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach1:8080/health
-    networks:
-      - chainpoint
-
-  # Test : curl -s  http://127.0.0.1:8092/health | jq
-  #
-  roach2-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach2-health-proxy
-    depends_on:
-      - roach2
-    ports:
-      - "8092:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach2:8080/health
-    networks:
-      - chainpoint
-
-  # Test : curl -s  http://127.0.0.1:8093/health | jq
-  #
-  roach3-health-proxy:
-    restart: always
-    image: quay.io/chainpoint/node-cockroach-health-proxy-service:latest
-    build:
-      context: ./node-cockroach-health-proxy-service
-    container_name: roach3-health-proxy
-    depends_on:
-      - roach3
-    ports:
-      - "8093:8080"
-    environment:
-      COCKROACH_HEALTH_CHECK_URI: http://roach3:8080/health
-    networks:
-      - chainpoint
-
   # bcoin:
-  #   image: quay.io/chainpoint/bcoin:latest
+  #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
   #   build:
   #     context: ./bcoin
   #   container_name: bcoin
