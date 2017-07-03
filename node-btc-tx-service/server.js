@@ -240,9 +240,11 @@ function startListening () {
 
   // Store the updated fee object on change
   watch.on('change', function (data, res) {
-    // console.log('data:', data)
-    BTCRecommendedFee = JSON.parse(data.Value)
-    console.log(BTCRecommendedFee)
+    if (data && data.Value) {
+      // console.log('data:', data)
+      BTCRecommendedFee = JSON.parse(data.Value)
+      console.log(BTCRecommendedFee)
+    }
   })
 
   // Oops, something is wrong with consul
