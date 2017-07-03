@@ -93,7 +93,7 @@ const genTxBody = (feeSatPerByte, hash) => {
 */
 const sendTxToBTC = (hash, callback) => {
   let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
-  console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
+  // console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
 
   let options = {
     headers: [
@@ -177,7 +177,7 @@ function processIncomingAnchorJob (msg) {
         }, 30000)
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message acked')
+        // console.log(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message acked')
       }
     })
   }
@@ -217,7 +217,7 @@ function amqpOpenConnection (connectionString) {
         amqpChannel = chan
         // Receive and process messages meant to initiate btc tx generation and publishing
         chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
-          console.log('processing incoming message')
+          // console.log('processing incoming message')
           processIncomingAnchorJob(msg)
         })
         return callback(null)
@@ -234,7 +234,7 @@ function amqpOpenConnection (connectionString) {
 
 // This initalizes all the consul watches and JS intervals
 function startListening () {
-  console.log('starting watches and intervals')
+  // console.log('starting watches and intervals')
   // Continuous watch on the consul key holding the fee object.
   var watch = consul.watch({ method: consul.kv.get, options: { key: env.BTC_REC_FEE_KEY } })
 
@@ -243,7 +243,7 @@ function startListening () {
     if (data && data.Value) {
       // console.log('data:', data)
       BTCRecommendedFee = JSON.parse(data.Value)
-      console.log(BTCRecommendedFee)
+      // console.log(BTCRecommendedFee)
     }
   })
 
@@ -260,12 +260,12 @@ function startListening () {
 function openStorageConnection (callback) {
   // Sync models to DB tables and trigger check
   // if a new genesis block is needed.
-  sequelize.sync({ logging: console.log }).nodeify((err) => {
+  sequelize.sync({ logging: false }).nodeify((err) => {
     if (err) {
       console.error('sequelize.sync() error: ' + err.stack)
       setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
     } else {
-      console.log('BtcTxLog sequelize database table synchronized')
+      // console.log('BtcTxLog sequelize database table synchronized')
       return callback(null, true)
     }
   })
