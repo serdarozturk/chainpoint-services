@@ -5,11 +5,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/bcoin:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/bcoin:latest'
-      - 'on_branch:master=quay.io/chainpoint/bcoin:{date}'
+      - 'on_branch:master=quay.io/chainpoint/bcoin:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/bcoin:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-base:
     context: node-base
@@ -17,11 +16,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-base:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-base:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-base:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-base:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-base:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-lib:
     context: node-lib
@@ -32,11 +30,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-lib:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-lib:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-lib:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-lib:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-lib:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-aggregator-service:
     context: node-aggregator-service
@@ -47,11 +44,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-aggregator-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-aggregator-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-aggregator-service-test:
     context: node-aggregator-service
@@ -62,11 +58,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-aggregator-service-test:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-aggregator-service-test:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-api-service:
     context: node-api-service
@@ -77,11 +72,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-api-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-api-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-api-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-api-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-api-service-test:
     context: node-api-service
@@ -92,11 +86,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-api-service-test:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-api-service-test:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-api-service-test:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-api-service-test:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-api-service-test:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-btc-fee-service:
     context: node-btc-fee-service
@@ -107,11 +100,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-btc-fee-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-btc-mon-service:
     context: node-btc-mon-service
@@ -122,11 +114,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-btc-mon-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-mon-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-btc-tx-service:
     context: node-btc-tx-service
@@ -137,11 +128,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-btc-tx-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-btc-tx-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-calendar-service:
     context: node-calendar-service
@@ -152,11 +142,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-calendar-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-calendar-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-calendar-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-calendar-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-calendar-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-nist-beacon-service:
     context: node-nist-beacon-service
@@ -167,11 +156,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-nist-beacon-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-nist-beacon-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-proof-gen-service:
     context: node-proof-gen-service
@@ -182,11 +170,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-proof-gen-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-proof-gen-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-proof-state-service:
     context: node-proof-state-service
@@ -197,11 +184,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-proof-state-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-proof-state-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-splitter-service:
     context: node-splitter-service
@@ -212,11 +198,10 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-splitter-service:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-splitter-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-splitter-service:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-splitter-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
 
   node-splitter-service-test:
     context: node-splitter-service
@@ -227,8 +212,7 @@ builds:
     pushes:
       - 'on_tag=quay.io/chainpoint/node-splitter-service-test:{git_tag}'
       - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:{date}'
+      - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:{git_branch}'
       - 'on_branch:master=quay.io/chainpoint/node-splitter-service-test:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
-      - 'org.chainpoint.git.branch={git_branch}'
