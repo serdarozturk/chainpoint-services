@@ -11,7 +11,7 @@ const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_C
 // The value is determined by the number of anchoring services enabled
 // The base of 3 represents the splitter, aggregator, and calendar events
 // This number will increase as additional anchor services are enabled
-const PROOF_STEP_COUNT = 3 + (env.ANCHOR_BTC ? 1 : 0) + (env.ANCHOR_ETH ? 1 : 0)
+const PROOF_STEP_COUNT = 3 + (env.ANCHOR_BTC === 'enabled' ? 1 : 0) + (env.ANCHOR_ETH === 'enabled' ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 

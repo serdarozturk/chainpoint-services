@@ -659,8 +659,8 @@ function getConfigInfoV1 (req, res, next) {
   res.send({
     chainpoint_stack_id: env.CHAINPOINT_STACK_ID,
     chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
-    anchor_btc: env.ANCHOR_BTC,
-    anchor_eth: env.ANCHOR_ETH,
+    anchor_btc: env.ANCHOR_BTC === 'enabled',
+    anchor_eth: env.ANCHOR_ETH === 'enabled',
     proof_expire_minutes: env.PROOF_EXPIRE_MINUTES,
     get_proofs_max_rest: env.GET_PROOFS_MAX_REST,
     get_proofs_max_ws: env.GET_PROOFS_MAX_WS,

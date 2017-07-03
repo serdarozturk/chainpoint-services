@@ -26,8 +26,8 @@ let envDefinitions = {
   //
   // CHAINPOINT_STACK_ID: Unique identifier for this Chainpoint stack of services
   // CHAINPOINT_BASE_URI: Base URI for this Chainpoint stack of services
-  // ANCHOR_BTC: Boolean flag for enabling and disabling BTC anchoring
-  // ANCHOR_ETH: Boolean flag for enabling and disabling ETH anchoring
+  // ANCHOR_BTC: flag for enabling and disabling BTC anchoring
+  // ANCHOR_ETH: flag for enabling and disabling ETH anchoring
   // PROOF_EXPIRE_MINUTES: The lifespan of stored proofs, in minutes
   // GET_PROOFS_MAX_REST: The maximum number of proofs that can be requested in one GET /proofs request
   // GET_PROOFS_MAX_WS: The maximum number of proofs that can be requested/subscribed to in one call
@@ -46,8 +46,9 @@ let envDefinitions = {
   PROOF_EXPIRE_MINUTES: envalid.num({ default: 1440, desc: 'The lifespan of stored proofs, in minutes' }),
 
   // Anchor to external blockchains toggle variables
-  ANCHOR_BTC: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling BTC anchoring' }),
-  ANCHOR_ETH: envalid.bool({ default: false, desc: 'Boolean flag for enabling and disabling ETH anchoring' }),
+  // Using string values in place of a Bool due to issues with storing bool values in K8s secrets
+  ANCHOR_BTC: envalid.str({ choices: ['enabled', 'disabled'], default: 'disabled', desc: 'String flag for enabling and disabling BTC anchoring' }),
+  ANCHOR_ETH: envalid.str({ choices: ['enabled', 'disabled'], default: 'disabled', desc: 'String flag for enabling and disabling ETH anchoring' }),
 
   // Consul related variables and keys
   CONSUL_HOST: envalid.str({ default: 'consul', desc: 'Consul server host' }),

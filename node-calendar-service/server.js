@@ -184,7 +184,7 @@ function processMessage (msg) {
         consumeAggRootMessage(msg)
         break
       case 'btctx':
-        if (env.ANCHOR_BTC) {
+        if (env.ANCHOR_BTC === 'enabled') {
           // Consumes a tx  message from the btctx service
           consumeBtcTxMessage(msg)
         } else {
@@ -193,7 +193,7 @@ function processMessage (msg) {
         }
         break
       case 'btcmon':
-        if (env.ANCHOR_BTC) {
+        if (env.ANCHOR_BTC === 'enabled') {
           // Consumes a tx message from the btctx service
           consumeBtcMonMessage(msg)
         } else {
@@ -908,7 +908,7 @@ function startListening () {
   }, env.CALENDAR_INTERVAL_MS)
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
-  if (env.ANCHOR_BTC) { // Do this only if BTC anchoring is enabled
+  if (env.ANCHOR_BTC === 'enabled') { // Do this only if BTC anchoring is enabled
     anchorBtcInterval = setBtcInterval()
     console.log('BTC anchoring enabled')
   } else {
@@ -916,7 +916,7 @@ function startListening () {
   }
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
-  if (env.ANCHOR_ETH) { // Do this only if ETH anchoring is enabled
+  if (env.ANCHOR_ETH === 'enabled') { // Do this only if ETH anchoring is enabled
     anchorEthInterval = setEthInterval()
     console.log('ETH anchoring enabled')
   } else {
