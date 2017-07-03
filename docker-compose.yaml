@@ -62,7 +62,6 @@ services:
       - roach3
       - redis
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -86,7 +85,6 @@ services:
       context: ./node-splitter-service
     depends_on:
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -105,7 +103,6 @@ services:
       context: ./node-aggregator-service
     depends_on:
       - rabbitmq
-      - influxdb
       - nist-beacon
     networks:
       - chainpoint
@@ -127,7 +124,6 @@ services:
     container_name: nist-beacon
     depends_on:
       - redis
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -152,7 +148,6 @@ services:
       - roach2
       - roach3
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -179,7 +174,6 @@ services:
     depends_on:
       - consul
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -201,7 +195,6 @@ services:
       - consul
       - rabbitmq
       - btc-fee
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -223,7 +216,6 @@ services:
     container_name: btc-mon
     depends_on:
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -244,7 +236,6 @@ services:
     depends_on:
       - rabbitmq
       - postgres
-      - influxdb
     networks:
       - chainpoint
     environment:
@@ -263,106 +254,10 @@ services:
       context: ./node-proof-gen-service
     depends_on:
       - rabbitmq
-      - influxdb
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
-
-  # InfluxDB Telegraf service
-  #
-  telegraf:
-    restart: always
-    image: telegraf:1.3.2-alpine
-    ports:
-      - "8092:8092/udp"
-      - "8094:8094"
-      # - "8125:8125/udp"
-    volumes:
-      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Chronograf service (Visualization)
-  #
-  # Admin Page
-  # http://127.0.0.1:8888/
-  #  
-  chronograf:
-    restart: always
-    image: chronograf:1.3.2.1-alpine
-    container_name: chronograf
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./data/chronograf:/var/lib/chronograf
-    environment:
-        INFLUXDB_URL: http://influxdb:8086
-        KAPACITOR_URL: http://kapacitor:9092
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Kapacitor service (Alerting)
-  #
-  kapacitor:
-    restart: always
-    image: kapacitor:1.3.1-alpine
-    environment:
-      KAPACITOR_HOSTNAME: kapacitor
-      KAPACITOR_INFLUXDB_0_URLS_0: http://influxdb:8086
-    volumes:
-      - ./data/kapacitor:/var/lib/kapacitor
-    ports:
-      - "9092:9092"
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB Kapacitor CLI
-  #   docker-compose run kapacitor-cli
-  #
-  kapacitor-cli:
-    image: kapacitor:1.3.1-alpine
-    entrypoint: ash
-    environment:
-      KAPACITOR_URL: http://kapacitor:9092
-    depends_on:
-      - influxdb
-      - kapacitor
-    networks:
-      - chainpoint
-
-  # InfluxDB
-  #
-  influxdb:
-    restart: always
-    image: influxdb:1.2.4-alpine
-    container_name: influxdb
-    ports:
-      - "8086:8086"
-    volumes:
-      - ./data/influxdb:/var/lib/influxdb
-    networks:
-      - chainpoint
-
-  # InfluxDB CLI
-  #   docker-compose run influxdb-cli
-  #
-  influxdb-cli:
-    image: influxdb:1.2.4-alpine
-    entrypoint:
-      - influx
-      - -host
-      - influxdb
-    depends_on:
-      - influxdb
-    networks:
-      - chainpoint
 
   # Postgres
   #

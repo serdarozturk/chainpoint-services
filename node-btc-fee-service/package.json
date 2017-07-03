@@ -12,7 +12,6 @@
     "coin-ticker": "^2.0.2",
     "consul": "^0.29.0",
     "envalid": "^3.1.1",
-    "influx": "^5.0.7",
     "lodash": "^4.17.4",
     "requestify": "^0.2.5",
     "satoshi-bitcoin": "^1.0.4"

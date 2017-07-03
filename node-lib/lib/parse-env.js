@@ -71,11 +71,6 @@ let envDefinitions = {
   // Redis related variables
   REDIS_CONNECT_URI: envalid.url({ default: 'redis://redis:6379', desc: 'The Redis server connection URI' }),
 
-  // Influx DB related variables
-  INFLUXDB_HOST: envalid.str({ default: 'influxdb', desc: 'The Influx server host' }),
-  INFLUXDB_PORT: envalid.num({ default: 8086, desc: 'The Influx server port' }),
-  INFLUXDB_DB: envalid.str({ default: 'chainpoint', desc: 'The Influx server database name' }),
-
   // Postgres related variables
   POSTGRES_CONNECT_PROTOCOL: envalid.str({ default: 'postgres:', desc: 'Postgres server connection protocol' }),
   POSTGRES_CONNECT_USER: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection user name' }),
