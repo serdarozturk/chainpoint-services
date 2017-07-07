@@ -52,7 +52,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       unique: true
     },
     time: {
-      comment: 'Block creation time in milliseconds since unix epoch',
+      comment: 'Block creation time in seconds since unix epoch',
       type: Sequelize.INTEGER,
       validate: {
         isInt: true
