@@ -258,8 +258,6 @@ function getBlockRange (start, end, callback) {
       let uncachedBlocks = blocks.filter((block) => {
         return block.cached === false && block.block
       })
-      console.log('uncachedBlocks')
-      console.log(uncachedBlocks)
       async.eachLimit(uncachedBlocks, 500, (uncachedBlock, eachCallback) => {
         cacheWriteBlock(uncachedBlock.block, (err) => {
           if (err) {
@@ -277,8 +275,6 @@ function getBlockRange (start, end, callback) {
         }).filter((block) => {
           return block
         })
-        console.log('blocks')
-        console.log(blocks)
         return wfCallback(null, blocks)
       })
     }
@@ -292,6 +288,8 @@ function getLatestBlock (callback) {
   // this value does not get cached because it frequently changes, just read from db diretly
   CalendarBlock.findOne({ attributes: ['id'], order: 'id DESC' }).nodeify((err, lastBlock) => {
     if (err) return callback(err)
+    // if a lastBlock was found, convert it to a plain JS object
+    if (lastBlock) lastBlock = lastBlock.get({ plain: true })
     return callback(null, lastBlock)
   })
 }
