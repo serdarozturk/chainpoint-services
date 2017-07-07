@@ -20,7 +20,7 @@ let amqpChannel = null
 // {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
 var BTCRecommendedFee = null
 
-// pull in variables defined in shared CalendarBlock module
+// pull in variables defined in shared BtcTxLog module
 let sequelize = btcTxLog.sequelize
 let BtcTxLog = btcTxLog.BtcTxLog
 

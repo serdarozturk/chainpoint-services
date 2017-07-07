@@ -52,13 +52,12 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       unique: true
     },
     time: {
-      comment: 'Block creation time in milliseconds since unix epoch',
+      comment: 'Block creation time in seconds since unix epoch',
       type: Sequelize.INTEGER,
       validate: {
         isInt: true
       },
-      allowNull: false,
-      unique: true
+      allowNull: false
     },
     version: {
       comment: 'Block version number, for future use.',
@@ -72,7 +71,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       allowNull: false
     },
     stackId: {
-      comment: 'The Chainpoint stack identifier',
+      comment: 'The Chainpoint stack identifier. Should be the domain or IP of the API. e.g. a.chainpoint.org',
       type: Sequelize.STRING,
       field: 'stack_id',
       allowNull: false

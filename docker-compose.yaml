@@ -350,7 +350,7 @@ services:
   #
   roach1:
     restart: always
-    image: cockroachdb/cockroach:v1.0.2
+    image: cockroachdb/cockroach:v1.0.3
     container_name: roach1
     ports:
       - "26257:26257"
@@ -365,7 +365,7 @@ services:
 
   roach2:
     restart: always
-    image: cockroachdb/cockroach:v1.0.2
+    image: cockroachdb/cockroach:v1.0.3
     container_name: roach2
     depends_on:
       - roach1
@@ -383,7 +383,7 @@ services:
 
   roach3:
     restart: always
-    image: cockroachdb/cockroach:v1.0.2
+    image: cockroachdb/cockroach:v1.0.3
     container_name: roach3
     depends_on:
       - roach1

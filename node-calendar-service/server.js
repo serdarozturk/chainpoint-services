@@ -86,7 +86,7 @@ let calcBlockHashSig = (bh) => {
 let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callback) => {
   let b = {}
   b.id = height
-  b.time = new Date().getTime()
+  b.time = Math.trunc(Date.now() / 1000)
   b.version = 1
   b.stackId = env.CHAINPOINT_STACK_ID
   b.type = type
