@@ -57,8 +57,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       validate: {
         isInt: true
       },
-      allowNull: false,
-      unique: true
+      allowNull: false
     },
     version: {
       comment: 'Block version number, for future use.',
