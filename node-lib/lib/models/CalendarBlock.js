@@ -71,7 +71,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
       allowNull: false
     },
     stackId: {
-      comment: 'The Chainpoint stack identifier',
+      comment: 'The Chainpoint stack identifier. Should be the domain or IP of the API. e.g. a.chainpoint.org',
       type: Sequelize.STRING,
       field: 'stack_id',
       allowNull: false
