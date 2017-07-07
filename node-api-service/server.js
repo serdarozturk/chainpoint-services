@@ -632,6 +632,12 @@ function getCalBlockRangeV1 (req, res, next) {
       cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
         if (err) return callback(err)
         if (!blocks || blocks.length === 0) blocks = []
+        // convert requisite fields to integers
+        for (let x = 0; x < blocks.length; x++) {
+          blocks[x].id = parseInt(blocks[x].id, 10)
+          blocks[x].time = parseInt(blocks[x].time, 10)
+          blocks[x].version = parseInt(blocks[x].version, 10)
+        }
         let results = {}
         results.blocks = blocks
         results.start = fromHeight
