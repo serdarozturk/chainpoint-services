@@ -20,22 +20,11 @@ const r = require('redis')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
-// API methods should return 502 when this value is null
 let amqpChannel = null
-// Tiny middleware function to pass amqpChannel to route handlers in the request obejct
-function injectAMQPChannel (req, res, next) {
-  req.amqpChannel = amqpChannel
-  next()
-}
 
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
 let redis = null
-// Tiny middleware function to pass redis to route handlers in the request obejct
-function injectRedis (req, res, next) {
-  req.redis = redis
-  next()
-}
 
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
@@ -115,11 +104,11 @@ server.use(restify.bodyParser({
 // API RESOURCES
 
 // submit hash(es)
-server.post({ path: '/hashes', version: '1.0.0' }, injectAMQPChannel, hashes.postHashesV1)
+server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashesV1)
 // get a single proof with a single hash_id
-server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, injectRedis, proofs.getProofsByIDV1)
+server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV1)
 // get multiple proofs with 'hashids' header param
-server.get({ path: '/proofs', version: '1.0.0' }, injectRedis, proofs.getProofsByIDV1)
+server.get({ path: '/proofs', version: '1.0.0' }, proofs.getProofsByIDV1)
 // verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, verify.postProofsForVerificationV1)
 // get the block hash for the calendar at the specified hieght
@@ -221,6 +210,7 @@ async function openRMQConnectionAsync (connectionString) {
       chan.prefetch(env.RMQ_PREFETCH_COUNT_API)
       // set 'amqpChannel' so that publishers have access to the channel
       amqpChannel = chan
+      hashes.setAMQPChannel(chan)
       // assert headers exchange for receiving proofs
       chan.assertExchange(env.RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
       let q = chan.assertQueue('', { durable: true })
@@ -233,6 +223,7 @@ async function openRMQConnectionAsync (connectionString) {
       conn.on('close', async () => {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
         amqpChannel = null
+        hashes.setAMQPChannel(null)
         await utils.sleep(5000)
         await openRMQConnectionAsync(connectionString)
       })
@@ -254,6 +245,7 @@ async function openRMQConnectionAsync (connectionString) {
 function openRedisConnection (redisURI) {
   redis = r.createClient(redisURI)
   redis.on('ready', () => {
+    proofs.setRedis(redis)
     subscribe.setRedis(redis)
     cachedCalendarBlock.setRedis(redis)
     verify.setRedis(redis)
@@ -263,6 +255,7 @@ function openRedisConnection (redisURI) {
   redis.on('error', async () => {
     redis.quit()
     redis = null
+    proofs.setRedis(null)
     subscribe.setRedis(null)
     cachedCalendarBlock.setRedis(null)
     verify.setRedis(null)

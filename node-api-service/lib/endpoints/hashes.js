@@ -7,6 +7,10 @@ const utils = require('../utils.js')
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
 
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+let amqpChannel = null
+
 /**
  * Generate the values for the 'meta' property in a POST /hashes response.
  *
@@ -69,8 +73,6 @@ function generatePostHashesResponse (hashes) {
  * - an even length string
  */
 function postHashesV1 (req, res, next) {
-  // get amqpChannel from request object
-  let amqpChannel = req.amqpChannel
 
   // validate content-type sent was 'application/json'
   if (req.contentType() !== 'application/json') {
@@ -130,5 +132,6 @@ function postHashesV1 (req, res, next) {
 
 module.exports = {
   postHashesV1: postHashesV1,
-  generatePostHashesResponse: generatePostHashesResponse
+  generatePostHashesResponse: generatePostHashesResponse,
+  setAMQPChannel: (chan) => { amqpChannel = chan }
 }

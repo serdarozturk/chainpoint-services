@@ -5,6 +5,10 @@ const uuidValidate = require('uuid-validate')
 const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
 
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
 // The custom MIME type for JSON proof array results containing Base64 encoded proof data
 const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
 
@@ -19,8 +23,6 @@ const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
  * Returns a chainpoint proof for the requested Hash ID
  */
 function getProofsByIDV1 (req, res, next) {
-  // get redis from request obejct
-  let redis = req.redis
 
   let hashIdResults = []
 
@@ -87,5 +89,6 @@ function getProofsByIDV1 (req, res, next) {
 }
 
 module.exports = {
-  getProofsByIDV1: getProofsByIDV1
+  getProofsByIDV1: getProofsByIDV1,
+  setRedis: (redisClient) => { redis = redisClient }
 }
