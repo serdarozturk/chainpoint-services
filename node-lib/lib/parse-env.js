@@ -146,7 +146,6 @@ let envDefinitions = {
 }
 
 module.exports = (service) => {
-  console.log(`Loading env variables for ${service}`)
   // Load and validate service specific require variables as needed
   switch (service) {
     case 'api':
