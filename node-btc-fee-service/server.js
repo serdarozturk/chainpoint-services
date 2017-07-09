@@ -128,7 +128,7 @@ async function start () {
     consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
     console.log('Consul connection established')
     // init interval functions
-    startIntervalsAsync()
+    await startIntervalsAsync()
     console.log('startup completed successfully')
   } catch (err) {
     console.error(`An error has occurred on startup: ${err}`)
