@@ -9,17 +9,82 @@ const async = require('async')
 const dns = require('dns')
 var jmespath = require('jmespath')
 
-const Html5WebSocket = require('html5-websocket')
-const ReconnectingWebSocket = require('reconnecting-websocket')
+// //////////////////////////////////////
+// WebSocket Reconnecting Client Wrapper
+// //////////////////////////////////////
 
-const wsOptions = {
-  constructor: Html5WebSocket,
-  maxReconnectionDelay: 10000,
-  minReconnectionDelay: 1500,
-  reconnectionDelayGrowFactor: 1.3,
-  connectionTimeout: 4000,
-  maxRetries: Infinity,
-  debug: false
+// See : https://github.com/websockets/ws/wiki/Websocket-client-implementation-for-auto-reconnect
+
+const WebSocket = require('ws')
+
+function WebSocketClient () {
+  this.number = 0	// Message number
+  this.autoReconnectInterval = 5 * 1000	// ms
+}
+WebSocketClient.prototype.open = function (url) {
+  this.url = url
+  this.instance = new WebSocket(this.url)
+  this.instance.on('open', () => {
+    this.onopen()
+  })
+  this.instance.on('message', (data, flags) => {
+    this.number ++
+    this.onmessage(data, flags, this.number)
+  })
+  this.instance.on('close', (e) => {
+    switch (e) {
+      case 1000: // CLOSE_NORMAL
+        console.log('WebSocket: closed')
+        break
+      default: // Abnormal closure
+        this.reconnect(e)
+        break
+    }
+    this.onclose(e)
+  })
+  this.instance.on('error', (e) => {
+    switch (e.code) {
+      case 'ECONNREFUSED':
+        this.reconnect(e)
+        break
+      default:
+        this.onerror(e)
+        break
+    }
+  })
+}
+
+WebSocketClient.prototype.send = function (data, option) {
+  try {
+    this.instance.send(data, option)
+  } catch (e) {
+    this.instance.emit('error', e)
+  }
+}
+
+WebSocketClient.prototype.reconnect = function (e) {
+  console.log(`WebSocketClient: retry in ${this.autoReconnectInterval}ms`, e)
+  var that = this
+  setTimeout(function () {
+    console.log('WebSocketClient: reconnecting...')
+    that.open(that.url)
+  }, this.autoReconnectInterval)
+}
+
+WebSocketClient.prototype.onopen = function (e) {
+  console.log('WebSocketClient: open', arguments)
+}
+
+WebSocketClient.prototype.onmessage = function (data, flags, number) {
+  console.log('WebSocketClient: message', arguments)
+}
+
+WebSocketClient.prototype.onerror = function (e) {
+  console.log('WebSocketClient: error', arguments)
+}
+
+WebSocketClient.prototype.onclose = function (e) {
+  console.log('WebSocketClient: closed', arguments)
 }
 
 // FIXME
@@ -49,7 +114,6 @@ let initStoredHash = (hash, sentAt, hashID) => {
 
   // create a redis hash for each SHA256 with initial tracking metadata
   let hashKey = ['hash', hash].join(':')
-  let d = new Date()
   redis.hmset(hashKey, ['sentAt', sentAt, 'hashID', hashID, 'hashIDTime', uuidTime.v1(hashID)])
 }
 
@@ -74,15 +138,18 @@ async.waterfall([
     })
   },
   function (host, callback) {
-    let rws = new ReconnectingWebSocket('ws://' + host, null, wsOptions)
-    callback(null, host, rws)
+    var wsc = new WebSocketClient()
+    wsc.open('ws://' + host)
+    callback(null, host, wsc)
   }
-], (err, host, rws) => {
+], (err, host, wsc) => {
   if (err) {
     console.error(err)
   }
 
-  rws.addEventListener('open', () => {
+  wsc.onopen = function (e) {
+    console.log('WebSocketClient connected:', arguments)
+
     setInterval(() => {
       let d = new Date()
       let newHash = crypto.createHash('sha256').update(d.toISOString()).digest('hex')
@@ -100,14 +167,16 @@ async.waterfall([
           initStoredHash(newHash, sentAt, hashID)
           // console.log(hashID)
           // Subscribe to proof updates for hashID.
-          rws.send(hashID)
+          wsc.send(hashID)
         }
       })
     }, SEND_HASH_INTERVAL_MSEC)
-  })
+  }
 
-  rws.onmessage = (event) => {
-    let jsonData = JSON.parse(event.data)
+  wsc.onmessage = (data, flags, number) => {
+    // console.log(`WebSocketClient message #${number}: `, data)
+
+    let jsonData = JSON.parse(data)
     let proofObj = cpb.binaryToObjectSync(jsonData.proof)
 
     async.parallel({

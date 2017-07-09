@@ -13,12 +13,11 @@
     "chainpoint-binary": "^3.2.1",
     "chainpoint-parse": "^1.0.1",
     "envalid": "^3.1.1",
-    "html5-websocket": "^1.0.0",
     "jmespath": "^0.15.0",
     "lodash": "^4.17.4",
-    "reconnecting-websocket": "^3.0.7",
     "redis": "^2.7.1",
     "superagent": "^3.5.2",
-    "uuid-time": "^1.0.0"
+    "uuid-time": "^1.0.0",
+    "ws": "^3.0.0"
   }
 }
