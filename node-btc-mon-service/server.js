@@ -1,10 +1,11 @@
-const MerkleTools = require('merkle-tools')
-const amqp = require('amqplib/callback_api')
-const async = require('async')
-const request = require('request')
-
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('btc-mon')
+
+const MerkleTools = require('merkle-tools')
+const amqp = require('amqplib')
+const async = require('async')
+const request = require('request')
+const utils = require('./lib/utils.js')
 
 // An array of all Bitcoin transaction id objects needing to be monitored.
 // Will be filled as new trasnactions ids arrive on the queue.
@@ -16,56 +17,6 @@ const merkleTools = new MerkleTools()
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
-
-/**
- * Opens an AMPQ connection and channel
- * Retry logic is included to handle losses of connection
- *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
- */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
-      // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
-      })
-    },
-    (conn, callback) => {
-      // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
-        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-        amqpChannel = null
-        // un-acked messaged will be requeued, so clear all work in progress
-        BTCTXIDS = []
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-      })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_BTCMON_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCMON)
-        amqpChannel = chan
-        // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(env.RMQ_WORK_IN_BTCMON_QUEUE, (msg) => {
-          consumeBtcTxIdMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
-      // catch errors when attempting to establish connection
-      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    }
-  })
-}
 
 function consumeBtcTxIdMessage (msg) {
   if (msg !== null) {
@@ -176,9 +127,6 @@ const getBlockInfoForBlockHash = (blockHash, callback) => {
   })
 }
 
-// AMQP initialization
-amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
-
 // Iterate through all BTCTXIDS objects, checking the confirmation count for each transaction
 // If MIN_BTC_CONFIRMS is reached for a given transaction, retrieve the state data needed
 // to build the proof path from the transaction to the block header merkle root value and
@@ -283,7 +231,69 @@ let monitorTransactions = () => {
   })
 }
 
-setInterval(() => monitorTransactions(), env.MONITOR_INTERVAL_SECONDS * 1000)
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
+      // connect to rabbitmq server
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_IN_BTCMON_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+      chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCMON)
+      amqpChannel = chan
+      // Continuously load the HASHES from RMQ with hash objects to process)
+      chan.consume(env.RMQ_WORK_IN_BTCMON_QUEUE, (msg) => {
+        consumeBtcTxIdMessage(msg)
+      })
+      // if the channel closes for any reason, attempt to reconnect
+      conn.on('close', async () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        // un-acked messaged will be requeued, so clear all work in progress
+        BTCTXIDS = []
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
+      })
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
+      await utils.sleep(5000)
+    }
+  }
+}
+
+function startIntervals () {
+  setInterval(() => monitorTransactions(), env.MONITOR_INTERVAL_SECONDS * 1000)
+}
+
+// process all steps need to start the application
+async function start () {
+  if (env.NODE_ENV === 'test') return
+  try {
+    // init RabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    // init interval functions
+    startIntervals()
+    console.log('startup completed successfully')
+  } catch (err) {
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
+  }
+}
+
+// get the whole show started
+start()
 
 // export these functions for unit tests
 module.exports = {
@@ -291,7 +301,7 @@ module.exports = {
   setBTCTXIDS: function (btctxids) { BTCTXIDS = btctxids },
   getAMQPChannel: function () { return amqpChannel },
   setAMQPChannel: (chan) => { amqpChannel = chan },
-  amqpOpenConnection: amqpOpenConnection,
+  openRMQConnectionAsync: openRMQConnectionAsync,
   consumeBtcTxIdMessage: consumeBtcTxIdMessage,
   monitorTransactions: monitorTransactions
 }
