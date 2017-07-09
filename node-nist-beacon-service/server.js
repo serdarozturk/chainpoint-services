@@ -2,8 +2,9 @@
 const env = require('./lib/parse-env.js')('nist')
 
 const BEACON = require('nist-randomness-beacon')
+const cnsl = require('consul')
 
-const consul = require('consul')({host: env.CONSUL_HOST, port: env.CONSUL_PORT})
+let consul = null
 
 let getNistLatest = () => {
   BEACON.last((err, res) => {
@@ -38,14 +39,34 @@ let getNistLatest = () => {
   })
 }
 
-// run at service start
-getNistLatest()
-
+function startIntervals () {
 // run at interval
-setInterval(() => {
+  setInterval(() => {
+    try {
+      getNistLatest()
+    } catch (err) {
+      console.error('getNistLatest : caught err : ', err.message)
+    }
+  }, env.NIST_INTERVAL_MS)
+}
+
+// process all steps need to start the application
+async function start () {
+  if (env.NODE_ENV === 'test') return
   try {
+    // init consul
+    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
+    // get initial value for service start
     getNistLatest()
+    // init interval functions
+    startIntervals()
+    console.log('startup completed successfully')
   } catch (err) {
-    console.error('getNistLatest : caught err : ', err.message)
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
   }
-}, env.NIST_INTERVAL_MS)
+}
+
+// get the whole show started
+start()
