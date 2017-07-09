@@ -1,3 +1,6 @@
+// load all environment variables into env object
+const env = require('./lib/parse-env.js')('agg')
+
 const _ = require('lodash')
 const utils = require('./lib/utils')
 const amqp = require('amqplib')
@@ -6,8 +9,6 @@ const crypto = require('crypto')
 const async = require('async')
 const uuidv1 = require('uuid/v1')
 const cnsl = require('consul')
-// load all environment variables into env object
-const env = require('./lib/parse-env.js')('agg')
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
