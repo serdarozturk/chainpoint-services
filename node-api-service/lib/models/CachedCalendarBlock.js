@@ -1,4 +1,4 @@
-const calendarBlock = require('../lib/models/CalendarBlock.js')
+const calendarBlock = require('./CalendarBlock.js')
 const async = require('async')
 
 const CAL_CACHE_EXPIRE_MINUTES = 60 * 24

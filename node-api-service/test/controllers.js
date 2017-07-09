@@ -8,6 +8,7 @@ var request = require('supertest')
 
 var app = require('../server')
 var server = app.server
+var hashes = require('../lib/endpoints/hashes')
 
 describe('Home Controller', () => {
   describe('GET /', () => {
@@ -689,7 +690,7 @@ describe('Config Controller', () => {
 describe('Functions', () => {
   describe('calling generatePostHashesResponse with one hash', () => {
     it('should return proper repsonse object', (done) => {
-      let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
+      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
       expect(res.meta).to.have.property('submitted_at')
       expect(res.meta).to.have.property('processing_hints')
@@ -711,7 +712,7 @@ describe('Functions', () => {
 
   describe('calling generatePostHashesResponse with three hashes', () => {
     it('should return proper repsonse object', (done) => {
-      let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
+      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
