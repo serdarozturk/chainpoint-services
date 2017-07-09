@@ -286,7 +286,6 @@ async function openRMQConnectionAsync (connectionString) {
       console.log('RabbitMQ connection established')
       rmqConnected = true
     } catch (error) {
-      console.log(error)
       // catch errors when attempting to establish connection
       console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
       await utils.sleep(5000)
@@ -300,6 +299,7 @@ async function start () {
   try {
     // init consul
     consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
     // init rabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
     // init watches and interval functions
