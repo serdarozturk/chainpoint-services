@@ -445,11 +445,11 @@ definitions:
         type: string
         example: https://a.prod.server.com
       anchor_btc:
-        type: boolean
-        example: true
+        type: string
+        example: enabled
       anchor_eth:
-        type: boolean
-        example: false
+        type: string
+        example: disabled
       proof_expire_minutes:
         type: integer
         example: 1440
