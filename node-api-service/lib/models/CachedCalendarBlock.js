@@ -74,11 +74,12 @@ function getBlockByHeight (height, callback) {
       // if block was found, skip to next function
       if (block) return wfCallback(null, block, false)
       // otherwise, try to read from database
-      CalendarBlock.findOne({ where: { id: height } }).nodeify((err, block) => {
-        if (err) return wfCallback(err)
+      CalendarBlock.findOne({ where: { id: height } }).then((block) => {
         // if a block was found, convert it to a plain JS object
         if (block) block = block.get({ plain: true })
         return wfCallback(null, block, true)
+      }).catch((err) => {
+        return wfCallback(err)
       })
     },
     // if the block was found, and it was read from the database, write to cache
@@ -113,10 +114,11 @@ function getCalBlockConfirmDataByDataId (dataId, callback) {
       // if hash was found, skip to next function
       if (hash) return wfCallback(null, hash, false)
       // otherwise, try to read from database
-      CalendarBlock.findOne({ where: { type: 'cal', data_id: dataId }, attributes: ['hash'] }).nodeify((err, block) => {
-        if (err) return callback(err)
+      CalendarBlock.findOne({ where: { type: 'cal', data_id: dataId }, attributes: ['hash'] }).then((block) => {
         if (!block) return callback(null, null)
         return callback(null, block.hash)
+      }).catch((err) => {
+        return callback(err)
       })
     },
     // if the hash was found, and it was read from the database, write to cache
@@ -147,10 +149,11 @@ function getBtcCBlockConfirmDataByDataId (dataId, callback) {
       // if dataVal was found, skip to next function
       if (dataVal) return wfCallback(null, dataVal, false)
       // otherwise, try to read from database
-      CalendarBlock.findOne({ where: { type: 'btc-c', dataId: dataId }, attributes: ['dataVal'] }).nodeify((err, block) => {
-        if (err) return callback(err)
+      CalendarBlock.findOne({ where: { type: 'btc-c', dataId: dataId }, attributes: ['dataVal'] }).then((block) => {
         if (!block) return callback(null, null)
         return callback(null, block.dataVal)
+      }).catch((err) => {
+        return wfCallback(err)
       })
     },
     // if the dataVal was found, and it was read from the database, write to cache
@@ -221,13 +224,14 @@ function getBlockRange (start, end, callback) {
 
       let dbBlocks = []
       async.each(nullRanges, (nullRange, eachCallback) => {
-        CalendarBlock.findAll({ where: { id: { $between: [nullRange.startHeight, nullRange.endHeight] } }, order: 'id ASC' }).nodeify((err, blocks) => {
-          if (err) return eachCallback(err)
+        CalendarBlock.findAll({ where: { id: { $between: [nullRange.startHeight, nullRange.endHeight] } }, order: 'id ASC' }).then((blocks) => {
           for (let x = 0; x < blocks.length; x++) {
             blocks[x] = blocks[x].get({ plain: true })
           }
           dbBlocks = dbBlocks.concat(blocks)
           return eachCallback(null)
+        }).catch((err) => {
+          return eachCallback(err)
         })
       }, (err) => {
         if (err) return wfCallback(err)
@@ -286,11 +290,12 @@ function getBlockRange (start, end, callback) {
 
 function getLatestBlock (callback) {
   // this value does not get cached because it frequently changes, just read from db diretly
-  CalendarBlock.findOne({ attributes: ['id'], order: 'id DESC' }).nodeify((err, lastBlock) => {
-    if (err) return callback(err)
+  CalendarBlock.findOne({ attributes: ['id'], order: 'id DESC' }).then((lastBlock) => {
     // if a lastBlock was found, convert it to a plain JS object
     if (lastBlock) lastBlock = lastBlock.get({ plain: true })
     return callback(null, lastBlock)
+  }).catch((err) => {
+    return callback(err)
   })
 }
 
