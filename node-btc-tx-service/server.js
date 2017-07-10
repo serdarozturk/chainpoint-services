@@ -2,7 +2,6 @@
 const env = require('./lib/parse-env.js')('btc-tx')
 
 const amqp = require('amqplib')
-const async = require('async')
 const bcoin = require('bcoin')
 const request = require('request')
 const sb = require('satoshi-bitcoin')

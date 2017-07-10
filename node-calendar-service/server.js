@@ -126,10 +126,10 @@ let createCalendarBlockAsync = async (root) => {
       let newId = parseInt(prevBlock.id, 10) + 1
       return await writeBlockAsync(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL')
     } else {
-      throw new Error('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error('could not write block')
+    throw new Error(`could not write block : ${error}`)
   }
 }
 
@@ -144,10 +144,10 @@ let createNistBlockAsync = async (nistDataObj) => {
       let dataVal = nistDataObj.split(':')[1].toString()  // the hex value for this NIST entry
       return await writeBlockAsync(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST')
     } else {
-      throw new Error('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error('could not write block')
+    throw new Error(`could not write block : ${error}`)
   }
 }
 
@@ -161,27 +161,27 @@ let createBtcAnchorBlockAsync = async (root) => {
       console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
       return await writeBlockAsync(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
     } else {
-      throw new Error('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error('could not write block')
+    throw new Error(`could not write block : ${error}`)
   }
 }
 
-let createBtcConfirmBlock = (height, root, callback) => {
+let createBtcConfirmBlockAsync = async (height, root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).then(async (prevBlock) => {
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      await writeBlockAsync(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM')
-      return callback(null)
+      return await writeBlockAsync(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM')
     } else {
-      return callback('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
-  }).catch((error) => {
-    return callback('could not write block : ' + error.message)
-  })
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
 }
 
 /**
@@ -709,9 +709,10 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
       async.waterfall([
         // Store Merkle root of BTC block in chain
         (wfCallback) => {
-          createBtcConfirmBlock(btcheadHeight, btcheadRoot, (err, block) => {
-            if (err) return wfCallback(err)
+          createBtcConfirmBlockAsync(btcheadHeight, btcheadRoot).then((block) => {
             return wfCallback(null, block)
+          }).catch((err) => {
+            return wfCallback(err)
           })
         },
         // queue up message containing updated proof state bound for proof state service
