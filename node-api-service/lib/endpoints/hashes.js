@@ -116,9 +116,9 @@ function postHashesV1 (req, res, next) {
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  let success = amqpChannel.sendToQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
     (err) => {
-      if (err !== null || !success) {
+      if (err !== null) {
         console.error(env.RMQ_WORK_OUT_SPLITTER_QUEUE, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {

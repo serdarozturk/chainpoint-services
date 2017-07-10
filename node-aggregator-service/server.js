@@ -156,9 +156,9 @@ let finalize = () => {
           stateObj.agg_state = {}
           stateObj.agg_state.ops = proofDataItem.proof
 
-          let success = amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'aggregator' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'aggregator' },
             (err) => {
-              if (err !== null || !success) {
+              if (err !== null) {
                 // An error as occurred publishing a message
                 console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
                 return eachCallback(err || 'write buffer full')
@@ -188,9 +188,9 @@ let finalize = () => {
         aggObj.agg_root = treeDataObj.agg_root
         aggObj.agg_hash_count = treeDataObj.agg_hash_count
 
-        let success = amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(aggObj)), { persistent: true, type: 'aggregator' },
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(aggObj)), { persistent: true, type: 'aggregator' },
           (err) => {
-            if (err !== null || !success) {
+            if (err !== null) {
               // An error as occurred publishing a message
               console.error(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message nacked')
               return callback(err || 'write buffer full')
