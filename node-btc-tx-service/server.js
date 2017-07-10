@@ -1,14 +1,16 @@
-const amqp = require('amqplib/callback_api')
+// load all environment variables into env object
+const env = require('./lib/parse-env.js')('btc-tx')
+
+const amqp = require('amqplib')
 const async = require('async')
 const bcoin = require('bcoin')
 const request = require('request')
 const sb = require('satoshi-bitcoin')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
+const cnsl = require('consul')
+const utils = require('./lib/utils.js')
 
-// load all environment variables into env object
-const env = require('./lib/parse-env.js')('btc-tx')
-
-const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+let consul = null
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -25,7 +27,7 @@ let sequelize = btcTxLog.sequelize
 let BtcTxLog = btcTxLog.BtcTxLog
 
 // The write function used write all btc tx log events
-let logBtcTxData = (txObj, callback) => {
+let logBtcTxDataAsync = async (txObj) => {
   let row = {}
   row.txId = txObj.hash
   row.publishDate = Date.parse(txObj.date)
@@ -37,11 +39,13 @@ let logBtcTxData = (txObj, callback) => {
   row.balanceBtc = parseFloat(txObj.outputs[1].value)
   row.stackId = env.CHAINPOINT_STACK_ID
 
-  BtcTxLog.create(row).nodeify((err, newRow) => {
-    if (err) return callback(`BTC log create error: ${err.message} : ${err.stack}`)
+  try {
+    let newRow = await BtcTxLog.create(row)
     console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
-    return callback(null, newRow.get({ plain: true }))
-  })
+    return newRow.get({ plain: true })
+  } catch (error) {
+    throw new Error(`BTC log create error: ${error.message} : ${error.stack}`)
+  }
 }
 
 /**
@@ -132,25 +136,16 @@ function processIncomingAnchorJob (msg) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
     let anchorData = messageObj.anchor_agg_root
-    async.waterfall([
-      (callback) => {
-        // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
-        if (!amqpChannel) return callback('no amqpConnection available')
-        // create and publish the transaction
-        sendTxToBTC(anchorData, (err, body) => {
-          if (err) return callback(err)
-          return callback(null, body)
-        })
-      },
-      (body, callback) => {
+
+    // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
+    if (!amqpChannel) throw new Error('no amqpConnection available')
+    // create and publish the transaction
+    sendTxToBTC(anchorData, async (err, body) => {
+      try {
+        if (err) throw new Error(err)
         // log the btc tx transaction
-        logBtcTxData(body, (err, newLogEntry) => {
-          if (err) return callback(err)
-          console.log(newLogEntry)
-          return callback(null, body)
-        })
-      },
-      (body, callback) => {
+        let newLogEntry = await logBtcTxDataAsync(body)
+        console.log(newLogEntry)
         // queue return message for calendar containing the new transaction information
         // adding btc transaction id and full transaction body to original message and returning
         messageObj.btctx_id = body.hash
@@ -159,27 +154,40 @@ function processIncomingAnchorJob (msg) {
           (err, ok) => {
             if (err !== null) {
               console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
-              return callback(err)
+              throw new Error(err)
             } else {
               console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
-              return callback(null)
+              amqpChannel.ack(msg)
             }
           })
-      }
-    ], function (err) {
-      if (err) {
+      } catch (error) {
         // An error has occurred publishing the transaction, nack consumption of message
-        console.error('error publishing transaction', err)
+        console.error('error publishing transaction : ' + error.message)
         // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
         setTimeout(() => {
           amqpChannel.nack(msg)
           console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
         }, 30000)
-      } else {
-        amqpChannel.ack(msg)
-        // console.log(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message acked')
       }
     })
+  }
+}
+
+/**
+ * Opens a storage connection
+ **/
+async function openStorageConnectionAsync (callback) {
+  let dbConnected = false
+  while (!dbConnected) {
+    try {
+      await sequelize.sync({ logging: false })
+      console.log('Sequelize connection established')
+      dbConnected = true
+    } catch (error) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
+      await utils.sleep(5000)
+    }
   }
 }
 
@@ -189,51 +197,44 @@ function processIncomingAnchorJob (msg) {
  *
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
       // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_IN_BTCTX_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+      chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCTX)
+      amqpChannel = chan
+      // Receive and process messages meant to initiate btc tx generation and publishing
+      chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
+        processIncomingAnchorJob(msg)
       })
-    },
-    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
+      conn.on('close', async () => {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
         amqpChannel = null
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
       })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_BTCTX_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT_BTCTX)
-        amqpChannel = chan
-        // Receive and process messages meant to initiate btc tx generation and publishing
-        chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
-          // console.log('processing incoming message')
-          processIncomingAnchorJob(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
       // catch errors when attempting to establish connection
       console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      await utils.sleep(5000)
     }
-  })
+  }
 }
 
 // This initalizes all the consul watches and JS intervals
-function startListening () {
+function startWatchesAndIntervals () {
+  console.log('starting watches and intervals')
+
   // console.log('starting watches and intervals')
   // Continuous watch on the consul key holding the fee object.
   var watch = consul.watch({ method: consul.kv.get, options: { key: env.BTC_REC_FEE_KEY } })
@@ -254,36 +255,25 @@ function startListening () {
   })
 }
 
-/**
- * Opens a storage connection
- **/
-function openStorageConnection (callback) {
-  // Sync models to DB tables and trigger check
-  // if a new genesis block is needed.
-  sequelize.sync({ logging: false }).nodeify((err) => {
-    if (err) {
-      console.error('sequelize.sync() error: ' + err.stack)
-      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
-    } else {
-      // console.log('BtcTxLog sequelize database table synchronized')
-      return callback(null, true)
-    }
-  })
+// process all steps need to start the application
+async function start () {
+  if (env.NODE_ENV === 'test') return
+  try {
+    // init consul
+    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
+    // init DB
+    await openStorageConnectionAsync()
+    // init RabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    // init watches and interval functions
+    startWatchesAndIntervals()
+    console.log('startup completed successfully')
+  } catch (err) {
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
+  }
 }
 
-function initConnectionsAndStart () {
-  // Open storage connection and then amqp connection
-  openStorageConnection((err, result) => {
-    if (err) {
-      console.error(err)
-    } else {
-      amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
-      // Init intervals and watches
-      startListening()
-    }
-  })
-}
-
-// start the whole show here
-// first open the required connections, then allow locks for db writing
-initConnectionsAndStart()
+// get the whole show started
+start()

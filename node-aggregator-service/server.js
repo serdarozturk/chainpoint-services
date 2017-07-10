@@ -1,12 +1,14 @@
+// load all environment variables into env object
+const env = require('./lib/parse-env.js')('agg')
+
 const _ = require('lodash')
+const utils = require('./lib/utils')
+const amqp = require('amqplib')
 const MerkleTools = require('merkle-tools')
-const amqp = require('amqplib/callback_api')
 const crypto = require('crypto')
 const async = require('async')
 const uuidv1 = require('uuid/v1')
 const cnsl = require('consul')
-// load all environment variables into env object
-const env = require('./lib/parse-env.js')('agg')
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -155,11 +157,11 @@ let finalize = () => {
           stateObj.agg_state.ops = proofDataItem.proof
 
           amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'aggregator' },
-            (err, ok) => {
+            (err) => {
               if (err !== null) {
                 // An error as occurred publishing a message
                 console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
-                return eachCallback(err)
+                return eachCallback(err || 'write buffer full')
               } else {
                 // New message has been published
                 console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message acked')
@@ -187,11 +189,11 @@ let finalize = () => {
         aggObj.agg_hash_count = treeDataObj.agg_hash_count
 
         amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(aggObj)), { persistent: true, type: 'aggregator' },
-          (err, ok) => {
+          (err) => {
             if (err !== null) {
               // An error as occurred publishing a message
               console.error(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message nacked')
-              return callback(err)
+              return callback(err || 'write buffer full')
             } else {
               // New message has been published
               console.log(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message acked')
@@ -223,7 +225,7 @@ let finalize = () => {
 }
 
 // This initalizes all the consul watches and JS intervals that fire all aggregator events
-function startListening () {
+function startWatchesAndIntervals () {
   console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
@@ -252,63 +254,66 @@ function startListening () {
  * Opens an AMPQ connection and channel
  * Retry logic is included to handle losses of connection
  *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ * @param {string} connectionString - The connection URI for the RabbitMQ instance
  */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
       // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_IN_AGG_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+      chan.prefetch(env.RMQ_PREFETCH_COUNT_AGG)
+      // set 'amqpChannel' so that publishers have access to the channel
+      amqpChannel = chan
+      // Continuously load the HASHES from RMQ with hash objects to process)
+      chan.consume(env.RMQ_WORK_IN_AGG_QUEUE, (msg) => {
+        consumeHashMessage(msg)
       })
-    },
-    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
+      conn.on('close', async () => {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
         amqpChannel = null
         // un-acked messaged will be requeued, so clear all work in progress
         HASHES = TREES = []
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
       })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_AGG_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_CAL_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT_AGG)
-        amqpChannel = chan
-        // Continuously load the HASHES from RMQ with hash objects to process)
-        chan.consume(env.RMQ_WORK_IN_AGG_QUEUE, (msg) => {
-          consumeHashMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
       // catch errors when attempting to establish connection
       console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      await utils.sleep(5000)
     }
-  })
+  }
 }
 
-function initConnectionsAndStart () {
+// process all steps need to start the application
+async function start () {
   if (env.NODE_ENV === 'test') return
-  consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
-  amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
-  // Init intervals and watches
-  startListening()
+  try {
+    // init consul
+    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
+    // init rabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    // init watches and interval functions
+    startWatchesAndIntervals()
+    console.log('startup completed successfully')
+  } catch (err) {
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
+  }
 }
 
-// start the whole show here
-initConnectionsAndStart()
+// get the whole show started
+start()
 
 // export these functions for unit tests
 module.exports = {
@@ -318,7 +323,7 @@ module.exports = {
   setTREES: function (trees) { TREES = trees },
   getAMQPChannel: function () { return amqpChannel },
   setAMQPChannel: (chan) => { amqpChannel = chan },
-  amqpOpenConnection: amqpOpenConnection,
+  openRMQConnectionAsync: openRMQConnectionAsync,
   consumeHashMessage: consumeHashMessage,
   aggregate: aggregate,
   finalize: finalize

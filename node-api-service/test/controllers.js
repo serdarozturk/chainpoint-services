@@ -8,6 +8,7 @@ var request = require('supertest')
 
 var app = require('../server')
 var server = app.server
+var hashes = require('../lib/endpoints/hashes')
 
 describe('Home Controller', () => {
   describe('GET /', () => {
@@ -672,8 +673,8 @@ describe('Config Controller', () => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('chainpoint_stack_id').and.to.equal('test')
           expect(res.body).to.have.property('chainpoint_base_uri').and.to.equal('http://test.chainpoint.org')
-          expect(res.body).to.have.property('anchor_btc').and.to.equal(false)
-          expect(res.body).to.have.property('anchor_eth').and.to.equal(false)
+          expect(res.body).to.have.property('anchor_btc').and.to.equal('disabled')
+          expect(res.body).to.have.property('anchor_eth').and.to.equal('disabled')
           expect(res.body).to.have.property('proof_expire_minutes').and.to.equal(1440)
           expect(res.body).to.have.property('get_proofs_max_rest').and.to.equal(250)
           expect(res.body).to.have.property('get_proofs_max_ws').and.to.equal(250)
@@ -689,7 +690,7 @@ describe('Config Controller', () => {
 describe('Functions', () => {
   describe('calling generatePostHashesResponse with one hash', () => {
     it('should return proper repsonse object', (done) => {
-      let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
+      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
       expect(res.meta).to.have.property('submitted_at')
       expect(res.meta).to.have.property('processing_hints')
@@ -711,7 +712,7 @@ describe('Functions', () => {
 
   describe('calling generatePostHashesResponse with three hashes', () => {
     it('should return proper repsonse object', (done) => {
-      let res = app.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
+      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
