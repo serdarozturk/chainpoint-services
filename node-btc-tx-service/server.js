@@ -42,9 +42,9 @@ let logBtcTxDataAsync = async (txObj) => {
   try {
     let newRow = await BtcTxLog.create(row)
     console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
-    return Promise.resolve(newRow.get({ plain: true }))
+    return newRow.get({ plain: true })
   } catch (error) {
-    return Promise.reject(new Error(`BTC log create error: ${error.message} : ${error.stack}`))
+    throw new Error(`BTC log create error: ${error.message} : ${error.stack}`)
   }
 }
 

@@ -107,9 +107,9 @@ let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyNa
   try {
     let block = await CalendarBlock.create(b)
     console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
-    return Promise.resolve(block.get({ plain: true }))
+    return block.get({ plain: true })
   } catch (error) {
-    return Promise.reject(new Error(`${friendlyName} BLOCK create error: ${error.message} : ${error.stack}`))
+    throw new Error(`${friendlyName} BLOCK create error: ${error.message} : ${error.stack}`)
   }
 }
 
@@ -126,10 +126,10 @@ let createCalendarBlockAsync = async (root) => {
       let newId = parseInt(prevBlock.id, 10) + 1
       return await writeBlockAsync(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL')
     } else {
-      return Promise.reject(new Error('could not write block, no genesis block found'))
+      throw new Error('could not write block, no genesis block found')
     }
   } catch (error) {
-    return Promise.reject(new Error('could not write block'))
+    throw new Error('could not write block')
   }
 }
 
@@ -144,10 +144,10 @@ let createNistBlockAsync = async (nistDataObj) => {
       let dataVal = nistDataObj.split(':')[1].toString()  // the hex value for this NIST entry
       return await writeBlockAsync(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST')
     } else {
-      return Promise.reject(new Error('could not write block, no genesis block found'))
+      throw new Error('could not write block, no genesis block found')
     }
   } catch (error) {
-    return Promise.reject(new Error('could not write block'))
+    throw new Error('could not write block')
   }
 }
 
@@ -161,10 +161,10 @@ let createBtcAnchorBlockAsync = async (root) => {
       console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
       return await writeBlockAsync(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
     } else {
-      return Promise.reject(new Error('could not write block, no genesis block found'))
+      throw new Error('could not write block, no genesis block found')
     }
   } catch (error) {
-    return Promise.reject(new Error('could not write block'))
+    throw new Error('could not write block')
   }
 }
 
@@ -177,10 +177,10 @@ let createBtcConfirmBlockAsync = async (height, root, callback) => {
       let newId = parseInt(prevBlock.id, 10) + 1
       return await writeBlockAsync(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM')
     } else {
-      return Promise.reject(new Error('could not write block, no genesis block found'))
+      throw new Error('could not write block, no genesis block found')
     }
   } catch (error) {
-    return Promise.reject(new Error('could not write block'))
+    throw new Error('could not write block')
   }
 }
 
@@ -368,84 +368,79 @@ let generateCalendarTree = () => {
 // Write tree to calendar block DB and also to proof state service via RMQ
 let persistCalendarTreeAsync = async (treeDataObj) => {
   // Store Merkle root of calendar in DB and chain to previous calendar entries
-  try {
-    let block = await createCalendarBlockAsync(treeDataObj.cal_root.toString('hex'))
-    async.waterfall([
-      async.constant(block),
-      // queue proof state messages for each aggregation root in the tree
-      (block, callback) => {
-        // for each aggregation root, queue up message containing
-        // updated proof state bound for proof state service
-        async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
-          let stateObj = {}
-          stateObj.agg_id = proofDataItem.agg_id
-          stateObj.agg_hash_count = proofDataItem.agg_hash_count
-          stateObj.cal_id = block.id
-          stateObj.cal_state = {}
-          // add ops connecting agg_root to cal_root
-          stateObj.cal_state.ops = proofDataItem.proof
-          // add ops extending proof path beyond cal_root to calendar block's block_hash
-          stateObj.cal_state.ops.push({ l: `${block.id}:${block.time}:${block.version}:${block.stackId}:${block.type}:${block.dataId}` })
-          stateObj.cal_state.ops.push({ r: block.prevHash })
-          stateObj.cal_state.ops.push({ op: 'sha-256' })
+  let block = await createCalendarBlockAsync(treeDataObj.cal_root.toString('hex'))
+  async.waterfall([
+    async.constant(block),
+    // queue proof state messages for each aggregation root in the tree
+    (block, callback) => {
+      // for each aggregation root, queue up message containing
+      // updated proof state bound for proof state service
+      async.each(treeDataObj.proofData, (proofDataItem, eachCallback) => {
+        let stateObj = {}
+        stateObj.agg_id = proofDataItem.agg_id
+        stateObj.agg_hash_count = proofDataItem.agg_hash_count
+        stateObj.cal_id = block.id
+        stateObj.cal_state = {}
+        // add ops connecting agg_root to cal_root
+        stateObj.cal_state.ops = proofDataItem.proof
+        // add ops extending proof path beyond cal_root to calendar block's block_hash
+        stateObj.cal_state.ops.push({ l: `${block.id}:${block.time}:${block.version}:${block.stackId}:${block.type}:${block.dataId}` })
+        stateObj.cal_state.ops.push({ r: block.prevHash })
+        stateObj.cal_state.ops.push({ op: 'sha-256' })
 
-          // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
-          let BASE_URIS = [env.CHAINPOINT_BASE_URI]
-          let uris = []
-          for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/hash`)
-          stateObj.cal_state.anchor = {
-            anchor_id: block.id,
-            uris: uris
-          }
+        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
+        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
+        let uris = []
+        for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/hash`)
+        stateObj.cal_state.anchor = {
+          anchor_id: block.id,
+          uris: uris
+        }
 
-          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
-            (err, ok) => {
-              if (err !== null) {
-                // An error as occurred publishing a message
-                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
-                return eachCallback(err)
-              } else {
-                // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
-                return eachCallback(null)
-              }
-            })
-        }, (err) => {
-          if (err) {
-            return callback(err)
-          } else {
-            let messages = treeDataObj.proofData.map((proofDataItem) => {
-              return proofDataItem.agg_msg
-            })
-            return callback(null, messages)
-          }
-        })
-      }
-    ], (err, messages) => {
-      // messages contains an array of agg_msg objects
-      if (err) {
-        _.forEach(messages, (message) => {
-          // nack consumption of all original hash messages part of this aggregation event
-          if (message !== null) {
-            amqpChannel.nack(message)
-            console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message nacked')
-          }
-        })
-        return Promise.reject(new Error(err))
-      } else {
-        _.forEach(messages, (message) => {
-          if (message !== null) {
-            // ack consumption of all original hash messages part of this aggregation event
-            amqpChannel.ack(message)
-            console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
-          }
-        })
-        return Promise.resolve()
-      }
-    })
-  } catch (error) {
-    return Promise.reject(error)
-  }
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'cal' },
+          (err, ok) => {
+            if (err !== null) {
+              // An error as occurred publishing a message
+              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message nacked')
+              return eachCallback(err)
+            } else {
+              // New message has been published
+              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
+              return eachCallback(null)
+            }
+          })
+      }, (err) => {
+        if (err) {
+          return callback(err)
+        } else {
+          let messages = treeDataObj.proofData.map((proofDataItem) => {
+            return proofDataItem.agg_msg
+          })
+          return callback(null, messages)
+        }
+      })
+    }
+  ], (err, messages) => {
+    // messages contains an array of agg_msg objects
+    if (err) {
+      _.forEach(messages, (message) => {
+        // nack consumption of all original hash messages part of this aggregation event
+        if (message !== null) {
+          amqpChannel.nack(message)
+          console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message nacked')
+        }
+      })
+      throw new Error(err)
+    } else {
+      _.forEach(messages, (message) => {
+        if (message !== null) {
+          // ack consumption of all original hash messages part of this aggregation event
+          amqpChannel.ack(message)
+          console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
+        }
+      })
+    }
+  })
 }
 
 // Aggregate all block hashes on chain since last BTC anchor block, add new
