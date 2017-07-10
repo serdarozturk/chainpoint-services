@@ -137,11 +137,11 @@ function processIncomingAnchorJob (msg) {
     // the value to be anchored, likely a merkle root hex string
     let anchorData = messageObj.anchor_agg_root
 
-    try {
-      // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
-      if (!amqpChannel) throw new Error('no amqpConnection available')
-      // create and publish the transaction
-      sendTxToBTC(anchorData, async (err, body) => {
+    // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
+    if (!amqpChannel) throw new Error('no amqpConnection available')
+    // create and publish the transaction
+    sendTxToBTC(anchorData, async (err, body) => {
+      try {
         if (err) throw new Error(err)
         // log the btc tx transaction
         let newLogEntry = await logBtcTxDataAsync(body)
@@ -160,16 +160,16 @@ function processIncomingAnchorJob (msg) {
               amqpChannel.ack(msg)
             }
           })
-      })
-    } catch (error) {
-      // An error has occurred publishing the transaction, nack consumption of message
-      console.error('error publishing transaction', error)
-      // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
-      setTimeout(() => {
-        amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
-      }, 30000)
-    }
+      } catch (error) {
+        // An error has occurred publishing the transaction, nack consumption of message
+        console.error('error publishing transaction : ' + error.message)
+        // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
+        setTimeout(() => {
+          amqpChannel.nack(msg)
+          console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
+        }, 30000)
+      }
+    })
   }
 }
 
