@@ -1,8 +1,8 @@
-// PostgreSQL DB storage adapter
-var Sequelize = require('sequelize')
-
 // load all environment variables into env object
 const env = require('../lib/parse-env.js')('postgres-adapter')
+
+// PostgreSQL DB storage adapter
+let Sequelize = require('sequelize')
 
 // Connection URI for Postgres
 const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_CONNECT_USER}:${env.POSTGRES_CONNECT_PW}@${env.POSTGRES_CONNECT_HOST}:${env.POSTGRES_CONNECT_PORT}/${env.POSTGRES_CONNECT_DB}`
@@ -16,7 +16,7 @@ const PROOF_STEP_COUNT = 3 + (env.ANCHOR_BTC === 'enabled' ? 1 : 0) + (env.ANCHO
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
 // table for state data connecting individual hashes to aggregation roots
-var AggStates = sequelize.define('agg_states', {
+let AggStates = sequelize.define('agg_states', {
   hash_id: { type: Sequelize.UUID, primaryKey: true },
   hash: { type: Sequelize.STRING },
   agg_id: { type: Sequelize.UUID },
@@ -31,7 +31,7 @@ var AggStates = sequelize.define('agg_states', {
 })
 
 // table for state data connecting aggregation roots to calendar block hashes
-var CalStates = sequelize.define('cal_states', {
+let CalStates = sequelize.define('cal_states', {
   agg_id: { type: Sequelize.UUID, primaryKey: true },
   cal_id: { type: Sequelize.INTEGER },
   cal_state: { type: Sequelize.TEXT }
@@ -45,7 +45,7 @@ var CalStates = sequelize.define('cal_states', {
 })
 
 // table for state data connecting calendar block hashes to anchor_agg_root
-var AnchorAggStates = sequelize.define('anchor_agg_states', {
+let AnchorAggStates = sequelize.define('anchor_agg_states', {
   cal_id: { type: Sequelize.INTEGER, primaryKey: true },
   anchor_agg_id: { type: Sequelize.UUID },
   anchor_agg_state: { type: Sequelize.TEXT }
@@ -59,7 +59,7 @@ var AnchorAggStates = sequelize.define('anchor_agg_states', {
 })
 
 // table for state data connecting one anchor_agg_root to one btctx_id
-var BtcTxStates = sequelize.define('btctx_states', {
+let BtcTxStates = sequelize.define('btctx_states', {
   anchor_agg_id: { type: Sequelize.UUID, primaryKey: true },
   btctx_id: { type: Sequelize.STRING },
   btctx_state: { type: Sequelize.TEXT }
@@ -73,7 +73,7 @@ var BtcTxStates = sequelize.define('btctx_states', {
 })
 
 // table for state data connecting one one btctx_id to one btchead root value at height btchead_height
-var BtcHeadStates = sequelize.define('btchead_states', {
+let BtcHeadStates = sequelize.define('btchead_states', {
   btctx_id: { type: Sequelize.STRING, primaryKey: true },
   btchead_height: { type: Sequelize.INTEGER },
   btchead_state: { type: Sequelize.TEXT }
@@ -108,371 +108,304 @@ sequelize.define('hash_tracker_log', {
   timestamps: false
 })
 
-function openConnection (callback) {
+async function openConnectionAsync () {
   // test to see if the service is ready by making a authenticate request to it
-  sequelize.authenticate().nodeify((err) => {
-    if (err) return callback('not_ready')
-    assertDBTables((err) => {
-      if (err) return callback('could not assert tables')
-      return callback(null, true)
-    })
-  })
+  await sequelize.authenticate()
+  await assertDBTablesAsync()
 }
 
-function assertDBTables (callback) {
-  sequelize.sync().nodeify((err) => {
-    if (err) return callback(err)
-    // all assertions made successfully, return success
-    return callback(null)
-  })
+async function assertDBTablesAsync () {
+  await sequelize.sync()
 }
 
-function getHashIdCountByAggId (aggId, callback) {
-  AggStates.count({ where: { 'agg_id': aggId } }).nodeify((err, count) => {
-    if (err) return callback(err)
-    return callback(null, count)
-  })
+async function getHashIdCountByAggIdAsync (aggId) {
+  let count = await AggStates.count({ where: { 'agg_id': aggId } })
+  return count
 }
 
-function getHashIdsByAggId (aggId, callback) {
-  AggStates.findAll({
+async function getHashIdsByAggIdAsync (aggId) {
+  let results = await AggStates.findAll({
     attributes: ['hash_id'],
     where: {
       agg_id: aggId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function getHashIdsByBtcTxId (btcTxId, callback) {
-  sequelize.query(`SELECT a.hash_id FROM agg_states a 
+async function getHashIdsByBtcTxIdAsync (btcTxId) {
+  let results = await sequelize.query(`SELECT a.hash_id FROM agg_states a 
     INNER JOIN cal_states c ON c.agg_id = a.agg_id 
     INNER JOIN anchor_agg_states aa ON aa.cal_id = c.cal_id 
     INNER JOIN btctx_states tx ON tx.anchor_agg_id = aa.anchor_agg_id 
-    WHERE tx.btctx_id = '${btcTxId}'`, { type: sequelize.QueryTypes.SELECT }).nodeify((err, results) => {
-      if (err) return callback(err)
-      return callback(null, results)
-    })
+    WHERE tx.btctx_id = '${btcTxId}'`, { type: sequelize.QueryTypes.SELECT })
+  return results
 }
 
-function getAggStateObjectByHashId (hashId, callback) {
-  AggStates.findOne({
+async function getAggStateObjectByHashIdAsync (hashId) {
+  let result = await AggStates.findOne({
     where: {
       hash_id: hashId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return result
 }
 
-function getCalStateObjectByAggId (aggId, callback) {
-  CalStates.findOne({
+async function getCalStateObjectByAggIdAsync (aggId) {
+  let result = await CalStates.findOne({
     where: {
       agg_id: aggId
     }
-  }).nodeify((err, result) => {
-    if (err) return callback(err)
-    return callback(null, result)
   })
+  return result
 }
 
-function getAnchorAggStateObjectByCalId (calId, callback) {
-  AnchorAggStates.findOne({
+async function getAnchorAggStateObjectByCalIdAsync (calId) {
+  let result = await AnchorAggStates.findOne({
     where: {
       cal_id: calId
     }
-  }).nodeify((err, result) => {
-    if (err) return callback(err)
-    return callback(null, result)
   })
+  return result
 }
 
-function getBTCTxStateObjectByAnchorAggId (anchorAggId, callback) {
-  BtcTxStates.findOne({
+async function getBTCTxStateObjectByAnchorAggIdAsync (anchorAggId) {
+  let result = await BtcTxStates.findOne({
     where: {
       anchor_agg_id: anchorAggId
     }
-  }).nodeify((err, result) => {
-    if (err) return callback(err)
-    return callback(null, result)
   })
+  return result
 }
 
-function getBTCHeadStateObjectByBTCTxId (btcTxId, callback) {
-  BtcHeadStates.findOne({
+async function getBTCHeadStateObjectByBTCTxIdAsync (btcTxId) {
+  let result = await BtcHeadStates.findOne({
     where: {
       btctx_id: btcTxId
     }
-  }).nodeify((err, result) => {
-    if (err) return callback(err)
-    return callback(null, result)
   })
+  return result
 }
 
-function getAggStateObjectsByAggId (aggId, callback) {
-  AggStates.findAll({
+async function getAggStateObjectsByAggIdAsync (aggId) {
+  let results = await AggStates.findAll({
     where: {
       agg_id: aggId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function getCalStateObjectsByCalId (calId, callback) {
-  CalStates.findAll({
+async function getCalStateObjectsByCalIdAsync (calId) {
+  let results = await CalStates.findAll({
     where: {
       cal_id: calId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function getAnchorAggStateObjectsByAnchorAggId (anchorAggId, callback) {
-  CalStates.findAll({
+async function getAnchorAggStateObjectsByAnchorAggIdAsync (anchorAggId) {
+  let results = await AnchorAggStates.findAll({
     where: {
       anchor_agg_id: anchorAggId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function getBTCTxStateObjectsByBTCTxId (btcTxId, callback) {
-  BtcTxStates.findAll({
+async function getBTCTxStateObjectsByBTCTxIdAsync (btcTxId) {
+  let results = await BtcTxStates.findAll({
     where: {
       btctx_id: btcTxId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function getBTCHeadStateObjectsByBTCHeadId (btcHeadId, callback) {
-  BtcHeadStates.findAll({
+async function getBTCHeadStateObjectsByBTCHeadIdAsync (btcHeadId) {
+  let results = await BtcHeadStates.findAll({
     where: {
       btchead_id: btcHeadId
     }
-  }).nodeify((err, results) => {
-    if (err) return callback(err)
-    return callback(null, results)
   })
+  return results
 }
 
-function writeAggStateObject (stateObject, callback) {
+async function writeAggStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.agg_state)
-  sequelize.query(`INSERT INTO agg_states (hash_id, hash, agg_id, agg_state)
+  await sequelize.query(`INSERT INTO agg_states (hash_id, hash, agg_id, agg_state)
     VALUES ('${stateObject.hash_id}', '${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
     ON CONFLICT (hash_id)
     DO UPDATE SET (hash, agg_id, agg_state) = ('${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
-    WHERE agg_states.hash_id = '${stateObject.hash_id}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE agg_states.hash_id = '${stateObject.hash_id}'`)
+  return true
 }
 
-function writeCalStateObject (stateObject, callback) {
+async function writeCalStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.cal_state)
-  sequelize.query(`INSERT INTO cal_states (agg_id, cal_id, cal_state)
+  await sequelize.query(`INSERT INTO cal_states (agg_id, cal_id, cal_state)
     VALUES ('${stateObject.agg_id}', '${stateObject.cal_id}', '${stateString}')
     ON CONFLICT (agg_id)
     DO UPDATE SET (cal_id, cal_state) = ('${stateObject.cal_id}', '${stateString}')
-    WHERE cal_states.agg_id = '${stateObject.agg_id}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE cal_states.agg_id = '${stateObject.agg_id}'`)
+  return true
 }
 
-function writeAnchorAggStateObject (stateObject, callback) {
+async function writeAnchorAggStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.anchor_agg_state)
-  sequelize.query(`INSERT INTO anchor_agg_states (cal_id, anchor_agg_id, anchor_agg_state)
+  await sequelize.query(`INSERT INTO anchor_agg_states (cal_id, anchor_agg_id, anchor_agg_state)
     VALUES ('${stateObject.cal_id}', '${stateObject.anchor_agg_id}', '${stateString}')
     ON CONFLICT (cal_id)
     DO UPDATE SET (anchor_agg_id, anchor_agg_state) = ('${stateObject.anchor_agg_id}', '${stateString}')
-    WHERE anchor_agg_states.cal_id = '${stateObject.cal_id}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE anchor_agg_states.cal_id = '${stateObject.cal_id}'`)
+  return true
 }
 
-function writeBTCTxStateObject (stateObject, callback) {
+async function writeBTCTxStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.btctx_state)
-  sequelize.query(`INSERT INTO btctx_states (anchor_agg_id, btctx_id, btctx_state)
+  await sequelize.query(`INSERT INTO btctx_states (anchor_agg_id, btctx_id, btctx_state)
     VALUES ('${stateObject.anchor_agg_id}', '${stateObject.btctx_id}', '${stateString}')
     ON CONFLICT (anchor_agg_id)
     DO UPDATE SET (btctx_id, btctx_state) = ('${stateObject.btctx_id}', '${stateString}')
-    WHERE btctx_states.anchor_agg_id = '${stateObject.anchor_agg_id}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE btctx_states.anchor_agg_id = '${stateObject.anchor_agg_id}'`)
+  return true
 }
 
-function writeBTCHeadStateObject (stateObject, callback) {
+async function writeBTCHeadStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.btchead_state)
-  sequelize.query(`INSERT INTO btchead_states (btctx_id, btchead_height, btchead_state)
+  await sequelize.query(`INSERT INTO btchead_states (btctx_id, btchead_height, btchead_state)
     VALUES ('${stateObject.btctx_id}', '${stateObject.btchead_height}', '${stateString}')
     ON CONFLICT (btctx_id)
     DO UPDATE SET (btchead_height, btchead_state) = ('${stateObject.btchead_height}', '${stateString}')
-    WHERE btchead_states.btctx_id = '${stateObject.btctx_id}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE btchead_states.btctx_id = '${stateObject.btctx_id}'`)
+  return true
 }
 
-function logSplitterEventForHashId (hashId, hash, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, splitter_at, steps_complete)
+async function logSplitterEventForHashIdAsync (hashId, hash) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, splitter_at, steps_complete)
     VALUES ('${hashId}', '${hash}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
     DO UPDATE SET (splitter_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
+  return true
 }
 
-function logAggregatorEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, aggregator_at, steps_complete)
+async function logAggregatorEventForHashIdAsync (hashId) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, aggregator_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
     DO UPDATE SET (aggregator_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
+  return true
 }
 
-function logCalendarEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, calendar_at, steps_complete)
+async function logCalendarEventForHashIdAsync (hashId) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, calendar_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
     DO UPDATE SET (calendar_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
+  return true
 }
 
-function logBtcEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_at, steps_complete)
+async function logBtcEventForHashIdAsync (hashId) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
     DO UPDATE SET (btc_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
+  return true
 }
 
-function logEthEventForHashId (hashId, callback) {
-  sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, eth_at, steps_complete)
+async function logEthEventForHashIdAsync (hashId) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, eth_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
     DO UPDATE SET (eth_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`).nodeify((err, result) => {
-      if (err) return callback(err)
-      return callback(null, true)
-    })
+    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
+  return true
 }
 
-function deleteProcessedHashesFromAggStates (callback) {
-  sequelize.query(`DELETE FROM agg_states WHERE hash_id IN
+async function deleteProcessedHashesFromAggStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM agg_states WHERE hash_id IN
     (SELECT hash_id FROM hash_tracker_logs 
-    WHERE steps_complete >= ${PROOF_STEP_COUNT})`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+    WHERE steps_complete >= ${PROOF_STEP_COUNT})`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
-function deleteHashTrackerLogEntries (callback) {
-  sequelize.query(`DELETE FROM hash_tracker_logs WHERE steps_complete >= ${PROOF_STEP_COUNT}`).spread((results, meta) => {
-    return callback(null, meta.rowCount)
-  }).catch((err) => {
-    return callback(err)
-  })
+async function deleteHashTrackerLogEntriesAsync () {
+  let results = await sequelize.query(`DELETE FROM hash_tracker_logs WHERE steps_complete >= ${PROOF_STEP_COUNT}`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
-function deleteCalStatesWithNoRemainingAggStates (callback) {
-  sequelize.query(`DELETE FROM cal_states WHERE agg_id IN
+async function deleteCalStatesWithNoRemainingAggStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM cal_states WHERE agg_id IN
     (SELECT c.agg_id FROM cal_states c
     LEFT JOIN agg_states a ON c.agg_id = a.agg_id
-    GROUP BY c.agg_id HAVING COUNT(a.agg_id) = 0)`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+    GROUP BY c.agg_id HAVING COUNT(a.agg_id) = 0)`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
-function deleteAnchorAggStatesWithNoRemainingCalStates (callback) {
-  sequelize.query(`DELETE FROM anchor_agg_states WHERE cal_id IN
+async function deleteAnchorAggStatesWithNoRemainingCalStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM anchor_agg_states WHERE cal_id IN
     (SELECT a.cal_id FROM anchor_agg_states a
     LEFT JOIN cal_states c ON a.cal_id = c.cal_id
-    GROUP BY a.cal_id HAVING COUNT(c.cal_id) = 0)`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+    GROUP BY a.cal_id HAVING COUNT(c.cal_id) = 0)`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
-function deleteBtcTxStatesWithNoRemainingAnchorAggStates (callback) {
-  sequelize.query(`DELETE FROM btctx_states WHERE anchor_agg_id IN
+async function deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM btctx_states WHERE anchor_agg_id IN
     (SELECT b.anchor_agg_id FROM btctx_states b
     LEFT JOIN anchor_agg_states a ON b.anchor_agg_id = a.anchor_agg_id
-    GROUP BY b.anchor_agg_id HAVING COUNT(a.anchor_agg_id) = 0)`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+    GROUP BY b.anchor_agg_id HAVING COUNT(a.anchor_agg_id) = 0)`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
-function deleteBtcHeadStatesWithNoRemainingBtcTxStates (callback) {
-  sequelize.query(`DELETE FROM btchead_states WHERE btctx_id IN
+async function deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM btchead_states WHERE btctx_id IN
     (SELECT btchead.btctx_id FROM btchead_states btchead
     LEFT JOIN btctx_states btctx ON btchead.btctx_id = btctx.btctx_id
-    GROUP BY btchead.btctx_id HAVING COUNT(btctx.btctx_id) = 0)`).spread((results, meta) => {
-      return callback(null, meta.rowCount)
-    }).catch((err) => {
-      return callback(err)
-    })
+    GROUP BY btchead.btctx_id HAVING COUNT(btctx.btctx_id) = 0)`)
+  let meta = results[1]
+  return meta.rowCount
 }
 
 module.exports = {
-  openConnection: openConnection,
-  getHashIdCountByAggId: getHashIdCountByAggId,
-  getHashIdsByAggId: getHashIdsByAggId,
-  getHashIdsByBtcTxId: getHashIdsByBtcTxId,
-  getAggStateObjectByHashId: getAggStateObjectByHashId,
-  getCalStateObjectByAggId: getCalStateObjectByAggId,
-  getAnchorAggStateObjectByCalId: getAnchorAggStateObjectByCalId,
-  getBTCTxStateObjectByAnchorAggId: getBTCTxStateObjectByAnchorAggId,
-  getBTCHeadStateObjectByBTCTxId: getBTCHeadStateObjectByBTCTxId,
-  getAggStateObjectsByAggId: getAggStateObjectsByAggId,
-  getCalStateObjectsByCalId: getCalStateObjectsByCalId,
-  getAnchorAggStateObjectsByAnchorAggId: getAnchorAggStateObjectsByAnchorAggId,
-  getBTCTxStateObjectsByBTCTxId: getBTCTxStateObjectsByBTCTxId,
-  getBTCHeadStateObjectsByBTCHeadId: getBTCHeadStateObjectsByBTCHeadId,
-  writeAggStateObject: writeAggStateObject,
-  writeCalStateObject: writeCalStateObject,
-  writeAnchorAggStateObject: writeAnchorAggStateObject,
-  writeBTCTxStateObject: writeBTCTxStateObject,
-  writeBTCHeadStateObject: writeBTCHeadStateObject,
-  logSplitterEventForHashId: logSplitterEventForHashId,
-  logAggregatorEventForHashId: logAggregatorEventForHashId,
-  logCalendarEventForHashId: logCalendarEventForHashId,
-  logBtcEventForHashId: logBtcEventForHashId,
-  logEthEventForHashId: logEthEventForHashId,
-  deleteProcessedHashesFromAggStates: deleteProcessedHashesFromAggStates,
-  deleteHashTrackerLogEntries: deleteHashTrackerLogEntries,
-  deleteCalStatesWithNoRemainingAggStates: deleteCalStatesWithNoRemainingAggStates,
-  deleteAnchorAggStatesWithNoRemainingCalStates: deleteAnchorAggStatesWithNoRemainingCalStates,
-  deleteBtcTxStatesWithNoRemainingAnchorAggStates: deleteBtcTxStatesWithNoRemainingAnchorAggStates,
-  deleteBtcHeadStatesWithNoRemainingBtcTxStates: deleteBtcHeadStatesWithNoRemainingBtcTxStates
+  openConnectionAsync: openConnectionAsync,
+  getHashIdCountByAggIdAsync: getHashIdCountByAggIdAsync,
+  getHashIdsByAggIdAsync: getHashIdsByAggIdAsync,
+  getHashIdsByBtcTxIdAsync: getHashIdsByBtcTxIdAsync,
+  getAggStateObjectByHashIdAsync: getAggStateObjectByHashIdAsync,
+  getCalStateObjectByAggIdAsync: getCalStateObjectByAggIdAsync,
+  getAnchorAggStateObjectByCalIdAsync: getAnchorAggStateObjectByCalIdAsync,
+  getBTCTxStateObjectByAnchorAggIdAsync: getBTCTxStateObjectByAnchorAggIdAsync,
+  getBTCHeadStateObjectByBTCTxIdAsync: getBTCHeadStateObjectByBTCTxIdAsync,
+  getAggStateObjectsByAggIdAsync: getAggStateObjectsByAggIdAsync,
+  getCalStateObjectsByCalIdAsync: getCalStateObjectsByCalIdAsync,
+  getAnchorAggStateObjectsByAnchorAggIdAsync: getAnchorAggStateObjectsByAnchorAggIdAsync,
+  getBTCTxStateObjectsByBTCTxIdAsync: getBTCTxStateObjectsByBTCTxIdAsync,
+  getBTCHeadStateObjectsByBTCHeadIdAsync: getBTCHeadStateObjectsByBTCHeadIdAsync,
+  writeAggStateObjectAsync: writeAggStateObjectAsync,
+  writeCalStateObjectAsync: writeCalStateObjectAsync,
+  writeAnchorAggStateObjectAsync: writeAnchorAggStateObjectAsync,
+  writeBTCTxStateObjectAsync: writeBTCTxStateObjectAsync,
+  writeBTCHeadStateObjectAsync: writeBTCHeadStateObjectAsync,
+  logSplitterEventForHashIdAsync: logSplitterEventForHashIdAsync,
+  logAggregatorEventForHashIdAsync: logAggregatorEventForHashIdAsync,
+  logCalendarEventForHashIdAsync: logCalendarEventForHashIdAsync,
+  logBtcEventForHashIdAsync: logBtcEventForHashIdAsync,
+  logEthEventForHashIdAsync: logEthEventForHashIdAsync,
+  deleteProcessedHashesFromAggStatesAsync: deleteProcessedHashesFromAggStatesAsync,
+  deleteHashTrackerLogEntriesAsync: deleteHashTrackerLogEntriesAsync,
+  deleteCalStatesWithNoRemainingAggStatesAsync: deleteCalStatesWithNoRemainingAggStatesAsync,
+  deleteAnchorAggStatesWithNoRemainingCalStatesAsync: deleteAnchorAggStatesWithNoRemainingCalStatesAsync,
+  deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync: deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync,
+  deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync: deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync
 }

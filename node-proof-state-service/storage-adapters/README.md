@@ -8,36 +8,36 @@ The following is a description of methods that must be defined in a storage adap
 
 | Name           | Description  | Returns  |
 | :------------- |:-------------|:-------------|
-| openConnection(callback(err, success))       | opens the connection to the underlying storage provider | boolean indicating success |
-| getHashIdCountByAggId(aggId, callback(err, count))     | gets all count of hash objects for a given agg_id currently in the database | integer |
-| getHashIdsByAggId(aggId, callback(err, hashIds))     | gets all hash ids associated with an aggregation event | result array containing hash id objects |
-| getHashIdsByBtcTxId(btcTxId, callback(err, hashIds))     | gets all hash ids associated with a btcTxId | result array containing hash id objects |
-| getAggStateObjectByHashId(hashId, callback(err, stateObject))     | gets the agg state object for a given hash id | an agg state object |
-| getCalStateObjectByAggId(aggId, callback(err, stateObject))     | gets the cal state object for a given agg id | a cal state object |
-| getAnchorAggStateObjectByCalId(calId, callback(err, stateObject))     | gets the anchor agg state object for a given cal id | an anchor agg state object |
-| getBTCTxStateObjectByAnchorAggId(anchorAggId, callback(err, stateObject))     | gets the btctx state object for a given anchor agg id | a btctx state object |
-| getBTCHeadStateObjectByBTCTxId(btcTxId, callback(err, stateObject))     | gets the btchead state object for a given btctx id | a btchead state object |
-| getAggStateObjectsByAggId(aggId, callback(err, stateObjects))     | gets all agg state data for a given agg id | result array containing agg state objects |
-| getCalStateObjectsByCalId(calId, callback(err, stateObjects))     | gets all cal state data for a given cal id | result array containing cal state objects |
-| getAnchorAggStateObjectsByAnchorAggId(anchorAggId, callback(err, stateObjects))     | gets all anchor agg state data for a given anchor agg id | result array containing anchor agg state objects |
-| getBTCTxStateObjectsByBTCTxId(btcTxId, callback(err, stateObjects))     | gets all btctx state data for a given btctx id | result array containing btctx state objects |
-| getBTCHeadStateObjectsByBTCHeadId(btcHeadId, callback(err, stateObjects))     | gets all btchead state data for a given btchead id | result array containing btchead state objects |
-| writeAggStateObject(stateObject, callback(err, success))     | write the agg state object to storage | boolean indicating success |
-| writeCalStateObject(stateObject, callback(err, success))     | write the cal state object to storage | boolean indicating success |
-| writeAnchorAggStateObject(stateObject, callback(err, success))     | write the anchor agg state object to storage | boolean indicating success |
-| writeBTCTxStateObject(stateObject, callback(err, success))     | write the btctx state object to storage | boolean indicating success |
-| writeBTCHeadStateObject(stateObject, callback(err, success))     | write the btchead state object to storage | boolean indicating success |
-| logSplitterEventForHashId(hashId, hash, callback(err, success))     | log a splitter event for the given hash id to the hash tracker | boolean indicating success |
-| logAggregationEventForHashId(hashId, callback(err, success))     | log an aggregation event for the given hash id to the hash tracker | boolean indicating success |
-| logCalendarEventForHashId(hashId, callback(err, success))     | log a calendar event for the given hash id to the hash tracker | boolean indicating success |
-| logEthEventForHashId(hashId, callback(err, success))     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
-| logBtcEventForHashId(hashId, callback(err, success))     | log a btc event for the given hash id to the hash tracker | boolean indicating success |
-| deleteProcessedHashesFromAggStates(callback(err, rowCount))     | prune records from agg\_states table | integer |
-| deleteHashTrackerLogEntries(callback(err, rowCount))     | prune records from hash\_tracker\_logs table | integer |
-| deleteCalStatesWithNoRemainingAggStates(callback(err, rowCount))     | prune records from cal\_states table | integer |
-| deleteAnchorAggStatesWithNoRemainingCalStates(callback(err, rowCount))     | prune records from anchor\_agg\_states table | integer |
-| deleteBtcTxStatesWithNoRemainingAnchorAggStates(callback(err, rowCount))     | prune records from btctx\_states table | integer |
-| deleteBtcHeadStatesWithNoRemainingBtcTxStates(callback(err, rowCount))     | prune records from btchead\_states table | integer |
+| openConnectionAsync()       | opens the connection to the underlying storage provider | boolean indicating success |
+| getHashIdCountByAggIdAsync(aggId)     | gets all count of hash objects for a given agg_id currently in the database | integer |
+| getHashIdsByAggIdAsync(aggId)     | gets all hash ids associated with an aggregation event | result array containing hash id objects |
+| getHashIdsByBtcTxIdAsync(btcTxId)     | gets all hash ids associated with a btcTxId | result array containing hash id objects |
+| getAggStateObjectByHashIdAsync(hashId)     | gets the agg state object for a given hash id | an agg state object |
+| getCalStateObjectByAggIdAsync(aggId)     | gets the cal state object for a given agg id | a cal state object |
+| getAnchorAggStateObjectByCalIdAsync(calId)     | gets the anchor agg state object for a given cal id | an anchor agg state object |
+| getBTCTxStateObjectByAnchorAggIdAsync(anchorAggId)     | gets the btctx state object for a given anchor agg id | a btctx state object |
+| getBTCHeadStateObjectByBTCTxIdAsync(btcTxId)     | gets the btchead state object for a given btctx id | a btchead state object |
+| getAggStateObjectsByAggIdAsync(aggId)     | gets all agg state data for a given agg id | result array containing agg state objects |
+| getCalStateObjectsByCalIdAsync(calId)     | gets all cal state data for a given cal id | result array containing cal state objects |
+| getAnchorAggStateObjectsByAnchorAggIdAsync(anchorAggId)     | gets all anchor agg state data for a given anchor agg id | result array containing anchor agg state objects |
+| getBTCTxStateObjectsByBTCTxIdAsync(btcTxId)     | gets all btctx state data for a given btctx id | result array containing btctx state objects |
+| getBTCHeadStateObjectsByBTCHeadIdAsync(btcHeadId)     | gets all btchead state data for a given btchead id | result array containing btchead state objects |
+| writeAggStateObjectAsync(stateObject)     | write the agg state object to storage | boolean indicating success |
+| writeCalStateObjectAsync(stateObject)     | write the cal state object to storage | boolean indicating success |
+| writeAnchorAggStateObjectAsync(stateObject)     | write the anchor agg state object to storage | boolean indicating success |
+| writeBTCTxStateObjectAsync(stateObject)     | write the btctx state object to storage | boolean indicating success |
+| writeBTCHeadStateObjectAsync(stateObject)     | write the btchead state object to storage | boolean indicating success |
+| logSplitterEventForHashIdAsync(hashId, hash,)     | log a splitter event for the given hash id to the hash tracker | boolean indicating success |
+| logAggregationEventForHashIdAsync(hashId)     | log an aggregation event for the given hash id to the hash tracker | boolean indicating success |
+| logCalendarEventForHashIdAsync(hashId)     | log a calendar event for the given hash id to the hash tracker | boolean indicating success |
+| logEthEventForHashIdAsync(hashId)     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
+| logBtcEventForHashIdAsync(hashId)     | log a btc event for the given hash id to the hash tracker | boolean indicating success |
+| deleteProcessedHashesFromAggStatesAsync()     | prune records from agg\_states table | integer |
+| deleteHashTrackerLogEntriesAsync()     | prune records from hash\_tracker\_logs table | integer |
+| deleteCalStatesWithNoRemainingAggStatesAsync()     | prune records from cal\_states table | integer |
+| deleteAnchorAggStatesWithNoRemainingCalStatesAsync()     | prune records from anchor\_agg\_states table | integer |
+| deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync()     | prune records from btctx\_states table | integer |
+| deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()     | prune records from btchead\_states table | integer |
 
 
 ## PostregSQL Adapter Configuration
