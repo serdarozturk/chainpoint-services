@@ -73,7 +73,6 @@ function generatePostHashesResponse (hashes) {
  * - an even length string
  */
 function postHashesV1 (req, res, next) {
-
   // validate content-type sent was 'application/json'
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
