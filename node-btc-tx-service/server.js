@@ -136,27 +136,16 @@ function processIncomingAnchorJob (msg) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
     let anchorData = messageObj.anchor_agg_root
-    async.waterfall([
-      (callback) => {
-        // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
-        if (!amqpChannel) return callback('no amqpConnection available')
-        // create and publish the transaction
-        sendTxToBTC(anchorData, (err, body) => {
-          if (err) return callback(err)
-          return callback(null, body)
-        })
-      },
-      async (body, callback) => {
+
+    try {
+      // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
+      if (!amqpChannel) throw new Error('no amqpConnection available')
+      // create and publish the transaction
+      sendTxToBTC(anchorData, async (err, body) => {
+        if (err) throw new Error(err)
         // log the btc tx transaction
-        try {
-          let newLogEntry = await logBtcTxDataAsync(body)
-          console.log(newLogEntry)
-          return callback(null, body)
-        } catch (error) {
-          return callback(error)
-        }
-      },
-      (body, callback) => {
+        let newLogEntry = await logBtcTxDataAsync(body)
+        console.log(newLogEntry)
         // queue return message for calendar containing the new transaction information
         // adding btc transaction id and full transaction body to original message and returning
         messageObj.btctx_id = body.hash
@@ -165,27 +154,22 @@ function processIncomingAnchorJob (msg) {
           (err, ok) => {
             if (err !== null) {
               console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
-              return callback(err)
+              throw new Error(err)
             } else {
               console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
-              return callback(null)
+              amqpChannel.ack(msg)
             }
           })
-      }
-    ], function (err) {
-      if (err) {
-        // An error has occurred publishing the transaction, nack consumption of message
-        console.error('error publishing transaction', err)
-        // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
-        setTimeout(() => {
-          amqpChannel.nack(msg)
-          console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
-        }, 30000)
-      } else {
-        amqpChannel.ack(msg)
-        // console.log(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message acked')
-      }
-    })
+      })
+    } catch (error) {
+      // An error has occurred publishing the transaction, nack consumption of message
+      console.error('error publishing transaction', error)
+      // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
+      setTimeout(() => {
+        amqpChannel.nack(msg)
+        console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
+      }, 30000)
+    }
   }
 }
 
