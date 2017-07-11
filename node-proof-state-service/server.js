@@ -207,7 +207,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(env.MQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
                 return eachCallback(null)
               }
             })
