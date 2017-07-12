@@ -27,7 +27,7 @@ function generatePostHashesResponseMetadata () {
 
   // FIXME : Calculate these based on last anchor time and known interval?
   metaDataObj.processing_hints = {
-    cal: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 1)),
+    cal: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 0.1)),
     eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 41)),
     btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 61))
   }
