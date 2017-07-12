@@ -325,9 +325,8 @@ async.waterfall([
       if (err) {
         console.error(err)
       } else {
-        // if (!result.proofMatched || !result.proofVerified) {
-        console.error(result)
-        // }
+        // let [anchorURI, anchorHash] = jmespath.search(result, "branches[*].anchors[?type=='btc'].[uris, expected_value][][][]")
+        console.error(JSON.stringify(result))
       }
     })
   }
