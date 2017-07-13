@@ -189,8 +189,15 @@ function addChainpointHeader (proof, hash, hashId) {
   proof['@context'] = 'https://w3id.org/chainpoint/v3'
   proof.type = 'Chainpoint'
   proof.hash = hash
-  proof.hash_id = hashId
-  proof.hash_submitted_at = utils.formatDateISO8601NoMs(new Date(uuidTime.v1(hashId)))
+
+  // the following two values are added as placeholders
+  // the spec does not allow for missing or empty values here
+  // these values will be replaced with proper ones by the Node instance
+  proof.hash_id_node = hashId
+  proof.hash_submitted_node_at = utils.formatDateISO8601NoMs(new Date(uuidTime.v1(hashId)))
+
+  proof.hash_id_core = hashId
+  proof.hash_submitted_core_at = proof.hash_submitted_node_at
   return proof
 }
 

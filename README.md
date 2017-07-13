@@ -148,8 +148,10 @@ sample output (prettified with [jq](https://stedolan.github.io/jq/)):
       "@context": "https://w3id.org/chainpoint/v3",
       "type": "Chainpoint",
       "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4",
-      "hash_id": "cb1980c0-4d53-11e7-88fb-870abcce3652",
-      "hash_submitted_at": "2017-06-09T20:39:54Z",
+      "hash_id_node": "cb1980c0-4d53-11e7-88fb-870abcce3652", 
+      "hash_submitted_node_at": "2017-06-09T20:39:54Z", 
+      "hash_id_core": "cb1980c0-4d53-11e7-88fb-870abcce3652",
+      "hash_submitted_core_at": "2017-06-09T20:39:54Z",
       "branches": [
         {
           "label": "cal_anchor_branch",
@@ -207,8 +209,10 @@ curl -X POST \
             "@context": "https://w3id.org/chainpoint/v3",
             "type": "Chainpoint",
             "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4",
-            "hash_id": "69b06800-4e23-11e7-87be-37208b69c348",
-            "hash_submitted_at": "2017-06-10T21:26:06Z",
+            "hash_id_node": "cb1980c0-4d53-11e7-88fb-870abcce3652", 
+            "hash_submitted_node_at": "2017-06-09T20:39:54Z", 
+            "hash_id_core": "cb1980c0-4d53-11e7-88fb-870abcce3652",
+            "hash_submitted_core_at": "2017-06-09T20:39:54Z",
             "branches": [{
                 "label": "cal_anchor_branch",
                 "ops": [{
@@ -244,9 +248,11 @@ sample output (prettified with [jq](https://stedolan.github.io/jq/)):
 [
     {
         "proof_index": 0,
-        "hash_id": "69b06800-4e23-11e7-87be-37208b69c348",
         "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4",
-        "hash_submitted_at": "2017-06-10T21:26:06Z",
+        "hash_id_node": "cb1980c0-4d53-11e7-88fb-870abcce3652", 
+        "hash_submitted_node_at": "2017-06-09T20:39:54Z", 
+        "hash_id_core": "cb1980c0-4d53-11e7-88fb-870abcce3652",
+        "hash_submitted_core_at": "2017-06-09T20:39:54Z",
         "anchors": [
             {
                 "branch": "cal_anchor_branch",
