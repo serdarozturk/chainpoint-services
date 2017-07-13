@@ -334,13 +334,20 @@ definitions:
       proof_index:
         type: integer
         example: 0          
-      hash_id:
-        type: string
-        example: "3bce9920-4ed7-11e7-a7d0-3d6269e334e8"
       hash:
         type: string
         example: "112233ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab11"
-      hash_submitted_at:
+      hash_id_node:
+        type: string
+        example: "3bce9920-4ed7-11e7-a7d0-3d6269e334e8"
+      hash_submitted_node_at:
+        type: string
+        format: "date-time"
+        example: "2017-06-11T18:53:18Z"       
+      hash_id_core:
+        type: string
+        example: "3bce9920-4ed7-11e7-a7d0-3d6269e334e8"
+      hash_submitted_core_at:
         type: string
         format: "date-time"
         example: "2017-06-11T18:53:18Z"
