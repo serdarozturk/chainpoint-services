@@ -8,6 +8,17 @@ function sleep (ms) {
 }
 
 /**
+ * Add specified seconds to a Date object
+ *
+ * @param {Date} date - The starting date
+ * @param {number} seconds - The seconds of seconds to add to the date
+ * @returns {Date}
+ */
+function addSeconds (date, seconds) {
+  return new Date(date.getTime() + (seconds * 1000))
+}
+
+/**
  * Add specified minutes to a Date object
  *
  * @param {Date} date - The starting date
@@ -44,6 +55,7 @@ function lowerCaseHashes (hashes) {
 module.exports = {
   sleep: sleep,
   addMinutes: addMinutes,
+  addSeconds: addSeconds,
   formatDateISO8601NoMs: formatDateISO8601NoMs,
   lowerCaseHashes: lowerCaseHashes
 }
