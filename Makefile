@@ -60,20 +60,19 @@ push:
 	./bin/docker-make
 
 ## Run API test suite with Mocha
-test-api:
+test-api: cockroachdb-setup
 	./bin/docker-make --no-push node-api-service-test
-	docker run -e "CHAINPOINT_STACK_ID=test" -e "CHAINPOINT_BASE_URI=http://test.chainpoint.org" --tty=true --rm quay.io/chainpoint/node-api-service-test:$(TAG)
-
+	 CHAINPOINT_STACK_ID=test CHAINPOINT_BASE_URI=http://test.chainpoint.org docker-compose up --build api-test
 
 ## Run aggregator test suite with Mocha
 test-aggregator:
 	./bin/docker-make --no-push node-aggregator-service-test
-	docker run --tty=true --rm quay.io/chainpoint/node-aggregator-service-test:$(TAG)
+	docker-compose up --build aggregator-test
 
 ## Run splitter test suite with Mocha
 test-splitter:
 	./bin/docker-make --no-push node-splitter-service-test
-	docker run --tty=true --rm quay.io/chainpoint/node-splitter-service-test:$(TAG)
+	docker-compose up --build splitter-test
 
 ## Run a small load test submitting hashes
 run-load-test:
