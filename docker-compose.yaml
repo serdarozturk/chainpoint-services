@@ -58,14 +58,31 @@ services:
       context: ./node-api-service
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - redis
       - rabbitmq
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
+      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
+      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
+      VIRTUAL_HOST: api.local
+
+  api-test:
+    image: quay.io/chainpoint/node-api-service-test:${DOCKER_TAG}
+    build:
+      context: ./node-api-service
+      dockerfile: Dockerfile.test
+    depends_on:
+      - roach1
+      - redis
+      - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: test
       CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
       CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
@@ -90,6 +107,18 @@ services:
     environment:
       NODE_ENV: development
 
+  splitter-test:
+    image: quay.io/chainpoint/node-splitter-service:${DOCKER_TAG}
+    build:
+      context: ./node-splitter-service
+      dockerfile: Dockerfile.test
+    depends_on:
+      - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: test
+
   # Aggregator
   #
   # SCALED: true
@@ -108,6 +137,19 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
+
+  aggregator-test:
+    image: quay.io/chainpoint/node-aggregator-service:${DOCKER_TAG}
+    build:
+      context: ./node-aggregator-service
+      dockerfile: Dockerfile.test
+    depends_on:
+      - rabbitmq
+      - nist-beacon
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: test
 
   # NIST Beacon
   # Retrieve and store current NIST Beacon records
@@ -145,8 +187,6 @@ services:
     container_name: calendar
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - rabbitmq
     networks:
       - chainpoint
@@ -190,8 +230,6 @@ services:
     container_name: btc-tx
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - consul
       - rabbitmq
       - btc-fee
@@ -360,43 +398,6 @@ services:
     command:
       - start
       - --insecure
-    networks:
-      - chainpoint
-
-  roach2:
-    restart: always
-    image: cockroachdb/cockroach:v1.0.3
-    container_name: roach2
-    depends_on:
-      - roach1
-    ports:
-      - 26257
-    volumes:
-      - ./data/roach2:/cockroach/cockroach-data
-    command:
-      - start
-      - --insecure
-      - --join
-      - roach1
-    networks:
-      - chainpoint
-
-  roach3:
-    restart: always
-    image: cockroachdb/cockroach:v1.0.3
-    container_name: roach3
-    depends_on:
-      - roach1
-      - roach2
-    ports:
-      - 26257
-    volumes:
-      - ./data/roach3:/cockroach/cockroach-data
-    command:
-      - start
-      - --insecure
-      - --join
-      - roach1
     networks:
       - chainpoint
 

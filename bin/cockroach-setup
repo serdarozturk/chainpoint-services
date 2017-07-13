@@ -24,14 +24,12 @@ done
 
 if [ "$DELETE" == 'true' ]
 then
-docker-compose stop roach3
-docker-compose stop roach2
 docker-compose stop roach1
 rm -rf $SCRIPT_FULL_PATH/../data/roach*
 fi
 
 echo "starting cockroachdb cluster..."
-docker-compose up -d --build roach3
+docker-compose up -d --build roach1
 
 # See : https://stackoverflow.com/questions/21183088/how-can-i-wait-for-a-docker-container-to-be-up-and-running
 attempt=0
