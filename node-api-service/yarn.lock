@@ -117,9 +117,9 @@ chainpoint-binary@^4.0.0:
     msgpack-lite "^0.1.26"
     pako "^1.0.5"
 
-chainpoint-parse@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/chainpoint-parse/-/chainpoint-parse-2.0.0.tgz#e363c9df4982f5c0288171166dad325efefd9db6"
+chainpoint-parse@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/chainpoint-parse/-/chainpoint-parse-2.0.1.tgz#ed069bbac37a638a7ed6297817f3a1b971db4077"
   dependencies:
     chainpoint-binary "^4.0.0"
     chainpoint-proof-json-schema "^1.0.0"
