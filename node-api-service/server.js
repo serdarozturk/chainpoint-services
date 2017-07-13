@@ -10,6 +10,7 @@ const restify = require('restify')
 const corsMiddleware = require('restify-cors-middleware')
 const webSocket = require('ws')
 const hashes = require('./lib/endpoints/hashes.js')
+const nodes = require('./lib/endpoints/nodes.js')
 const proofs = require('./lib/endpoints/proofs.js')
 const verify = require('./lib/endpoints/verify.js')
 const calendar = require('./lib/endpoints/calendar.js')
@@ -119,6 +120,10 @@ server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCal
 server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1)
 // get the block objects for the calendar in the specified range, incusive
 server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1)
+// register a new node
+server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
+// update an existing node
+server.put({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.putNodeV1Async)
 // get configuration information for this stack
 server.get({ path: '/config', version: '1.0.0' }, config.getConfigInfoV1)
 // teapot
@@ -180,7 +185,7 @@ async function openStorageConnectionAsync () {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await cachedCalendarBlock.getSequelize().sync({ logging: false })
+      await cachedCalendarBlock.getSequelize().sync({})
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {

@@ -1,0 +1,110 @@
+const Sequelize = require('sequelize-cockroachdb')
+
+const envalid = require('envalid')
+
+const env = envalid.cleanEnv(process.env, {
+  COCKROACH_HOST: envalid.str({ devDefault: 'roach1', desc: 'CockroachDB host or IP' }),
+  COCKROACH_PORT: envalid.num({ default: 26257, desc: 'CockroachDB port' }),
+  COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
+  COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
+  COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
+  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_nodes', desc: 'CockroachDB table name' }),
+  COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
+  COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
+  COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
+})
+
+// Connect to CockroachDB through Sequelize.
+let sequelizeOptions = {
+  dialect: 'postgres',
+  host: env.COCKROACH_HOST,
+  port: env.COCKROACH_PORT,
+  logging: false
+}
+
+// Present TLS client certificate to production cluster
+if (env.isProduction) {
+  sequelizeOptions.dialectOptions = {
+    ssl: {
+      rejectUnauthorized: false,
+      ca: env.COCKROACH_TLS_CA_CRT,
+      key: env.COCKROACH_TLS_CLIENT_KEY,
+      cert: env.COCKROACH_TLS_CLIENT_CRT
+    }
+  }
+}
+
+let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
+
+var NodeRegistration = sequelize.define(env.COCKROACH_TABLE_NAME,
+  {
+    tntAddr: {
+      comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^(0x)?[0-9a-fA-F]{40}$', 'i']
+      },
+      field: 'tnt_addr',
+      allowNull: false,
+      unique: true,
+      primaryKey: true
+    },
+    ipAddr: {
+      comment: 'The public IPv4 address of a Node, when blank represents a non-public Node.',
+      type: Sequelize.STRING,
+      validate: {
+        isIPv4: true
+      },
+      field: 'ip_addr',
+      allowNull: true
+    },
+    hmacKey: {
+      comment: 'The HMAC secret for this Node. Needed for Node data updates.',
+      type: Sequelize.STRING,
+      validate: {
+        is: ['^[a-f0-9]{64}$', 'i']
+      },
+      field: 'hmac_key',
+      allowNull: false,
+      unique: true
+    },
+    auditedPublicIPAt: {
+      comment: 'The last time, in sec since EPOCH, when the Node was publicly reachable over HTTP by Core.',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'audited_public_ip_at',
+      allowNull: true
+    },
+    auditedTimeAt: {
+      comment: 'The last time, in sec since EPOCH, when the Node reported time was verified to be in tolerance by Core.',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'audited_cal_block_at',
+      allowNull: true
+    },
+    auditedCalStateAt: {
+      comment: 'The last time, in sec since EPOCH, when the Node Calendar was verified by Core.',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'audited_cal_block_at',
+      allowNull: true
+    }
+  },
+  {
+    // Disable the modification of table names; By default, sequelize will automatically
+    // transform all passed model names (first parameter of define) into plural.
+    // if you don't want that, set the following
+    freezeTableName: true
+  }
+)
+
+module.exports = {
+  sequelize: sequelize,
+  NodeRegistration: NodeRegistration
+}

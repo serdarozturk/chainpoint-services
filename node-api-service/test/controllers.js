@@ -3,12 +3,15 @@
 process.env.NODE_ENV = 'test'
 
 // test related packages
-var expect = require('chai').expect
-var request = require('supertest')
+const expect = require('chai').expect
+const request = require('supertest')
+const crypto = require('crypto')
+const moment = require('moment')
 
-var app = require('../server')
-var server = app.server
-var hashes = require('../lib/endpoints/hashes')
+const app = require('../server')
+const server = app.server
+const hashes = require('../lib/endpoints/hashes')
+const nodes = require('../lib/endpoints/nodes')
 
 describe('Home Controller', () => {
   describe('GET /', () => {
@@ -356,6 +359,7 @@ describe('Calendar Controller', () => {
         })
     })
   })
+
   describe('GET /calendar/height', () => {
     it('should return proper error with negative height', (done) => {
       request(server)
@@ -683,6 +687,251 @@ describe('Config Controller', () => {
           expect(res.body).to.have.property('get_calendar_blocks_max')
           expect(res.body).to.have.property('time')
           done()
+        })
+    })
+  })
+})
+
+describe('Nodes Controller', () => {
+  describe('POST /nodes', () => {
+    beforeEach(function () {
+      nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
+      // console.log(nodes)
+    })
+
+    it('should return proper error with invalid content type', (done) => {
+      request(server)
+        .post('/nodes')
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid content type')
+          done()
+        })
+    })
+
+    it('should return error with no tnt_addr', (done) => {
+      request(server)
+        .post('/nodes')
+        .send({ip_addr: '127.0.0.1'})
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, missing tnt_addr')
+          done()
+        })
+    })
+
+    it('should return error with empty tnt_addr', (done) => {
+      request(server)
+        .post('/nodes')
+        .send({tnt_addr: '', ip_addr: '127.0.0.1'})
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, empty tnt_addr')
+          done()
+        })
+    })
+
+    it('should return error with malformed tnt_addr', (done) => {
+      request(server)
+        .post('/nodes')
+        .send({tnt_addr: '0xabc', ip_addr: '127.0.0.1'})
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, malformed tnt_addr')
+          done()
+        })
+    })
+
+    it('should return error with empty ip_addr', (done) => {
+      request(server)
+        .post('/nodes')
+        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: ''})
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, invalid empty ip_addr, remove if non-public IP')
+          done()
+        })
+    })
+
+    it('should be OK if a ip_addr is registered twice', (done) => {
+      request(server)
+        .post('/nodes')
+        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1'})
+        .expect(200)
+        .end((err, res) => {
+          request(server)
+            .post('/nodes')
+            .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1'})
+            .expect(200)
+            .end((err, res) => {
+              done()
+            })
+        })
+    })
+
+    it('should return OK for valid request', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1' })
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('tnt_addr')
+          expect(res.body).to.have.property('ip_addr')
+          expect(res.body).to.have.property('hmac_key')
+          expect(res.body.hmac_key.length).to.equal(64)
+          done()
+        })
+    })
+  })
+
+  describe('PUT /nodes', () => {
+    beforeEach(function () {
+      nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
+    })
+
+    it('should return OK for valid PUT no change to tnt or IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let ipAddr = '127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .expect(200)
+        .end((err, res) => {
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, ipAddr, formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+          .put('/nodes/' + randTntAddr)
+          .send({ ip_addr: ipAddr, hmac: calculatedHMAC })
+          .expect('Content-type', /json/)
+          .expect(200)
+          .end((err, res) => {
+            expect(err).to.equal(null)
+            expect(res.body).to.have.property('tnt_addr')
+            .and.to.equal(randTntAddr)
+            expect(res.body).to.have.property('ip_addr')
+            .and.to.equal(ipAddr)
+            done()
+          })
+        })
+    })
+
+    it('should return OK for valid PUT no change to tnt and updated IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let ipAddr = '127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .expect(200)
+        .end((err, res) => {
+          let updatedIP = '127.0.0.2'
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, updatedIP, formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+          .put('/nodes/' + randTntAddr)
+          .send({ ip_addr: updatedIP, hmac: calculatedHMAC })
+          .expect('Content-type', /json/)
+          .expect(200)
+          .end((err, res) => {
+            expect(err).to.equal(null)
+            expect(res.body).to.have.property('tnt_addr')
+            .and.to.equal(randTntAddr)
+            expect(res.body).to.have.property('ip_addr')
+            .and.to.equal(updatedIP)
+            done()
+          })
+        })
+    })
+
+    it('should return OK for valid PUT no change to tnt and removed IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let ipAddr = '127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .expect(200)
+        .end((err, res) => {
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, '', formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+          .put('/nodes/' + randTntAddr)
+          .send({ hmac: calculatedHMAC })
+          .expect('Content-type', /json/)
+          .expect(200)
+          .end((err, res) => {
+            expect(err).to.equal(null)
+            expect(res.body).to.have.property('tnt_addr')
+            .and.to.equal(randTntAddr)
+            expect(res.body).to.not.have.property('ip_addr')
+            done()
+          })
         })
     })
   })

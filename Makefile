@@ -62,7 +62,7 @@ push:
 ## Run API test suite with Mocha
 test-api: cockroachdb-setup
 	./bin/docker-make --no-push node-api-service-test
-	 CHAINPOINT_STACK_ID=test CHAINPOINT_BASE_URI=http://test.chainpoint.org docker-compose up --build api-test
+	CHAINPOINT_STACK_ID=test CHAINPOINT_BASE_URI=http://test.chainpoint.org docker-compose up --build api-test
 
 ## Run aggregator test suite with Mocha
 test-aggregator:

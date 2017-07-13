@@ -23,7 +23,6 @@ const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
  * Returns a chainpoint proof for the requested Hash ID
  */
 function getProofsByIDV1 (req, res, next) {
-
   let hashIdResults = []
 
   // check if hash_id parameter was included
@@ -55,7 +54,7 @@ function getProofsByIDV1 (req, res, next) {
     return { hash_id: hashId.trim(), proof: null }
   })
   let requestedType = req.accepts(JSONLD_MIME_TYPE) ? JSONLD_MIME_TYPE : BASE64_MIME_TYPE
-  console.log(req.accepts(requestedType))
+  // console.log(req.accepts(requestedType))
 
   async.eachLimit(hashIdResults, 50, (hashIdResult, callback) => {
     // validate id param is proper UUIDv1
