@@ -22,7 +22,7 @@ services:
   nginx-proxy:
     restart: always
     image: jwilder/nginx-proxy
-    container_name: nginx-proxy
+    container_name: nginx-proxy-core
     ports:
       - "80:80"
     volumes:
@@ -163,7 +163,7 @@ services:
     image: quay.io/chainpoint/node-nist-beacon-service:${DOCKER_TAG}
     build:
       context: ./node-nist-beacon-service
-    container_name: nist-beacon
+    container_name: nist-beacon-core
     depends_on:
       - redis
     networks:
@@ -184,7 +184,7 @@ services:
     image: quay.io/chainpoint/node-calendar-service:${DOCKER_TAG}
     build:
       context: ./node-calendar-service
-    container_name: calendar
+    container_name: calendar-core
     depends_on:
       - roach1
       - rabbitmq
@@ -210,7 +210,7 @@ services:
     image: quay.io/chainpoint/node-btc-fee-service:${DOCKER_TAG}
     build:
       context: ./node-btc-fee-service
-    container_name: btc-fee
+    container_name: btc-fee-core
     depends_on:
       - consul
       - rabbitmq
@@ -227,7 +227,7 @@ services:
     image: quay.io/chainpoint/node-btc-tx-service:${DOCKER_TAG}
     build:
       context: ./node-btc-tx-service
-    container_name: btc-tx
+    container_name: btc-tx-core
     depends_on:
       - roach1
       - consul
@@ -251,7 +251,7 @@ services:
     image: quay.io/chainpoint/node-btc-mon-service:${DOCKER_TAG}
     build:
       context: ./node-btc-mon-service
-    container_name: btc-mon
+    container_name: btc-mon-core
     depends_on:
       - rabbitmq
     networks:
@@ -311,7 +311,7 @@ services:
   postgres:
     restart: always
     image: postgres:9.6.2-alpine
-    container_name: postgres
+    container_name: postgres-core
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
     environment:
@@ -334,7 +334,7 @@ services:
   rabbitmq:
     restart: always
     image: rabbitmq:3.6.9-management-alpine
-    container_name: rabbitmq
+    container_name: rabbitmq-core
     hostname: rabbitmq
     ports:
     - 5673:5672
@@ -353,7 +353,7 @@ services:
   redis:
     restart: always
     image: redis:3.2.9-alpine
-    container_name: redis
+    container_name: redis-core
     ports:
       - "6380:6379"
     volumes:
@@ -372,7 +372,7 @@ services:
   consul:
     restart: always
     image: consul:0.8.5
-    container_name: consul
+    container_name: consul-core
     ports:
       - "8300:8300"
       - "8400:8400"
@@ -389,7 +389,7 @@ services:
   roach1:
     restart: always
     image: cockroachdb/cockroach:v1.0.3
-    container_name: roach1
+    container_name: roach1-core
     ports:
       - "26257:26257"
       - "8080:8080"
@@ -405,7 +405,7 @@ services:
   #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
   #   build:
   #     context: ./bcoin
-  #   container_name: bcoin
+  #   container_name: bcoin-core
   #   restart: unless-stopped
   #   ports:
   #     #-- Mainnet
