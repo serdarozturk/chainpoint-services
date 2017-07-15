@@ -72,6 +72,7 @@ services:
 
   api-test:
     image: quay.io/chainpoint/node-api-service-test:${DOCKER_TAG}
+    container_name: node-api-service-test
     build:
       context: ./node-api-service
       dockerfile: Dockerfile.test
@@ -108,7 +109,8 @@ services:
       NODE_ENV: development
 
   splitter-test:
-    image: quay.io/chainpoint/node-splitter-service:${DOCKER_TAG}
+    image: quay.io/chainpoint/node-splitter-service-test:${DOCKER_TAG}
+    container_name: node-splitter-service-test
     build:
       context: ./node-splitter-service
       dockerfile: Dockerfile.test
@@ -139,7 +141,8 @@ services:
       NODE_ENV: development
 
   aggregator-test:
-    image: quay.io/chainpoint/node-aggregator-service:${DOCKER_TAG}
+    image: quay.io/chainpoint/node-aggregator-service-test:${DOCKER_TAG}
+    container_name: node-aggregator-service-test
     build:
       context: ./node-aggregator-service
       dockerfile: Dockerfile.test
