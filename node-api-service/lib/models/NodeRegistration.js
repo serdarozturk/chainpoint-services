@@ -49,13 +49,13 @@ var NodeRegistration = sequelize.define(env.COCKROACH_TABLE_NAME,
       unique: true,
       primaryKey: true
     },
-    ipAddr: {
-      comment: 'The public IPv4 address of a Node, when blank represents a non-public Node.',
+    publicUri: {
+      comment: 'The public URI address of a Node, when blank represents a non-public Node.',
       type: Sequelize.STRING,
       validate: {
-        isIPv4: true
+        isUrl: true
       },
-      field: 'ip_addr',
+      field: 'public_uri',
       allowNull: true
     },
     hmacKey: {

@@ -695,7 +695,7 @@ describe('Config Controller', () => {
 describe('Nodes Controller', () => {
   describe('POST /nodes', () => {
     beforeEach(function () {
-      nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
+      // nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
       // console.log(nodes)
     })
 
@@ -720,7 +720,7 @@ describe('Nodes Controller', () => {
     it('should return error with no tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({ip_addr: '127.0.0.1'})
+        .send({public_uri: 'http://127.0.0.1'})
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -738,7 +738,7 @@ describe('Nodes Controller', () => {
     it('should return error with empty tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '', ip_addr: '127.0.0.1'})
+        .send({tnt_addr: '', public_uri: 'http://127.0.0.1'})
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -756,7 +756,7 @@ describe('Nodes Controller', () => {
     it('should return error with malformed tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0xabc', ip_addr: '127.0.0.1'})
+        .send({tnt_addr: '0xabc', public_uri: 'http://127.0.0.1'})
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -771,10 +771,10 @@ describe('Nodes Controller', () => {
         })
     })
 
-    it('should return error with empty ip_addr', (done) => {
+    it('should return error with empty public_uri', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: ''})
+        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: ''})
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -784,20 +784,20 @@ describe('Nodes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, invalid empty ip_addr, remove if non-public IP')
+            .and.to.equal('invalid JSON body, invalid empty public_uri, remove if non-public IP')
           done()
         })
     })
 
-    it('should be OK if a ip_addr is registered twice', (done) => {
+    it('should be OK if a public_uri is registered twice', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1'})
+        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1'})
         .expect(200)
         .end((err, res) => {
           request(server)
             .post('/nodes')
-            .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1'})
+            .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1'})
             .expect(200)
             .end((err, res) => {
               done()
@@ -811,13 +811,13 @@ describe('Nodes Controller', () => {
       })
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), ip_addr: '127.0.0.1' })
+        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
           expect(res.body).to.have.property('tnt_addr')
-          expect(res.body).to.have.property('ip_addr')
+          expect(res.body).to.have.property('public_uri')
           expect(res.body).to.have.property('hmac_key')
           expect(res.body.hmac_key.length).to.equal(64)
           done()
@@ -836,30 +836,30 @@ describe('Nodes Controller', () => {
       })
 
       let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let ipAddr = '127.0.0.1'
+      let publicUri = 'http://127.0.0.1'
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
         .expect(200)
         .end((err, res) => {
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
           let hash = crypto.createHmac('sha256', res.body.hmac_key)
           let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, ipAddr, formattedDate].join('')
+          let hmacTxt = [randTntAddr, publicUri, formattedDate].join('')
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
           .put('/nodes/' + randTntAddr)
-          .send({ ip_addr: ipAddr, hmac: calculatedHMAC })
+          .send({ public_uri: publicUri, hmac: calculatedHMAC })
           .expect('Content-type', /json/)
           .expect(200)
           .end((err, res) => {
             expect(err).to.equal(null)
             expect(res.body).to.have.property('tnt_addr')
             .and.to.equal(randTntAddr)
-            expect(res.body).to.have.property('ip_addr')
-            .and.to.equal(ipAddr)
+            expect(res.body).to.have.property('public_uri')
+            .and.to.equal(publicUri)
             done()
           })
         })
@@ -871,31 +871,31 @@ describe('Nodes Controller', () => {
       })
 
       let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let ipAddr = '127.0.0.1'
+      let publicUrl = 'http://127.0.0.1'
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .send({ tnt_addr: randTntAddr, public_uri: publicUrl })
         .expect(200)
         .end((err, res) => {
-          let updatedIP = '127.0.0.2'
+          let updatedUri = 'http://127.0.0.2'
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
           let hash = crypto.createHmac('sha256', res.body.hmac_key)
           let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, updatedIP, formattedDate].join('')
+          let hmacTxt = [randTntAddr, updatedUri, formattedDate].join('')
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
           .put('/nodes/' + randTntAddr)
-          .send({ ip_addr: updatedIP, hmac: calculatedHMAC })
+          .send({ public_uri: updatedUri, hmac: calculatedHMAC })
           .expect('Content-type', /json/)
           .expect(200)
           .end((err, res) => {
             expect(err).to.equal(null)
             expect(res.body).to.have.property('tnt_addr')
             .and.to.equal(randTntAddr)
-            expect(res.body).to.have.property('ip_addr')
-            .and.to.equal(updatedIP)
+            expect(res.body).to.have.property('public_uri')
+            .and.to.equal(updatedUri)
             done()
           })
         })
@@ -907,11 +907,11 @@ describe('Nodes Controller', () => {
       })
 
       let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let ipAddr = '127.0.0.1'
+      let publicUri = 'http://127.0.0.1'
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, ip_addr: ipAddr })
+        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
         .expect(200)
         .end((err, res) => {
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
@@ -929,7 +929,7 @@ describe('Nodes Controller', () => {
             expect(err).to.equal(null)
             expect(res.body).to.have.property('tnt_addr')
             .and.to.equal(randTntAddr)
-            expect(res.body).to.not.have.property('ip_addr')
+            expect(res.body).to.not.have.property('public_uri')
             done()
           })
         })

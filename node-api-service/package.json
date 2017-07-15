@@ -15,7 +15,6 @@
     "chainpoint-binary": "^4.0.0",
     "chainpoint-parse": "^2.0.1",
     "envalid": "^3.1.1",
-    "ip-address": "^5.8.8",
     "lodash": "^4.17.4",
     "moment": "^2.18.1",
     "redis": "^2.7.1",
@@ -25,6 +24,7 @@
     "uuid": "^3.1.0",
     "uuid-time": "^1.0.0",
     "uuid-validate": "^0.0.2",
+    "valid-url": "^1.0.9",
     "ws": "^2.3.1"
   },
   "devDependencies": {

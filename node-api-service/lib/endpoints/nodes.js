@@ -1,13 +1,12 @@
 const crypto = require('crypto')
 const restify = require('restify')
 const _ = require('lodash')
-const env = require('../parse-env.js')('api')
-const Address4 = require('ip-address').Address4
 const moment = require('moment')
+var validUrl = require('valid-url')
 
 const nodeRegistration = require('../models/NodeRegistration.js')
 
-  // validate hashes are individually well formed
+// validate hashes are individually well formed
 let isEthereumAddr = (address) => {
   return /^0x[0-9a-fA-F]{40}$/i.test(address)
 }
@@ -38,17 +37,14 @@ async function postNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, malformed tnt_addr'))
   }
 
-  // a POST without ip_addr prop represents a non-public Node
-  if (req.params.hasOwnProperty('ip_addr') && _.isEmpty(req.params.ip_addr)) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, invalid empty ip_addr, remove if non-public IP'))
+  // a POST without public_uri prop represents a non-public Node
+  if (req.params.hasOwnProperty('public_uri') && _.isEmpty(req.params.public_uri)) {
+    return next(new restify.InvalidArgumentError('invalid JSON body, invalid empty public_uri, remove if non-public IP'))
   }
 
-  // if an IP is provided, it must be valid
-  if (req.params.ip_addr) {
-    let parsedIPAddr = new Address4(req.params.ip_addr)
-    if (!parsedIPAddr.isValid()) {
-      return next(new restify.InvalidArgumentError('invalid JSON body, invalid ip_addr'))
-    }
+  // if an public_uri is provided, it must be valid
+  if (req.params.public_uri && !validUrl.isWebUri(req.params.public_uri)) {
+    return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
   }
 
   let sequelize = nodeRegistration.sequelize
@@ -76,7 +72,7 @@ async function postNodeV1Async (req, res, next) {
   try {
     await reg.create({
       tntAddr: req.params.tnt_addr,
-      ipAddr: req.params.ip_addr,
+      publicUri: req.params.public_uri,
       hmacKey: randHMACKey
     })
   } catch (error) {
@@ -86,7 +82,7 @@ async function postNodeV1Async (req, res, next) {
 
   res.send({
     tnt_addr: req.params.tnt_addr,
-    ip_addr: req.params.ip_addr,
+    public_uri: req.params.public_uri,
     hmac_key: randHMACKey
   })
   return next()
@@ -114,11 +110,10 @@ async function putNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, malformed tnt_addr'))
   }
 
-  // if an IP is provided, it must be valid
-  if (req.params.hasOwnProperty('ip_addr') && !_.isEmpty(req.params.ip_addr)) {
-    let parsedIPAddr = new Address4(req.params.ip_addr)
-    if (!parsedIPAddr.isValid()) {
-      return next(new restify.InvalidArgumentError('invalid JSON body, invalid ip_addr'))
+  // if an public_uri is provided, it must be valid
+  if (req.params.hasOwnProperty('public_uri') && !_.isEmpty(req.params.public_uri)) {
+    if (!validUrl.isWebUri(req.params.public_uri)) {
+      return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
     }
   }
 
@@ -154,7 +149,7 @@ async function putNodeV1Async (req, res, next) {
     // Forces Nodes to be within 1 min of Core to generate a valid HMAC
     let hash = crypto.createHmac('sha256', regNode.hmacKey)
     let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-    let hmacTxt = [req.params.tnt_addr, req.params.ip_addr, formattedDate].join('')
+    let hmacTxt = [req.params.tnt_addr, req.params.public_uri, formattedDate].join('')
     let calculatedHMAC = hash.update(hmacTxt).digest('hex')
     // console.log('calculatedHMAC : ', calculatedHMAC)
 
@@ -162,10 +157,10 @@ async function putNodeV1Async (req, res, next) {
       return next(new restify.InvalidArgumentError('incorrect hmac'))
     }
 
-    if (!req.params.hasOwnProperty('ip_addr') || _.isEmpty(req.params.ip_addr)) {
-      regNode.ipAddr = null
+    if (!req.params.hasOwnProperty('public_uri') || _.isEmpty(req.params.public_uri)) {
+      regNode.publicUri = null
     } else {
-      regNode.ipAddr = req.params.ip_addr
+      regNode.publicUri = req.params.public_uri
     }
 
     await regNode.save()
@@ -176,7 +171,7 @@ async function putNodeV1Async (req, res, next) {
 
   res.send({
     tnt_addr: req.params.tnt_addr,
-    ip_addr: req.params.ip_addr
+    public_uri: req.params.public_uri
   })
   return next()
 }
