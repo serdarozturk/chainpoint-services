@@ -300,6 +300,22 @@ services:
     environment:
       NODE_ENV: development
 
+  # Node Auditing
+  # Responsible for auditing the availability, time, and calendar state
+  # of public Tierion Network Nodes
+  #
+  audit:
+    restart: always
+    image: quay.io/chainpoint/node-audit-service:${DOCKER_TAG}
+    build:
+      context: ./node-audit-service
+    depends_on:
+      - roach1
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+
   # Postgres
   #
   # See : https://hub.docker.com/_/postgres/

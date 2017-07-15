@@ -4,7 +4,7 @@ const _ = require('lodash')
 const moment = require('moment')
 var validUrl = require('valid-url')
 
-const nodeRegistration = require('../models/NodeRegistration.js')
+const nodeRegistration = require('../../lib/models/NodeRegistration.js')
 
 // validate hashes are individually well formed
 let isEthereumAddr = (address) => {

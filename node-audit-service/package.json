@@ -1,0 +1,17 @@
+{
+  "name": "chainpoint-node-btc-fee-service",
+  "version": "0.0.1",
+  "description": "Chainpoint audit service.",
+  "author": "Glenn Rempe <glenn@tierion.com>",
+  "license": "MIT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "envalid": "^3.1.1",
+    "lodash": "^4.17.4",
+    "requestify": "^0.2.5",
+    "sequelize-cockroachdb": "^1.0.2"
+  }
+}
