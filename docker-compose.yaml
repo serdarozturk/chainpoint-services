@@ -84,8 +84,8 @@ services:
       - chainpoint
     environment:
       NODE_ENV: test
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_STACK_ID: test
+      CHAINPOINT_BASE_URI: http://test.chainpoint.org
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
