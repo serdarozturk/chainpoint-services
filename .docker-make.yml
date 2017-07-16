@@ -84,6 +84,19 @@ builds:
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
 
+  node-audit-service:
+    context: node-audit-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-audit-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-audit-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-audit-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
   node-btc-fee-service:
     context: node-btc-fee-service
     dockerfile: Dockerfile
