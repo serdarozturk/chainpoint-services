@@ -125,7 +125,7 @@ server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node
 server.put({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.putNodeV1Async)
 // get configuration information for this stack
-server.get({ path: '/config', version: '1.0.0' }, config.getConfigInfoV1)
+server.get({ path: '/config', version: '1.0.0' }, config.getConfigInfoV1Async)
 // teapot
 server.get({ path: '/', version: '1.0.0' }, root.getV1)
 
