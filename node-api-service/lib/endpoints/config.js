@@ -1,5 +1,4 @@
 const env = require('../parse-env.js')('api')
-const utils = require('../utils.js')
 
 function getCorePublicKeyList () {
   return {
@@ -25,7 +24,7 @@ function getConfigInfoV1 (req, res, next) {
     post_hashes_max: env.POST_HASHES_MAX,
     post_verify_proofs_max: env.POST_VERIFY_PROOFS_MAX,
     get_calendar_blocks_max: env.GET_CALENDAR_BLOCKS_MAX,
-    time: utils.formatDateISO8601NoMs(new Date()),
+    time: new Date().toISOString(),
     public_keys: getCorePublicKeyList()
   })
   return next()
