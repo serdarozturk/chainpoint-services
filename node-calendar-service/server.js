@@ -61,13 +61,13 @@ console.log('Consul connection established')
 // When a Base64 pubKey is published publicly it should also
 // be accompanied by this hash of its bytes to serve
 // as a fingerprint.
-let calcSigningPubKeyHash = (pubKey) => {
+let calcSigningPubKeyHashHex = (pubKey) => {
   return crypto.createHash('sha256').update(pubKey).digest('hex')
 }
-const signingPubKeyHash = calcSigningPubKeyHash(signingKeypair.publicKey)
+const signingPubKeyHashHex = calcSigningPubKeyHashHex(signingKeypair.publicKey)
 
 // Calculate a deterministic block hash and return a Buffer hash value
-let calcBlockHash = (block) => {
+let calcBlockHashHex = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.stackId.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
   let dataValBuffer = Buffer.from(block.dataVal, 'hex')
@@ -77,12 +77,12 @@ let calcBlockHash = (block) => {
     prefixBuffer,
     dataValBuffer,
     prevHashBuffer
-  ])).digest()
+  ])).digest('hex')
 }
 
 // Calculate a base64 encoded signature over the block hash
-let calcBlockHashSig = (bh) => {
-  return nacl.util.encodeBase64(nacl.sign(bh, signingKeypair.secretKey))
+let calcBlockHashSigB64 = (blockHashHex) => {
+  return nacl.util.encodeBase64(nacl.sign.detached(nacl.util.decodeUTF8(blockHashHex), signingKeypair.secretKey))
 }
 
 // The write function used by all block creation functions to write to calendar blockchain
@@ -97,12 +97,12 @@ let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyNa
   b.dataVal = dataVal
   b.prevHash = prevHash
 
-  let bh = calcBlockHash(b)
-  b.hash = bh.toString('hex')
+  let blockHashHex = calcBlockHashHex(b)
+  b.hash = blockHashHex
 
   // pre-pend Base64 signature with truncated chars of SHA256 hash of the
   // pubkey bytes, joined with ':', to allow for lookup of signing pubkey.
-  b.sig = [signingPubKeyHash.slice(0, 12), calcBlockHashSig(bh)].join(':')
+  b.sig = [signingPubKeyHashHex.slice(0, 12), calcBlockHashSigB64(blockHashHex)].join(':')
 
   try {
     let block = await CalendarBlock.create(b)
