@@ -1,7 +1,7 @@
 # chainpoint-services
 
-Chainpoint Services is a modern
-[microservices architecture](https://martinfowler.com/articles/microservices.html)
+Chainpoint Services is the Core of the Tierion Network and
+a modern [microservices architecture](https://martinfowler.com/articles/microservices.html)
 that implements the [chainpoint.org](https://chainpoint.org) API.
 
 The services provided are generally composed of Node.js applications
