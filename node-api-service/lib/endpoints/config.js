@@ -1,13 +1,11 @@
 const env = require('../parse-env.js')('api')
 const utils = require('../utils.js')
-const fs = require('fs')
 
-async function getCorePublicKeyListAsync () {
-  // Currently, public keys are simply documented in a JSON file
-  // which is read and returned here. In the future, this will be
-  // replaced with a more robust system
-  let pubKeyJSON = fs.readFileSync('./lib/public-keys.json')
-  return JSON.parse(pubKeyJSON)
+function getCorePublicKeyList () {
+  return {
+    '09b0ec65fa25': 'Q88brO55SfkY5S0Rbnyh3gh1s6izAj9v4BSWVF1dce0=',
+    'fcbc2ba6c808': 'UWJSQwBjlvlkSirJcdFKP4zGQIq1mfrk7j0xV0CZ9yI='
+  }
 }
 
 /**
@@ -15,7 +13,7 @@ async function getCorePublicKeyListAsync () {
  *
  * Returns a configuration information object
  */
-async function getConfigInfoV1Async (req, res, next) {
+function getConfigInfoV1 (req, res, next) {
   res.send({
     chainpoint_stack_id: env.CHAINPOINT_STACK_ID,
     chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
@@ -28,11 +26,11 @@ async function getConfigInfoV1Async (req, res, next) {
     post_verify_proofs_max: env.POST_VERIFY_PROOFS_MAX,
     get_calendar_blocks_max: env.GET_CALENDAR_BLOCKS_MAX,
     time: utils.formatDateISO8601NoMs(new Date()),
-    public_keys: await getCorePublicKeyListAsync()
+    public_keys: getCorePublicKeyList()
   })
   return next()
 }
 
 module.exports = {
-  getConfigInfoV1Async: getConfigInfoV1Async
+  getConfigInfoV1: getConfigInfoV1
 }
