@@ -87,7 +87,8 @@ run-load-test:
 test: test-api test-aggregator test-splitter 
 
 ## Build and start all
-up: build cockroachdb-setup
+up: build-config
+	build cockroachdb-setup
 	docker-compose up -d --build
 
 ## Startup without performing builds, rely on pull of images. Set DOCKER_TAG
