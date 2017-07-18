@@ -6,9 +6,6 @@ const calendarBlock = require('../models/CalendarBlock.js')
 // This value is set once the connection has been established
 let redis = null
 
-// The redis key where the current audit challenge is stored
-const AUDIT_CHALLENGE_KEY = 'ChallengeString'
-
 let CalendarBlock = calendarBlock.CalendarBlock
 
 function getCorePublicKeyList () {
@@ -25,8 +22,8 @@ function getCorePublicKeyList () {
  */
 async function getConfigInfoV1Async (req, res, next) {
   let topCoreBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
-  let latestChallenge = await redis.getAsync(AUDIT_CHALLENGE_KEY)
-  console.log(latestChallenge)
+  let latestChallengeKey = await redis.getAsync(`calendar_audit_challenge:latest_key`)
+  let latestChallenge = await redis.getAsync(latestChallengeKey)
   // the challenge value contains the solution in the last segment, remove it before adding to teh response
   let challengeSegments = latestChallenge.split(':')
   challengeSegments.pop()

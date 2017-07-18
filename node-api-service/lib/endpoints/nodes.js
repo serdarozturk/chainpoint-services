@@ -6,6 +6,9 @@ var validUrl = require('valid-url')
 
 const nodeRegistration = require('../../lib/models/NodeRegistration.js')
 
+let sequelize = nodeRegistration.sequelize
+let NodeRegistration = nodeRegistration.NodeRegistration
+
 // validate hashes are individually well formed
 let isEthereumAddr = (address) => {
   return /^0x[0-9a-fA-F]{40}$/i.test(address)
@@ -47,9 +50,6 @@ async function postNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
   }
 
-  let sequelize = nodeRegistration.sequelize
-  let reg = nodeRegistration.NodeRegistration
-
   try {
     await sequelize.sync({ logging: false })
   } catch (error) {
@@ -58,7 +58,7 @@ async function postNodeV1Async (req, res, next) {
   }
 
   try {
-    let count = await reg.count({ where: { tntAddr: req.params.tnt_addr } })
+    let count = await NodeRegistration.count({ where: { tntAddr: req.params.tnt_addr } })
     if (count >= 1) {
       return next(new restify.ConflictError('tnt_addr : address already exists'))
     }
@@ -70,7 +70,7 @@ async function postNodeV1Async (req, res, next) {
   let randHMACKey = crypto.randomBytes(32).toString('hex')
 
   try {
-    await reg.create({
+    await NodeRegistration.create({
       tntAddr: req.params.tnt_addr,
       publicUri: req.params.public_uri,
       hmacKey: randHMACKey
@@ -129,9 +129,6 @@ async function putNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid hmac'))
   }
 
-  let sequelize = nodeRegistration.sequelize
-  let reg = nodeRegistration.NodeRegistration
-
   try {
     await sequelize.sync({ logging: false })
   } catch (error) {
@@ -140,7 +137,7 @@ async function putNodeV1Async (req, res, next) {
   }
 
   try {
-    let regNode = await reg.find({ where: { tntAddr: req.params.tnt_addr } })
+    let regNode = await NodeRegistration.find({ where: { tntAddr: req.params.tnt_addr } })
     if (!regNode) {
       return next(new restify.ResourceNotFoundError('not found'))
     }

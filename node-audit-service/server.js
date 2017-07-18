@@ -1,6 +1,7 @@
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('audit')
 
+const { promisify } = require('util')
 const nodeRegistration = require('./lib/models/NodeRegistration.js')
 const utils = require('./lib/utils.js')
 const r = require('redis')
@@ -9,6 +10,7 @@ const crypto = require('crypto')
 const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
 const bluebird = require('bluebird')
+const request = require('request')
 
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
@@ -29,7 +31,7 @@ const coreCacheTransporters = requestify.coreCacheTransporters
 requestify.cacheTransporter(coreCacheTransporters.inMemory())
 
 // How often to query the DB for stale nodes
-const CHECK_STALE_INTERVAL_MS = 1000 * 60 // 1 min
+const CHECK_STALE_INTERVAL_MS = 1000 * 60 * 30 // 30 minutes
 
 // How old must a node's timestamp be to be considered stale
 const STALE_AFTER_MS = 1000 * 60 * 60 // 1 hour
@@ -37,13 +39,109 @@ const STALE_AFTER_MS = 1000 * 60 * 60 // 1 hour
 // The frequency in which audit challenges are generated, in minutes
 const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 
-// The redis key where the current audit challenge is stored
-const AUDIT_CHALLENGE_KEY = 'ChallengeString'
+// The lifespan of an audit challenge in Redis
+const CHALLENGE_EXPIRE_MINUTES = 75
+
+// The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
+const ACCEPTABLE_DELTA_MS = 2000 // 2 seconds
+
+// create an async version of the request library
+const requestAsync = promisify(request)
 
 // Retrieve all registered Nodes that have out of date
 // audit results. Nodes should be audited hourly.
 async function getStaleAuditNodesAsync () {
-  console.log('AUDITING', STALE_AFTER_MS)
+  let staleCutoffTimestamp = Date.now() - STALE_AFTER_MS
+  let staleCutoffDate = new Date(staleCutoffTimestamp).toISOString()
+  console.log(`Auditing Nodes with audit timestamps older that ${staleCutoffDate}`)
+
+  let nodes = await NodeRegistration.findAll({
+    where:
+    {
+      $and:
+      [
+        { publicUri: { $ne: null } },
+        {
+          $or:
+          [
+            { auditedPublicIPAt: { $lte: staleCutoffTimestamp } },
+            { auditedTimeAt: { $lte: staleCutoffTimestamp } },
+            { auditedCalStateAt: { $lte: staleCutoffTimestamp } },
+            { auditedPublicIPAt: null },
+            { auditedTimeAt: null },
+            { auditedCalStateAt: null }
+          ]
+        }
+      ]
+    }
+  })
+
+  console.log(`${nodes.length} stale Nodes were found`)
+
+  // iterate through each Node, requesting an answer to the challenge
+  for (let x = 0; x < nodes.length; x++) {
+    let options = {
+      headers: [
+        {
+          name: 'Content-Type',
+          value: 'application/json'
+        }
+      ],
+      method: 'GET',
+      uri: `${nodes[x].publicUri}/config`,
+      json: true,
+      gzip: true
+    }
+
+    let auditCoreTimestamp
+    let response
+    try {
+      auditCoreTimestamp = Date.now()
+      response = await requestAsync(options)
+    } catch (error) {
+      console.error(`NodeAudit : GET failed with error ${error.message} for ${nodes[x].publicUri}`)
+      continue
+    }
+    if (response.statusCode !== 200) {
+      console.error(`NodeAudit : GET failed with status code ${response.statusCode} for ${nodes[x].publicUri}`)
+      continue
+    }
+    if (!response.body.calendar || !response.body.calendar.audit_response) {
+      console.error(`NodeAudit : GET failed with missing audit response for ${nodes[x].publicUri}`)
+      continue
+    }
+    if (!response.body.time) {
+      console.error(`NodeAudit : GET failed with missing time for ${nodes[x].publicUri}`)
+      continue
+    }
+
+    let auditResponseData = response.calendar.audit_response.split(':')
+    let auditResponseTimestamp = auditResponseData[0]
+    let auditResponseSolution = auditResponseData[1]
+    let auditChallenge = await redis.getAsync(`calendar_audit_challenge:${auditResponseTimestamp}`)
+    let nodeTime = Date.parse(response.body.time)
+    let updateValues = {}
+
+    // We've gotten this far, so at least auditedPublicIPAt has passed
+    updateValues.auditedPublicIPAt = auditCoreTimestamp
+
+    // check if the Node timestamp is withing the acceptable range
+    if (Math.abs(nodeTime - auditCoreTimestamp) <= ACCEPTABLE_DELTA_MS) {
+      updateValues.auditedTimeAt = auditCoreTimestamp
+    }
+
+    // check if the Node challenge solution is correct
+    let challengeSegments = auditChallenge.split(':')
+    let challengeSolution = challengeSegments.pop()
+    if (auditResponseSolution === challengeSolution) {
+      updateValues.auditedCalStateAt = auditCoreTimestamp
+    }
+
+    // update the Node audit results in NodeRegistration if there are new timestamps to record
+    if (Object.keys(updateValues).length > 0) {
+      await NodeRegistration.update(updateValues, { _id: nodes[x].id })
+    }
+  }
 }
 
 // Generate a new audit challenge for the Nodes
@@ -66,7 +164,7 @@ async function generateAuditChallengeAsync () {
       } else {
         throw new Error('no genesis block found')
       }
-    // calulcate min and max values with special exception for low block count
+      // calulcate min and max values with special exception for low block count
       let max = height > 2000 ? height - 1000 : height
       let randomNum = await rnd(10, 1000)
       let min = max - randomNum
@@ -74,8 +172,11 @@ async function generateAuditChallengeAsync () {
 
       let challengeAnswer = await calculateChallengeAnswerAsync(min, max, nonce)
       let auditChallenge = `${time}:${min}:${max}:${nonce}:${challengeAnswer}`
-
-      await redis.setAsync(AUDIT_CHALLENGE_KEY, auditChallenge)
+      let challengeKey = `calendar_audit_challenge:${time}`
+      // store the new challenge at its own unique key
+      await redis.setAsync(challengeKey, auditChallenge, 'EX', CHALLENGE_EXPIRE_MINUTES * 60)
+      // keep track of the newest challenge key so /config knows what the latest to display is
+      await redis.setAsync(`calendar_audit_challenge:latest_key`, challengeKey)
       console.log(`Challenge set : ${auditChallenge}`)
     } catch (error) {
       console.error((`could not generate audit challenge : ${error}`))
