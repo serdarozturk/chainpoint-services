@@ -70,7 +70,9 @@ can be shorted to just the command name.
 
 ### Setup Environment Variables
 
-Running `make` the first time will copy `.env.sample` to `.env`. This file will be used by `docker-compose` to set required environment variables.
+You will need to set up environment variables before building.
+
+Running `make build-config` will copy `.env.sample` to `.env`. This file will be used by `docker-compose` to set required environment variables.
 
 You can modify the `.env` as needed, any changes will be ignored by Git.
 
