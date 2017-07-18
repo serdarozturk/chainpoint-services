@@ -30,11 +30,8 @@ const requestify = require('requestify')
 const coreCacheTransporters = requestify.coreCacheTransporters
 requestify.cacheTransporter(coreCacheTransporters.inMemory())
 
-// How often to query the DB for stale nodes
-const CHECK_STALE_INTERVAL_MS = 1000 * 60 * 30 // 30 minutes
-
-// How old must a node's timestamp be to be considered stale
-const STALE_AFTER_MS = 1000 * 60 * 60 // 1 hour
+// The frequency of the Node audit checks
+const AUDIT_NODES_INTERVAL_MS = 1000 * 60 * 30 // 30 minutes
 
 // The frequency in which audit challenges are generated, in minutes
 const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
@@ -48,35 +45,11 @@ const ACCEPTABLE_DELTA_MS = 2000 // 2 seconds
 // create an async version of the request library
 const requestAsync = promisify(request)
 
-// Retrieve all registered Nodes that have out of date
-// audit results. Nodes should be audited hourly.
-async function getStaleAuditNodesAsync () {
-  let staleCutoffTimestamp = Date.now() - STALE_AFTER_MS
-  let staleCutoffDate = new Date(staleCutoffTimestamp).toISOString()
-  console.log(`Auditing Nodes with audit timestamps older that ${staleCutoffDate}`)
+// Retrieve all registered Nodes with public_uris for auditing.
+async function auditNodesAsync () {
+  let nodes = await NodeRegistration.findAll({ where: { publicUri: { $ne: null } } })
 
-  let nodes = await NodeRegistration.findAll({
-    where:
-    {
-      $and:
-      [
-        { publicUri: { $ne: null } },
-        {
-          $or:
-          [
-            { auditedPublicIPAt: { $lte: staleCutoffTimestamp } },
-            { auditedTimeAt: { $lte: staleCutoffTimestamp } },
-            { auditedCalStateAt: { $lte: staleCutoffTimestamp } },
-            { auditedPublicIPAt: null },
-            { auditedTimeAt: null },
-            { auditedCalStateAt: null }
-          ]
-        }
-      ]
-    }
-  })
-
-  console.log(`${nodes.length} stale Nodes were found`)
+  console.log(`${nodes.length} public Nodes were found`)
 
   // iterate through each Node, requesting an answer to the challenge
   for (let x = 0; x < nodes.length; x++) {
@@ -93,48 +66,48 @@ async function getStaleAuditNodesAsync () {
       gzip: true
     }
 
-    let auditCoreTimestamp
-    let response
+    let coreAuditTimestamp
+    let nodeResponse
     try {
-      auditCoreTimestamp = Date.now()
-      response = await requestAsync(options)
+      coreAuditTimestamp = Date.now()
+      nodeResponse = await requestAsync(options)
     } catch (error) {
       console.error(`NodeAudit : GET failed with error ${error.message} for ${nodes[x].publicUri}`)
       continue
     }
-    if (response.statusCode !== 200) {
-      console.error(`NodeAudit : GET failed with status code ${response.statusCode} for ${nodes[x].publicUri}`)
+    if (nodeResponse.statusCode !== 200) {
+      console.error(`NodeAudit : GET failed with status code ${nodeResponse.statusCode} for ${nodes[x].publicUri}`)
       continue
     }
-    if (!response.body.calendar || !response.body.calendar.audit_response) {
+    if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
       console.error(`NodeAudit : GET failed with missing audit response for ${nodes[x].publicUri}`)
       continue
     }
-    if (!response.body.time) {
+    if (!nodeResponse.body.time) {
       console.error(`NodeAudit : GET failed with missing time for ${nodes[x].publicUri}`)
       continue
     }
 
-    let auditResponseData = response.calendar.audit_response.split(':')
-    let auditResponseTimestamp = auditResponseData[0]
-    let auditResponseSolution = auditResponseData[1]
-    let auditChallenge = await redis.getAsync(`calendar_audit_challenge:${auditResponseTimestamp}`)
-    let nodeTime = Date.parse(response.body.time)
+    let nodeAuditResponseData = nodeResponse.calendar.audit_response.split(':')
+    let nodeAuditResponseTimestamp = nodeAuditResponseData[0]
+    let nodeAuditResponseSolution = nodeAuditResponseData[1]
+    let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseTimestamp}`)
+    let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
     let updateValues = {}
 
     // We've gotten this far, so at least auditedPublicIPAt has passed
-    updateValues.auditedPublicIPAt = auditCoreTimestamp
+    updateValues.auditedPublicIPAt = coreAuditTimestamp
 
     // check if the Node timestamp is withing the acceptable range
-    if (Math.abs(nodeTime - auditCoreTimestamp) <= ACCEPTABLE_DELTA_MS) {
-      updateValues.auditedTimeAt = auditCoreTimestamp
+    if (Math.abs(nodeAuditTimestamp - coreAuditTimestamp) <= ACCEPTABLE_DELTA_MS) {
+      updateValues.auditedTimeAt = coreAuditTimestamp
     }
 
     // check if the Node challenge solution is correct
-    let challengeSegments = auditChallenge.split(':')
-    let challengeSolution = challengeSegments.pop()
-    if (auditResponseSolution === challengeSolution) {
-      updateValues.auditedCalStateAt = auditCoreTimestamp
+    let coreChallengeSegments = coreAuditChallenge.split(':')
+    let coreChallengeSolution = coreChallengeSegments.pop()
+    if (nodeAuditResponseSolution === coreChallengeSolution) {
+      updateValues.auditedCalStateAt = coreAuditTimestamp
     }
 
     // update the Node audit results in NodeRegistration if there are new timestamps to record
@@ -247,10 +220,10 @@ async function openStorageConnectionAsync () {
 }
 
 async function startIntervalsAsync () {
-  await getStaleAuditNodesAsync()
   await generateAuditChallengeAsync()
-  setInterval(async () => await getStaleAuditNodesAsync(), CHECK_STALE_INTERVAL_MS)
+  await auditNodesAsync()
   setInterval(async () => await generateAuditChallengeAsync(), GEN_AUDIT_CHALLENGE_MIN * 60 * 1000)
+  setInterval(async () => await auditNodesAsync(), AUDIT_NODES_INTERVAL_MS)
 }
 
 // process all steps need to start the application
