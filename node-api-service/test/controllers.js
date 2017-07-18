@@ -666,6 +666,16 @@ describe('Verify Controller', () => {
 })
 
 describe('Config Controller', () => {
+  app.config.setRedis({
+    getAsync: async () => {
+      return 'qwe:qwe:qwe:qwe:qwe'
+    }
+  })
+  app.config.setCalendarBlock({
+    findOne: async () => {
+      return { id: 27272 }
+    }
+  })
   describe('GET /config', () => {
     it('should return proper config object', (done) => {
       request(server)
@@ -687,6 +697,9 @@ describe('Config Controller', () => {
           expect(res.body).to.have.property('get_calendar_blocks_max')
           expect(res.body).to.have.property('time')
           expect(res.body).to.have.property('public_keys')
+          expect(res.body).to.have.property('calendar')
+          expect(res.body.calendar).to.have.property('height')
+          expect(res.body.calendar).to.have.property('audit_challenge')
           done()
         })
     })

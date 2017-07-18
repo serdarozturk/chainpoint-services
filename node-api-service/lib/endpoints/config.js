@@ -1,5 +1,16 @@
 const env = require('../parse-env.js')('api')
 
+const calendarBlock = require('../models/CalendarBlock.js')
+
+// The redis connection used for all redis communication
+// This value is set once the connection has been established
+let redis = null
+
+// The redis key where the current audit challenge is stored
+const AUDIT_CHALLENGE_KEY = 'ChallengeString'
+
+let CalendarBlock = calendarBlock.CalendarBlock
+
 function getCorePublicKeyList () {
   return {
     '09b0ec65fa25': 'Q88brO55SfkY5S0Rbnyh3gh1s6izAj9v4BSWVF1dce0=',
@@ -12,7 +23,15 @@ function getCorePublicKeyList () {
  *
  * Returns a configuration information object
  */
-function getConfigInfoV1 (req, res, next) {
+async function getConfigInfoV1Async (req, res, next) {
+  let topCoreBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
+  let latestChallenge = await redis.getAsync(AUDIT_CHALLENGE_KEY)
+  console.log(latestChallenge)
+  // the challenge value contains the solution in the last segment, remove it before adding to teh response
+  let challengeSegments = latestChallenge.split(':')
+  challengeSegments.pop()
+  latestChallenge = challengeSegments.join(':')
+
   res.send({
     chainpoint_stack_id: env.CHAINPOINT_STACK_ID,
     chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
@@ -25,11 +44,17 @@ function getConfigInfoV1 (req, res, next) {
     post_verify_proofs_max: env.POST_VERIFY_PROOFS_MAX,
     get_calendar_blocks_max: env.GET_CALENDAR_BLOCKS_MAX,
     time: new Date().toISOString(),
-    public_keys: getCorePublicKeyList()
+    public_keys: getCorePublicKeyList(),
+    calendar: {
+      height: parseInt(topCoreBlock.id),
+      audit_challenge: latestChallenge
+    }
   })
   return next()
 }
 
 module.exports = {
-  getConfigInfoV1: getConfigInfoV1
+  getConfigInfoV1Async: getConfigInfoV1Async,
+  setRedis: (redisClient) => { redis = redisClient },
+  setCalendarBlock: (calBlock) => { CalendarBlock = calBlock }
 }

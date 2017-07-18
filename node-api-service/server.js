@@ -18,6 +18,7 @@ const config = require('./lib/endpoints/config.js')
 const subscribe = require('./lib/endpoints/subscribe.js')
 const root = require('./lib/endpoints/root.js')
 const r = require('redis')
+const bluebird = require('bluebird')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -125,7 +126,7 @@ server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node
 server.put({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.putNodeV1Async)
 // get configuration information for this stack
-server.get({ path: '/config', version: '1.0.0' }, config.getConfigInfoV1)
+server.get({ path: '/config', version: '1.0.0' }, config.getConfigInfoV1Async)
 // teapot
 server.get({ path: '/', version: '1.0.0' }, root.getV1)
 
@@ -250,11 +251,13 @@ async function openRMQConnectionAsync (connectionString) {
 function openRedisConnection (redisURI) {
   redis = r.createClient(redisURI)
   redis.on('ready', () => {
+    bluebird.promisifyAll(redis)
     proofs.setRedis(redis)
     subscribe.setRedis(redis)
     cachedCalendarBlock.setRedis(redis)
     verify.setRedis(redis)
     calendar.setRedis(redis)
+    config.setRedis(redis)
     console.log('Redis connection established')
   })
   redis.on('error', async () => {
@@ -265,6 +268,7 @@ function openRedisConnection (redisURI) {
     cachedCalendarBlock.setRedis(null)
     verify.setRedis(null)
     calendar.setRedis(null)
+    config.setRedis(null)
     console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
     await utils.sleep(5000)
     openRedisConnection(redisURI)
@@ -311,5 +315,6 @@ module.exports = {
     amqpChannel = chan
     hashes.setAMQPChannel(chan)
   },
-  server: server
+  server: server,
+  config: config
 }
