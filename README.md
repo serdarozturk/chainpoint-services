@@ -70,7 +70,7 @@ can be shorted to just the command name.
 
 ### Setup Environment Variables
 
-You will need ot set up environment variables before building.
+You will need to set up environment variables before building.
 
 Running `make build-config` will copy `.env.sample` to `.env`. This file will be used by `docker-compose` to set required environment variables.
 
