@@ -68,6 +68,15 @@ var NodeRegistration = sequelize.define(env.COCKROACH_TABLE_NAME,
       allowNull: false,
       unique: true
     },
+    lastAuditAt: {
+      comment: 'The last time an audit was performed for this Node, in sec since EPOCH.',
+      type: Sequelize.INTEGER,
+      validate: {
+        isInt: true
+      },
+      field: 'last_audit_at',
+      allowNull: true
+    },
     auditedPublicIPAt: {
       comment: 'The last time, in sec since EPOCH, when the Node was publicly reachable over HTTP by Core.',
       type: Sequelize.INTEGER,

@@ -31,7 +31,10 @@ const coreCacheTransporters = requestify.coreCacheTransporters
 requestify.cacheTransporter(coreCacheTransporters.inMemory())
 
 // The frequency of the Node audit checks
-const AUDIT_NODES_INTERVAL_MS = 1000 * 60 * 30 // 30 minutes
+const AUDIT_NODES_INTERVAL_MS = 1000 * 60 // 1 minute
+
+// The age of the last successful audit before a new audit should be performed for a Node
+const AUDIT_NEEDED_AGE_MS = 1000 * 60 * 30 // 30 minutes
 
 // The frequency in which audit challenges are generated, in minutes
 const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
@@ -47,12 +50,26 @@ const requestAsync = promisify(request)
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
-  let nodes = await NodeRegistration.findAll({ where: { publicUri: { $ne: null } } })
+  let lastAuditCutoff = Date.now() - AUDIT_NEEDED_AGE_MS
+  let nodesReadyForAudit = await NodeRegistration.findAll(
+    {
+      where: {
+        $and: [
+          { publicUri: { $ne: null } },
+          {
+            $or: [
+              { lastAuditAt: null },
+              { lastAuditAt: { $lte: lastAuditCutoff } }
+            ]
+          }
+        ]
+      }
+    })
 
-  console.log(`${nodes.length} public Nodes were found`)
+  console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
 
   // iterate through each Node, requesting an answer to the challenge
-  for (let x = 0; x < nodes.length; x++) {
+  for (let x = 0; x < nodesReadyForAudit.length; x++) {
     let options = {
       headers: [
         {
@@ -61,7 +78,7 @@ async function auditNodesAsync () {
         }
       ],
       method: 'GET',
-      uri: `${nodes[x].publicUri}/config`,
+      uri: `${nodesReadyForAudit[x].publicUri}/config`,
       json: true,
       gzip: true
     }
@@ -72,19 +89,23 @@ async function auditNodesAsync () {
       coreAuditTimestamp = Date.now()
       nodeResponse = await requestAsync(options)
     } catch (error) {
-      console.error(`NodeAudit : GET failed with error ${error.message} for ${nodes[x].publicUri}`)
+      console.error(`NodeAudit : GET failed with error ${error.message} for ${nodesReadyForAudit[x].publicUri}`)
+      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       continue
     }
     if (nodeResponse.statusCode !== 200) {
-      console.error(`NodeAudit : GET failed with status code ${nodeResponse.statusCode} for ${nodes[x].publicUri}`)
+      console.error(`NodeAudit : GET failed with status code ${nodeResponse.statusCode} for ${nodesReadyForAudit[x].publicUri}`)
+      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       continue
     }
     if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
-      console.error(`NodeAudit : GET failed with missing audit response for ${nodes[x].publicUri}`)
+      console.error(`NodeAudit : GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
+      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       continue
     }
     if (!nodeResponse.body.time) {
-      console.error(`NodeAudit : GET failed with missing time for ${nodes[x].publicUri}`)
+      console.error(`NodeAudit : GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
+      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       continue
     }
 
@@ -93,7 +114,11 @@ async function auditNodesAsync () {
     let nodeAuditResponseSolution = nodeAuditResponseData[1]
     let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseTimestamp}`)
     let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
+
     let updateValues = {}
+
+    // update the last audit time
+    updateValues.lastAuditAt = coreAuditTimestamp
 
     // We've gotten this far, so at least auditedPublicIPAt has passed
     updateValues.auditedPublicIPAt = coreAuditTimestamp
@@ -110,10 +135,8 @@ async function auditNodesAsync () {
       updateValues.auditedCalStateAt = coreAuditTimestamp
     }
 
-    // update the Node audit results in NodeRegistration if there are new timestamps to record
-    if (Object.keys(updateValues).length > 0) {
-      await NodeRegistration.update(updateValues, { _id: nodes[x].id })
-    }
+    // update the Node audit results in NodeRegistration
+    await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
   }
 }
 
@@ -230,7 +253,6 @@ async function startIntervalsAsync () {
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
-    console.log(env.REDIS_CONNECT_URI)
     // init Redis
     openRedisConnection(env.REDIS_CONNECT_URI)
     // init DB
