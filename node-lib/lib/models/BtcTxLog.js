@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_btc_tx_log', desc: 'CockroachDB table name' }),
+  COCKROACH_BTC_TX_LOG_TABLE_NAME: envalid.str({ default: 'chainpoint_btc_tx_log', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -37,7 +37,7 @@ if (env.isProduction) {
 let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
 
 // Define the model and the table it will be stored in.
-var BtcTxLog = sequelize.define(env.COCKROACH_TABLE_NAME,
+var BtcTxLog = sequelize.define(env.COCKROACH_BTC_TX_LOG_TABLE_NAME,
   {
     txId: {
       comment: 'The bitcoin transaction id hash.',

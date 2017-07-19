@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_calendar_blockchain', desc: 'CockroachDB table name' }),
+  COCKROACH_CAL_TABLE_NAME: envalid.str({ default: 'chainpoint_calendar_blockchain', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -39,7 +39,7 @@ let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.
 // Define the model and the table it will be stored in.
 // See : Why don't we auto increment primary key automatically:
 //   https://www.cockroachlabs.com/docs/serial.html
-var CalendarBlock = sequelize.define(env.COCKROACH_TABLE_NAME,
+var CalendarBlock = sequelize.define(env.COCKROACH_CAL_TABLE_NAME,
   {
     id: {
       comment: 'Sequential monotonically incrementing Integer ID representing block height.',

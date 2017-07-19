@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_nodes', desc: 'CockroachDB table name' }),
+  COCKROACH_REG_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_nodes', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -36,7 +36,7 @@ if (env.isProduction) {
 
 let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
 
-var NodeRegistration = sequelize.define(env.COCKROACH_TABLE_NAME,
+var NodeRegistration = sequelize.define(env.COCKROACH_REG_TABLE_NAME,
   {
     tntAddr: {
       comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
