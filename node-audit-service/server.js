@@ -12,6 +12,12 @@ const MerkleTools = require('merkle-tools')
 const bluebird = require('bluebird')
 const request = require('request')
 
+// TweetNaCl.js
+// see: http://ed25519.cr.yp.to
+// see: https://github.com/dchest/tweetnacl-js#signatures
+const nacl = require('tweetnacl')
+nacl.util = require('tweetnacl-util')
+
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
 let redis = null
@@ -131,7 +137,11 @@ async function auditNodesAsync () {
     // check if the Node challenge solution is correct
     let coreChallengeSegments = coreAuditChallenge.split(':')
     let coreChallengeSolution = coreChallengeSegments.pop()
-    if (nodeAuditResponseSolution === coreChallengeSolution) {
+
+    nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+    coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
+
+    if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
       updateValues.auditedCalStateAt = coreAuditTimestamp
     }
 
