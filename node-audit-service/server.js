@@ -174,6 +174,7 @@ async function generateAuditChallengeAsync () {
       let max = height > 2000 ? height - 1000 : height
       let randomNum = await rnd(10, 1000)
       let min = max - randomNum
+      if (min < 0) min = 0
       let nonce = crypto.randomBytes(32).toString('hex')
 
       let challengeAnswer = await calculateChallengeAnswerAsync(min, max, nonce)
