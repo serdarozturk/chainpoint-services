@@ -685,7 +685,6 @@ describe('Config Controller', () => {
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
-          expect(res.body).to.have.property('chainpoint_stack_id').and.to.equal('test')
           expect(res.body).to.have.property('chainpoint_base_uri').and.to.equal('http://test.chainpoint.org')
           expect(res.body).to.have.property('anchor_btc')
           expect(res.body).to.have.property('anchor_eth')

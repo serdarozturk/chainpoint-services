@@ -30,7 +30,6 @@ async function getConfigInfoV1Async (req, res, next) {
   latestChallenge = challengeSegments.join(':')
 
   res.send({
-    chainpoint_stack_id: env.CHAINPOINT_STACK_ID,
     chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
     anchor_btc: env.ANCHOR_BTC,
     anchor_eth: env.ANCHOR_ETH,
