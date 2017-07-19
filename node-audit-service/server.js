@@ -145,6 +145,8 @@ async function auditNodesAsync () {
       updateValues.auditedCalStateAt = coreAuditTimestamp
     }
 
+    console.log(`Audit complete for ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(updateValues)}`)
+
     // update the Node audit results in NodeRegistration
     await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
   }
