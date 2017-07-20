@@ -24,7 +24,7 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
 let envDefinitions = {
   // The following variables are exposed by this stack's /config endpoint
   //
-  // CHAINPOINT_BASE_URI: Base URI for this Chainpoint stack of services
+  // CHAINPOINT_CORE_BASE_URI: Base URI for this Chainpoint Core stack of services
   // ANCHOR_BTC: flag for enabling and disabling BTC anchoring
   // ANCHOR_ETH: flag for enabling and disabling ETH anchoring
   // PROOF_EXPIRE_MINUTES: The lifespan of stored proofs, in minutes
@@ -148,10 +148,10 @@ module.exports = (service) => {
   // Load and validate service specific require variables as needed
   switch (service) {
     case 'api':
-      envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
+      envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
       break
     case 'cal':
-      envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
+      envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
       envDefinitions.SIGNING_SECRET_KEY = envalid.str({ desc: 'A Base64 encoded NaCl secret signing key' })
       break
     case 'btc-mon':
@@ -160,7 +160,7 @@ module.exports = (service) => {
       envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
       break
     case 'btc-tx':
-      envDefinitions.CHAINPOINT_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint stack of services' })
+      envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
       envDefinitions.BCOIN_API_WALLET_ID = envalid.str({ desc: 'The wallet Id to be used' })
       envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })
       envDefinitions.BCOIN_API_USERNAME = envalid.str({ desc: 'The API username for the Bcoin instance' })

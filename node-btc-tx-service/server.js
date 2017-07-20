@@ -36,7 +36,7 @@ let logBtcTxDataAsync = async (txObj) => {
   row.inputAddress = txObj.inputs[0].address
   row.outputAddress = txObj.outputs[1].address
   row.balanceBtc = parseFloat(txObj.outputs[1].value)
-  row.stackId = env.CHAINPOINT_BASE_URI
+  row.stackId = env.CHAINPOINT_CORE_BASE_URI
 
   try {
     let newRow = await BtcTxLog.create(row)

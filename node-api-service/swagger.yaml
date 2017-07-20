@@ -445,7 +445,7 @@ definitions:
   GetConfigResponse:
     type: object
     properties:       
-      chainpoint_base_uri:
+      chainpoint_core_base_uri:
         type: string
         example: https://a.prod.server.com
       anchor_btc:

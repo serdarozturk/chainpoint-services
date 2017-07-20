@@ -38,7 +38,7 @@ async function getConfigInfoV1Async (req, res, next) {
     }
 
     result = {
-      chainpoint_base_uri: env.CHAINPOINT_BASE_URI,
+      chainpoint_core_base_uri: env.CHAINPOINT_CORE_BASE_URI,
       anchor_btc: env.ANCHOR_BTC,
       anchor_eth: env.ANCHOR_ETH,
       proof_expire_minutes: env.PROOF_EXPIRE_MINUTES,

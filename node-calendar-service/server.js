@@ -91,7 +91,7 @@ let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyNa
   b.id = height
   b.time = Math.trunc(Date.now() / 1000)
   b.version = 1
-  b.stackId = env.CHAINPOINT_BASE_URI
+  b.stackId = env.CHAINPOINT_CORE_BASE_URI
   b.type = type
   b.dataId = dataId
   b.dataVal = dataVal
@@ -392,8 +392,8 @@ let persistCalendarTreeAsync = async (treeDataObj) => {
         stateObj.cal_state.ops.push({ r: block.prevHash })
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
-        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
-        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
+        // Build the anchors uris using the locations configured in CHAINPOINT_CORE_BASE_URI
+        let BASE_URIS = [env.CHAINPOINT_CORE_BASE_URI]
         let uris = []
         for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/hash`)
         stateObj.cal_state.anchor = {
@@ -723,8 +723,8 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
           stateObj.btchead_state = {}
           stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
 
-          // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
-          let BASE_URIS = [env.CHAINPOINT_BASE_URI]
+          // Build the anchors uris using the locations configured in CHAINPOINT_CORE_BASE_URI
+          let BASE_URIS = [env.CHAINPOINT_CORE_BASE_URI]
           let uris = []
           for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/data`)
           stateObj.btchead_state.anchor = {

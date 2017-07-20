@@ -64,7 +64,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
@@ -83,7 +83,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: test
-      CHAINPOINT_BASE_URI: http://test.chainpoint.org
+      CHAINPOINT_CORE_BASE_URI: http://test.chainpoint.org
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
@@ -193,7 +193,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       SIGNING_SECRET_KEY: ${SIGNING_SECRET_KEY}
@@ -237,7 +237,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
       BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
       BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
