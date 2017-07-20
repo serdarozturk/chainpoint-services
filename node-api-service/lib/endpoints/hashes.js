@@ -6,10 +6,16 @@ const utils = require('../utils.js')
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
+const uuidTime = require('uuid-time')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
+
+// The latest NIST data
+// This value is updated from consul events as changes are detected
+let nistLatest = null
+let nistLatestEpoch = null
 
 /**
  * Generate the values for the 'meta' property in a POST /hashes response.
@@ -107,6 +113,16 @@ function postHashesV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid hashes present'))
   }
 
+  // if NIST value is present, ensure NTP time is ahead of latest NIST value
+  if (nistLatest) {
+    let newUUIDEpoch = uuidTime.v1(uuidv1())
+    if (newUUIDEpoch < nistLatestEpoch) {
+      // this shoud not occur, log and return error to initiate retry
+      console.error(`Bad UUID time generated : NTP ${newUUIDEpoch} < NIST ${nistLatestEpoch}`)
+      return next(new restify.InternalServerError('Bad UUID time'))
+    }
+  }
+
   let responseObj = generatePostHashesResponse(req.params.hashes)
 
   // AMQP / RabbitMQ
@@ -129,8 +145,26 @@ function postHashesV1 (req, res, next) {
   return next()
 }
 
+function updateNistVars (nistValue) {
+  try {
+    let nistTimestampString = nistValue.split(':')[0].toString()
+    let nistTimestampInt = parseInt(nistTimestampString) // epoch in seconds
+    if (!nistTimestampInt) throw new Error()
+    let nistDate = new Date(nistTimestampInt * 1000) // multiple x 1000 to get ms
+    nistLatest = nistValue
+    nistLatestEpoch = nistDate.getTime()
+  } catch (error) {
+    // the nist value being set must be bad, disable UUID / NIST validation until valid value is received
+    console.error('Bad NIST time encountered, skipping UUID > NIST validation')
+    nistLatest = null
+    nistLatestEpoch = null
+  }
+}
+
 module.exports = {
   postHashesV1: postHashesV1,
   generatePostHashesResponse: generatePostHashesResponse,
-  setAMQPChannel: (chan) => { amqpChannel = chan }
+  setAMQPChannel: (chan) => { amqpChannel = chan },
+  getNistLatest: () => { return nistLatest },
+  setNistLatest: (val) => { updateNistVars(val) }
 }

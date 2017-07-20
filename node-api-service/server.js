@@ -19,6 +19,7 @@ const subscribe = require('./lib/endpoints/subscribe.js')
 const root = require('./lib/endpoints/root.js')
 const r = require('redis')
 const bluebird = require('bluebird')
+const cnsl = require('consul')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -45,6 +46,8 @@ let server = restify.createServer({
   name: 'chainpoint',
   version: '1.0.0'
 })
+
+let consul = null
 
 // Create a WS server to run in association with the Restify server
 let webSocketServer = new webSocket.Server({ server: server.server })
@@ -275,6 +278,26 @@ function openRedisConnection (redisURI) {
   })
 }
 
+// This initalizes all the consul watches
+function startWatches () {
+  console.log('starting watches')
+
+  // Continuous watch on the consul key holding the NIST object.
+  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
+
+  // Store the updated fee object on change
+  nistWatch.on('change', function (data, res) {
+    // process only if a value has been returned and it is different than what is already stored
+    if (data && data.Value && hashes.getNistLatest() !== data.Value) {
+      hashes.setNistLatest(data.Value)
+    }
+  })
+
+  nistWatch.on('error', function (err) {
+    console.error('nistWatch error: ', err)
+  })
+}
+
 // Instruct REST server to begin listening for request
 function listenRestify (callback) {
   server.listen(8080, (err) => {
@@ -290,12 +313,17 @@ let listenRestifyAsync = promisify(listenRestify)
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
+    // init consul
+    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
     // init Redis
     openRedisConnection(env.REDIS_CONNECT_URI)
     // init DB
     await openStorageConnectionAsync()
     // init RabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    // init watches
+    startWatches()
     // Init Restify
     await listenRestifyAsync()
     console.log('startup completed successfully')
@@ -315,6 +343,7 @@ module.exports = {
     amqpChannel = chan
     hashes.setAMQPChannel(chan)
   },
+  setNistLatest: (val) => { hashes.setNistLatest(val) },
   server: server,
   config: config
 }

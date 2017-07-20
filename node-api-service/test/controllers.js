@@ -306,10 +306,34 @@ describe('Hashes Controller', () => {
         })
     })
 
+    it('should return proper error with UUID < NIST value', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+      app.setNistLatest('3000585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      request(server)
+        .post('/hashes')
+        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .expect('Content-type', /json/)
+        .expect(500)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InternalServerError')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('Bad UUID time')
+          done()
+        })
+    })
+
     it('should return proper result with on valid call', (done) => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+
       request(server)
         .post('/hashes')
         .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
