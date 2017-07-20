@@ -116,9 +116,9 @@ async function auditNodesAsync () {
     }
 
     let nodeAuditResponseData = nodeResponse.body.calendar.audit_response.split(':')
-    let nodeAuditResponseTimestamp = nodeAuditResponseData[0]
+    let nodeAuditResponseCoreChallengeCreateTimestamp = nodeAuditResponseData[0]
     let nodeAuditResponseSolution = nodeAuditResponseData[1]
-    let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseTimestamp}`)
+    let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}`)
     let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
 
     let updateValues = {}
