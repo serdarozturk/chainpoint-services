@@ -113,7 +113,7 @@ function postHashesV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid hashes present'))
   }
 
-  // if NIST value is present, ensure NTP time is ahead of latest NIST value
+  // if NIST value is present, ensure NTP time is >= latest NIST value
   if (nistLatest) {
     let newUUIDEpoch = uuidTime.v1(uuidv1())
     if (newUUIDEpoch < nistLatestEpoch) {
