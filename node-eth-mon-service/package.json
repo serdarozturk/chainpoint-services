@@ -12,7 +12,8 @@
     "transferTokens": "node ./scripts/transferTokens.js",
     "getBalance": "node ./scripts/getBalance.js",
     "watchTransfers": "node ./scripts/watchTransfers.js",
-    "build": "truffle compile"
+    "build": "truffle compile",
+    "migrate": "truffle migrate"
   },
   "author": "",
   "license": "ISC",
