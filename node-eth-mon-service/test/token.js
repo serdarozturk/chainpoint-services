@@ -1,9 +1,9 @@
 /* global artifacts, contract, it, assert */
-var TheTestToken = artifacts.require('./TheTestToken.sol')
+var BCAPTestToken = artifacts.require('./BCAPTestToken.sol')
 
-contract('TheTestToken', (accounts) => {
+contract('BCAPTestToken', (accounts) => {
   it('should deploy', () => {
-    return TheTestToken.deployed()
+    return BCAPTestToken.deployed()
     .then((instance) => {
       assert.notEqual(instance, null, 'Instance should not be null')
     })
