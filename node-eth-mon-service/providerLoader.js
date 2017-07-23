@@ -16,6 +16,10 @@ module.exports = (wallet) => {
   var engine = new ProviderEngine()
   engine.addProvider(new WalletSubprovider(wallet, {}))
   engine.addProvider(new Web3Subprovider(new Web3.providers.HttpProvider(nodeUri)))
-  engine.start() // Required by the provider engine.
+
+  // Only start this if we are running in testnet - otherwise it holds the main thread open
+  if(process.env.NETWORK == 'roptsten'){
+    engine.start() // Required by the provider engine.
+  }
   return engine
 }
