@@ -1,6 +1,7 @@
 require('dotenv').config()
-var loadToken = require('../tokenLoader.js')
-var TokenOps = require('../tokenOps.js')
+const loadProvider = require('../loaders/providerLoader.js')
+const loadToken = require('../loaders/tokenLoader.js')
+const TokenOps = require('../tokenOps.js')
 
 // Verify the correct command line options are passed in
 if (process.argv.length !== 4) {
@@ -9,8 +10,10 @@ if (process.argv.length !== 4) {
   process.exit(-1)
 }
 
-// Load the token contract and create the TokenOps class
-let ops = new TokenOps(loadToken())
+// Load the provider, token contract, and create the TokenOps class
+let web3Provider = loadProvider(process.env.ETH_PROVIDER_URI)
+let tokenContract = loadToken(web3Provider, process.env.ETH_TNT_TOKEN_ADDR)
+let ops = new TokenOps(tokenContract)
 
 ops.sendTokens(process.argv[2], parseInt(process.argv[3]), (error, res) => {
   // Check for error
