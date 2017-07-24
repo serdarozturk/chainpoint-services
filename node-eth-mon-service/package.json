@@ -7,8 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "./node_modules/mocha/bin/mocha **/*.spec.js",
-    "generateWallet": "node ./scripts/walletGenerator.js",
+    "test": "truffle test; ./node_modules/mocha/bin/mocha **/*.spec.js",
     "transferTokens": "node ./scripts/transferTokens.js",
     "getBalance": "node ./scripts/getBalance.js",
     "watchTransfers": "node ./scripts/watchTransfers.js",
