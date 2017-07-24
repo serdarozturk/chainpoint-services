@@ -152,6 +152,10 @@ module.exports = (service) => {
       envDefinitions.INSIGHT_API_BASE_URI = envalid.url({ desc: 'The Bitcore Insight-API base URI' })
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
+    case 'eth-mon':
+      envDefinitions.ETH_PROVIDER_URI = envalid.url({ desc: 'URI to the ETH node provider.' })
+      envDefinitions.ETH_TNT_TOKEN_ADDR = envalid.str({ desc: 'The address of the TNT token contract to be used' })
+      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ desc: 'The address used to listen for incoming TNT transfers' })
   }
   return envalid.cleanEnv(process.env, envDefinitions, {
     strict: true
