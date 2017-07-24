@@ -10,7 +10,7 @@ module.exports = (provider, tokenAddr) => {
   let web3 = new Web3(provider)
 
   // Set the default "from" account to the accounts
-  web3.eth.defaultAccount = web3.accounts[0]
+  web3.eth.defaultAccount = web3.eth.accounts[0]
 
   // First check to see the Token Address is set as an env var
   if (!tokenAddr) {
@@ -18,8 +18,10 @@ module.exports = (provider, tokenAddr) => {
     process.exit(-1)
   }
 
+  console.log('Using token addr: ' + tokenAddr)
+
   // Load the ABI for the contract and initialize a contract interface
-  let tokenABI = require('./build/contracts/BCAPTestToken.json').abi
+  let tokenABI = require('../build/contracts/BCAPTestToken.json').abi
   let tokenDefinition = web3.eth.contract(tokenABI)
 
   // Set the actual instance from the address on the blockchain, so we can communicate with it.

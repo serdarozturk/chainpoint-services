@@ -1,6 +1,6 @@
 require('dotenv').config()
-var loadWallet = require('./walletLoader.js')
-var loadProvider = require('./providerLoader.js')
+var loadWallet = require('./loaders/walletLoader.js')
+var loadProvider = require('./loaders/providerLoader.js')
 
 // Read the wallet in from the file
 let wallet = loadWallet()

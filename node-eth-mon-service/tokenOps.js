@@ -26,6 +26,8 @@ class TokenOps {
    * Listener function that will invoke callback whenever a new transaction is found.
    * It will trigger any events from blockstart onwards (pass 0 to see all events in the history of the blockchain.)
    *
+   * returns the event object so watch can be canceled with event.stopWatching()
+   *
    * @param {*} listenAddr - address to listen for incoming transfers
    * @param {*} blockStart - block to start listening from
    * @param {*} callback - callback invoked whenever a new transfer is recieved to listenAddr

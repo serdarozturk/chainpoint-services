@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_REG_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_nodes', desc: 'CockroachDB table name' }),
+  COCKROACH_ETH_TX_LOG_TABLE_NAME: envalid.str({ default: 'chainpoint_eth_tx_log', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -36,79 +36,55 @@ if (env.isProduction) {
 
 let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
 
-var NodeRegistration = sequelize.define(env.COCKROACH_REG_TABLE_NAME,
+// Define the model and the table it will be stored in.
+var EthTokenLog = sequelize.define(env.COCKROACH_ETH_TX_LOG_TABLE_NAME,
   {
-    tntAddr: {
-      comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
+    txId: {
+      comment: 'The ethereum transaction id hash.',
+      primaryKey: true,
       type: Sequelize.STRING,
       validate: {
-        is: ['^(0x)?[0-9a-fA-F]{40}$', 'i']
+        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
       },
-      field: 'tnt_addr',
-      allowNull: false,
-      unique: true,
-      primaryKey: true
-    },
-    publicUri: {
-      comment: 'The public URI address of a Node, when blank represents a non-public Node.',
-      type: Sequelize.STRING,
-      validate: {
-        isUrl: true
-      },
-      field: 'public_uri',
-      allowNull: true
-    },
-    hmacKey: {
-      comment: 'The HMAC secret for this Node. Needed for Node data updates.',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[a-f0-9]{64}$', 'i']
-      },
-      field: 'hmac_key',
+      field: 'tx_id',
       allowNull: false,
       unique: true
     },
-    lastAuditAt: {
-      comment: 'The last time an audit was performed for this Node, in sec since EPOCH.',
+    transactionIndex: {
+      comment: 'Integer of the transactions index position log was created from',
       type: Sequelize.INTEGER,
       validate: {
         isInt: true
       },
-      field: 'last_audit_at',
-      allowNull: true
+      field: 'tx_index',
+      allowNull: false
     },
-    auditedPublicIPAt: {
-      comment: 'The last time, in sec since EPOCH, when the Node was publicly reachable over HTTP by Core.',
+    blockNumber: {
+      comment: 'Block number where this log was in',
       type: Sequelize.INTEGER,
       validate: {
         isInt: true
       },
-      field: 'audited_public_ip_at',
-      allowNull: true
+      field: 'tx_block',
+      allowNull: false
     },
-    auditedTimeAt: {
-      comment: 'The last time, in sec since EPOCH, when the Node reported time was verified to be in tolerance by Core.',
-      type: Sequelize.INTEGER,
-      validate: {
-        isInt: true
-      },
-      field: 'audited_cal_block_at',
-      allowNull: true
+    fromAddress: {
+      comment: 'The ethereum address where tokens were transferred from',
+      type: Sequelize.STRING,
+      field: 'from_address',
+      allowNull: false
     },
-    auditedCalStateAt: {
-      comment: 'The last time, in sec since EPOCH, when the Node Calendar was verified by Core.',
-      type: Sequelize.INTEGER,
-      validate: {
-        isInt: true
-      },
-      field: 'audited_cal_block_at',
-      allowNull: true
+    toAddress: {
+      comment: 'The ethereum address where tokens were transferred to',
+      type: Sequelize.STRING,
+      field: 'to_address',
+      allowNull: false
     },
-    tntCredit: {
-      comment: 'The balance of token credit they have against their address.',
+    amount: {
+      comment: 'The amount of TNT tokens sent in the transaction - in base units',
       type: Sequelize.BIGINT,
-      field: 'tnt_credit',
-      defaultValue: 0
+      field: 'amount',
+      allowNull: false
     }
   },
   {
@@ -121,5 +97,5 @@ var NodeRegistration = sequelize.define(env.COCKROACH_REG_TABLE_NAME,
 
 module.exports = {
   sequelize: sequelize,
-  NodeRegistration: NodeRegistration
+  EthTokenLog: EthTokenLog
 }
