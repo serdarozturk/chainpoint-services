@@ -56,23 +56,28 @@ const requestAsync = promisify(request)
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
-  let lastAuditCutoff = Date.now() - AUDIT_NEEDED_AGE_MS
-  let nodesReadyForAudit = await NodeRegistration.findAll(
-    {
-      where: {
-        $and: [
-          { publicUri: { $ne: null } },
-          {
-            $or: [
-              { lastAuditAt: null },
-              { lastAuditAt: { $lte: lastAuditCutoff } }
-            ]
-          }
-        ]
-      }
-    })
+  let nodesReadyForAudit = []
+  try {
+    let lastAuditCutoff = Date.now() - AUDIT_NEEDED_AGE_MS
+    nodesReadyForAudit = await NodeRegistration.findAll(
+      {
+        where: {
+          $and: [
+            { publicUri: { $ne: null } },
+            {
+              $or: [
+                { lastAuditAt: null },
+                { lastAuditAt: { $lte: lastAuditCutoff } }
+              ]
+            }
+          ]
+        }
+      })
 
-  console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
+    console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
+  } catch (error) {
+    console.error(`Could not retrieve public Node list : ${error.message}`)
+  }
 
   // iterate through each Node, requesting an answer to the challenge
   for (let x = 0; x < nodesReadyForAudit.length; x++) {
@@ -95,60 +100,78 @@ async function auditNodesAsync () {
       coreAuditTimestamp = Date.now()
       nodeResponse = await requestAsync(options)
     } catch (error) {
-      console.error(`NodeAudit : GET failed with error ${error.message} for ${nodesReadyForAudit[x].publicUri}`)
-      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-      continue
-    }
-    if (nodeResponse.statusCode !== 200) {
-      console.error(`NodeAudit : GET failed with status code ${nodeResponse.statusCode} for ${nodesReadyForAudit[x].publicUri}`)
-      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      if (error.statusCode !== 200) {
+        console.error(`NodeAudit : GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}`)
+      } else {
+        console.error(`NodeAudit : GET failed with error ${error.message} for ${nodesReadyForAudit[x].publicUri}`)
+      }
+      try {
+        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      } catch (error) {
+        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+      }
       continue
     }
     if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
       console.error(`NodeAudit : GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
-      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      try {
+        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      } catch (error) {
+        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+      }
       continue
     }
     if (!nodeResponse.body.time) {
       console.error(`NodeAudit : GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
-      await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      try {
+        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      } catch (error) {
+        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+      }
       continue
     }
 
-    let nodeAuditResponseData = nodeResponse.body.calendar.audit_response.split(':')
-    let nodeAuditResponseCoreChallengeCreateTimestamp = nodeAuditResponseData[0]
-    let nodeAuditResponseSolution = nodeAuditResponseData[1]
-    let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}`)
-    let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
-
     let updateValues = {}
+    try {
+      let nodeAuditResponseData = nodeResponse.body.calendar.audit_response.split(':')
+      let nodeAuditResponseCoreChallengeCreateTimestamp = nodeAuditResponseData[0]
+      let nodeAuditResponseSolution = nodeAuditResponseData[1]
+      let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}`)
+      let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
 
-    // update the last audit time
-    updateValues.lastAuditAt = coreAuditTimestamp
+      // update the last audit time
+      updateValues.lastAuditAt = coreAuditTimestamp
 
-    // We've gotten this far, so at least auditedPublicIPAt has passed
-    updateValues.auditedPublicIPAt = coreAuditTimestamp
+      // We've gotten this far, so at least auditedPublicIPAt has passed
+      updateValues.auditedPublicIPAt = coreAuditTimestamp
 
-    // check if the Node timestamp is withing the acceptable range
-    if (Math.abs(nodeAuditTimestamp - coreAuditTimestamp) <= ACCEPTABLE_DELTA_MS) {
-      updateValues.auditedTimeAt = coreAuditTimestamp
+      // check if the Node timestamp is withing the acceptable range
+      if (Math.abs(nodeAuditTimestamp - coreAuditTimestamp) <= ACCEPTABLE_DELTA_MS) {
+        updateValues.auditedTimeAt = coreAuditTimestamp
+      }
+
+      // check if the Node challenge solution is correct
+      let coreChallengeSegments = coreAuditChallenge.split(':')
+      let coreChallengeSolution = coreChallengeSegments.pop()
+
+      nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+      coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
+
+      if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
+        updateValues.auditedCalStateAt = coreAuditTimestamp
+      }
+
+      console.log(`Audit complete for ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(updateValues)}`)
+    } catch (error) {
+      console.error(`NodeAudit : Could not process audit for ${nodesReadyForAudit[x].publicUri} : ${error.message}`)
     }
-
-    // check if the Node challenge solution is correct
-    let coreChallengeSegments = coreAuditChallenge.split(':')
-    let coreChallengeSolution = coreChallengeSegments.pop()
-
-    nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
-    coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
-
-    if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-      updateValues.auditedCalStateAt = coreAuditTimestamp
-    }
-
-    console.log(`Audit complete for ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(updateValues)}`)
 
     // update the Node audit results in NodeRegistration
-    await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+    try {
+      await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+    } catch (error) {
+      console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after audit`)
+    }
   }
 }
 
