@@ -1,7 +1,7 @@
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('audit')
 
-const { promisify } = require('util')
+const rp = require('request-promise-native')
 const nodeRegistration = require('./lib/models/NodeRegistration.js')
 const utils = require('./lib/utils.js')
 const r = require('redis')
@@ -10,7 +10,6 @@ const crypto = require('crypto')
 const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
 const bluebird = require('bluebird')
-const request = require('request')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -51,9 +50,6 @@ const CHALLENGE_EXPIRE_MINUTES = 75
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
 const ACCEPTABLE_DELTA_MS = 2000 // 2 seconds
 
-// create an async version of the request library
-const requestAsync = promisify(request)
-
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
   let nodesReadyForAudit = []
@@ -91,14 +87,15 @@ async function auditNodesAsync () {
       method: 'GET',
       uri: `${nodesReadyForAudit[x].publicUri}/config`,
       json: true,
-      gzip: true
+      gzip: true,
+      resolveWithFullResponse: true
     }
 
     let coreAuditTimestamp
     let nodeResponse
     try {
       coreAuditTimestamp = Date.now()
-      nodeResponse = await requestAsync(options)
+      nodeResponse = await rp(options)
     } catch (error) {
       if (error.statusCode !== 200) {
         console.error(`NodeAudit : GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}`)
@@ -161,16 +158,16 @@ async function auditNodesAsync () {
         updateValues.auditedCalStateAt = coreAuditTimestamp
       }
 
+      // update the Node audit results in NodeRegistration
+      try {
+        await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      } catch (error) {
+        throw new Error(`Could not update Node registration`)
+      }
+
       console.log(`Audit complete for ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(updateValues)}`)
     } catch (error) {
       console.error(`NodeAudit : Could not process audit for ${nodesReadyForAudit[x].publicUri} : ${error.message}`)
-    }
-
-    // update the Node audit results in NodeRegistration
-    try {
-      await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-    } catch (error) {
-      console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after audit`)
     }
   }
 }
