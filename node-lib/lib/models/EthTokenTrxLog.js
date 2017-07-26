@@ -43,9 +43,6 @@ var EthTokenLog = sequelize.define(env.COCKROACH_ETH_TX_LOG_TABLE_NAME,
       comment: 'The ethereum transaction id hash.',
       primaryKey: true,
       type: Sequelize.STRING,
-      validate: {
-        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
-      },
       field: 'tx_id',
       allowNull: false,
       unique: true

@@ -123,7 +123,7 @@ services:
 
   # NIST Beacon
   # Retrieve and store current NIST Beacon records
-  # 
+  #
   # SCALED: false
   #
   # PORTS : none
@@ -169,7 +169,7 @@ services:
 
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
-  # 
+  #
   btc-tx:
     restart: always
     image: quay.io/chainpoint/node-btc-tx-service:${DOCKER_TAG}
@@ -205,9 +205,31 @@ services:
       NODE_ENV: development
       INSIGHT_API_BASE_URI: ${INSIGHT_API_BASE_URI}
 
+  # Ethereum TNT Transer Monitor
+  # Monitor and report on the state of TNT tokens.
+  #
+  eth-mon:
+    restart: always
+    image: quay.io/chainpoint/node-eth-mon-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-mon-service
+    container_name: btc-eth-core
+    depends_on:
+      - testrpc
+      - roach1
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      ETH_TNT_LISTEN_ADDR: ${ETH_TNT_LISTEN_ADDR}
+    command: npm run dev
+    volumes:
+    - ./node-eth-mon-service/scripts:/home/node/app/scripts
+    - ./node-eth-mon-service/loaders:/home/node/app/loaders
+
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
-  # 
+  #
   proof-state:
     restart: always
     image: quay.io/chainpoint/node-proof-state-service:${DOCKER_TAG}
@@ -226,7 +248,7 @@ services:
   # Proof Generation
   # Responsible for constructing, signing, and validating Chainpoint proofs
   # for Calendar, Bitcoin, and Ethereum attestation levels.
-  # 
+  #
   proof-gen:
     restart: always
     image: quay.io/chainpoint/node-proof-gen-service:${DOCKER_TAG}
@@ -358,3 +380,14 @@ services:
       - --insecure
     networks:
       - chainpoint
+
+testrpc:
+  image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+  build:
+    context: ./testrpc
+  container_name: testrpc-core
+  restart: unless-stopped
+  ports:
+    - "8545:8545" # RPC
+  networks:
+    - chainpoint

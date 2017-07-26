@@ -101,6 +101,29 @@ builds:
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
 
+  testrpc:
+    context: testrpc
+    dockerfile: Dockerfile
+    pushes:
+      - 'on_tag=quay.io/chainpoint/testrpc:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/testrpc:latest'
+      - 'on_branch:master=quay.io/chainpoint/testrpc:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-eth-mon-service:
+    context: node-eth-mon-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-eth-mon-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-mon-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-mon-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
   node-btc-tx-service:
     context: node-btc-tx-service
     dockerfile: Dockerfile
