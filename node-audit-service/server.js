@@ -148,14 +148,18 @@ async function auditNodesAsync () {
       }
 
       // check if the Node challenge solution is correct
-      let coreChallengeSegments = coreAuditChallenge.split(':')
-      let coreChallengeSolution = coreChallengeSegments.pop()
+      if (coreAuditChallenge) {
+        let coreChallengeSegments = coreAuditChallenge.split(':')
+        let coreChallengeSolution = coreChallengeSegments.pop()
 
-      nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
-      coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
+        nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+        coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
 
-      if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-        updateValues.auditedCalStateAt = coreAuditTimestamp
+        if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
+          updateValues.auditedCalStateAt = coreAuditTimestamp
+        }
+      } else {
+        console.error(`NodeAudit : No challenge data found for key 'calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}'`)
       }
 
       // update the Node audit results in NodeRegistration
