@@ -12,17 +12,23 @@ if (process.argv.length !== 4) {
 
 // Load the provider, token contract, and create the TokenOps class
 let web3Provider = loadProvider(process.env.ETH_PROVIDER_URI)
-let tokenContract = loadToken(web3Provider, process.env.ETH_TNT_TOKEN_ADDR)
-let ops = new TokenOps(tokenContract)
+loadToken(web3Provider, process.env.ETH_TNT_TOKEN_ADDR).then((tokenContract) => {
+  let ops = new TokenOps(tokenContract)
 
-ops.sendTokens(process.argv[2], parseInt(process.argv[3]), (error, res) => {
-  // Check for error
-  if (error) {
-    console.log(error)
-    process.exit(-1)
-  }
+  let toAddr = process.argv[2]
+  let amt = parseInt(process.argv[3])
 
-  console.log('Tokens have been transferred')
-  console.log('Transaction: ' + res)
-  process.exit()
+  console.log('Sending ' + amt + ' TNT to: ' + toAddr)
+
+  ops.sendTokens(toAddr, amt, (error, res) => {
+    // Check for error
+    if (error) {
+      console.log(error)
+      process.exit(-1)
+    }
+
+    console.log('Tokens have been transferred')
+    console.log('Transaction: ' + res)
+    process.exit()
+  })
 })

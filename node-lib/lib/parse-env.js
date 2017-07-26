@@ -167,8 +167,9 @@ module.exports = (service) => {
       envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
       break
     case 'eth-mon':
-      envDefinitions.ETH_PROVIDER_URI = envalid.url({ desc: 'URI to the ETH node provider.' })
-      envDefinitions.ETH_TNT_TOKEN_ADDR = envalid.str({ desc: 'The address of the TNT token contract to be used' })
+      envDefinitions.ETH_PROVIDER_URI = envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' })
+      envDefinitions.ETH_PROVIDER_HOST = envalid.str({ default: 'testrpc', desc: 'Host name of the ETH provider.' })
+      envDefinitions.ETH_PROVIDER_PORT = envalid.num({ default: 8545, desc: 'Port of the ETH provider.' })
       envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ desc: 'The address used to listen for incoming TNT transfers' })
   }
   return envalid.cleanEnv(process.env, envDefinitions, {

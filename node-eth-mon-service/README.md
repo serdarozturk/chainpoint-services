@@ -56,3 +56,19 @@ You will see events printed to the screen:
 ```
 Transfer occurred on Block 5 From: 0xfa55ebf21a12a414c7c37c641dd745638aaf5d86 To: 0x6a6d86907817db62e317bb21367f20e3802fbb66 AMT: 1000
 ```
+
+## REST API
+
+```
+curl http://localhost:8085/balance/0x6a6d86907817db62e317bb21367f20e3802fbb66
+```
+
+
+
+```
+curl -X POST \
+  http://localhost:8085/transfer \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/json' \
+  -d '{ "to_addr": "0x6a6d86907817db62e317bb21367f20e3802fbb66", "value": "10000"}'
+```

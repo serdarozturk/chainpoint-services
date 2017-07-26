@@ -12,4 +12,6 @@ RUN mkdir -p /root/testrpc \
     && npm install \
     && npm uninstall node-gyp
 
-CMD ["node", "/root/testrpc/build/cli.node.js"]
+EXPOSE 8545
+
+CMD ["node", "/root/testrpc/build/cli.node.js", "-h", "0.0.0.0"]

@@ -1,6 +1,5 @@
 var Web3 = require('web3')
 const contract = require('truffle-contract')
-const TokenContract = require('../build/contracts/BCAPTestToken.json')
 /*
  * This function will load the BCAP token ABI from the build directory and initialize
  * it so that it can be used to interact with the blockchain. It will use env variable
@@ -29,7 +28,8 @@ module.exports = async (provider, tokenAddr) => {
   }
 
   // If the env var was not set, see if the token definition has been deployed.
-  const token = contract(TokenContract)
+  const token = contract(tokenDef)
+  token.setProvider(provider)
   let deployedToken = await token.deployed()
 
   // Didn't find it there either... bail out
@@ -38,6 +38,8 @@ module.exports = async (provider, tokenAddr) => {
     process.exit(-1)
   }
 
-  // Return the deployed instance
-  return deployedToken
+  // Dumb workaround for bug - https://github.com/ethereum/web3.js/issues/925
+  let tokenABI = tokenDef.abi
+  let tokenDefinition = web3.eth.contract(tokenABI)
+  return tokenDefinition.at(deployedToken.address)
 }

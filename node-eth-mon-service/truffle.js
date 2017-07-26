@@ -1,4 +1,4 @@
-require('dotenv').config()
+const env = require('./lib/parse-env.js')('eth-mon')
 
 /**
  * This export is used by various truffle scripts to determine how to connect to different ETH networks.
@@ -7,8 +7,8 @@ require('dotenv').config()
 module.exports = {
   networks: {
     development: {
-      host: 'localhost',
-      port: 8545,
+      host: env.ETH_PROVIDER_HOST,
+      port: env.ETH_PROVIDER_PORT,
       network_id: '*' // Match any network id
     }
   }

@@ -12,19 +12,20 @@ if (process.argv.length !== 4) {
 
 // Load the provider, token contract, and create the TokenOps class
 let web3Provider = loadProvider(process.env.ETH_PROVIDER_URI)
-let tokenContract = loadToken(web3Provider, process.env.ETH_TNT_TOKEN_ADDR)
-let ops = new TokenOps(tokenContract)
+loadToken(web3Provider, process.env.ETH_TNT_TOKEN_ADDR).then((tokenContract) => {
+  let ops = new TokenOps(tokenContract)
 
-console.log('Listening for transfers to ' + process.argv[2] + ' starting from block ' + parseInt(process.argv[3]) + '\n')
+  console.log('Listening for transfers to ' + process.argv[2] + ' starting from block ' + parseInt(process.argv[3]) + '\n')
 
-// Start listening
-ops.watchForTransfers(process.argv[2], parseInt(process.argv[3]), (error, params) => {
-  // Check for error
-  if (error) {
-    console.error(error)
-    process.exit(-1)
-  }
+  // Start listening
+  ops.watchForTransfers(process.argv[2], parseInt(process.argv[3]), (error, params) => {
+    // Check for error
+    if (error) {
+      console.error(error)
+      process.exit(-1)
+    }
 
-  // For demo, we will just print out the event
-  console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args._from + ' To: ' + params.args._to + ' AMT: ' + params.args._value)
+    // For demo, we will just print out the event
+    console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args._from + ' To: ' + params.args._to + ' AMT: ' + params.args._value)
+  })
 })
