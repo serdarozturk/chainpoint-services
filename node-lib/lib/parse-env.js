@@ -154,9 +154,9 @@ module.exports = (service) => {
       break
     case 'eth-mon':
       envDefinitions.ETH_PROVIDER_URI = envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' })
-      envDefinitions.ETH_PROVIDER_HOST = envalid.str({ default: 'testrpc', desc: 'Host name of the ETH provider.' })
-      envDefinitions.ETH_PROVIDER_PORT = envalid.num({ default: 8545, desc: 'Port of the ETH provider.' })
-      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ desc: 'The address used to listen for incoming TNT transfers' })
+      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ default: '0x0', desc: 'The address used to listen for incoming TNT transfers' })
+      envDefinitions.LISTEN_TX_PORT = envalid.num({ default: 8085, desc: 'Port of the ETH provider.' })
+      break
   }
   return envalid.cleanEnv(process.env, envDefinitions, {
     strict: true

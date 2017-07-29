@@ -111,16 +111,42 @@ builds:
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
 
-  node-eth-mon-service:
-    context: node-eth-mon-service
+  node-eth-contracts:
+    context: node-eth-contracts
     dockerfile: Dockerfile
     rewrite_from: node-lib
     depends_on:
       - node-lib
     pushes:
-      - 'on_tag=quay.io/chainpoint/node-eth-mon-service:{git_tag}'
-      - 'on_branch:master=quay.io/chainpoint/node-eth-mon-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-eth-mon-service:{fcommitid}'
+      - 'on_tag=quay.io/chainpoint/node-eth-contracts:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-contracts:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-contracts:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-eth-tnt-listener-service:
+    context: node-eth-tnt-listener-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-eth-tnt-listener-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-tnt-listener-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-tnt-listener-service:{fcommitid}'
+    labels:
+      - 'org.chainpoint.git.commitid={fcommitid}'
+
+  node-eth-tnt-tx-service:
+    context: node-eth-tnt-tx-service
+    dockerfile: Dockerfile
+    rewrite_from: node-lib
+    depends_on:
+      - node-lib
+    pushes:
+      - 'on_tag=quay.io/chainpoint/node-eth-tnt-tx-service:{git_tag}'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-tnt-tx-service:latest'
+      - 'on_branch:master=quay.io/chainpoint/node-eth-tnt-tx-service:{fcommitid}'
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
 
