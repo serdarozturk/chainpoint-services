@@ -4,6 +4,10 @@ networks:
   chainpoint:
     driver: bridge
 
+# Allows deployed contracts to be shared between eth related services
+volumes:
+  eth-contracts-volume:
+
 services:
 
   # NGINX Proxy
@@ -263,28 +267,6 @@ services:
       BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
       BCOIN_API_PASS: ${BCOIN_API_PASS}
 
-  # Ethereum TNT Transer Monitor
-  # Monitor and report on the state of TNT tokens.
-  #
-  eth-mon:
-    restart: always
-    image: quay.io/chainpoint/node-eth-mon-service:${DOCKER_TAG}
-    build:
-      context: ./node-eth-mon-service
-    container_name: btc-eth-core
-    depends_on:
-      - testrpc
-      - roach1
-    networks:
-      - chainpoint
-    environment:
-      NODE_ENV: development
-      ETH_TNT_LISTEN_ADDR: ${ETH_TNT_LISTEN_ADDR}
-    command: npm run dev
-    volumes:
-    - ./node-eth-mon-service/scripts:/home/node/app/scripts
-    - ./node-eth-mon-service/loaders:/home/node/app/loaders
-
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
   # 
@@ -461,6 +443,67 @@ services:
   #     - ./data/bcoin:/root/.bcoin
   #   networks:
   #     - chainpoint
+
+  # Ethereum Contracts
+  # Builds and deploys the contracts to the testrpc node
+  #
+  eth-contracts:
+    image: quay.io/chainpoint/node-eth-contracts:${DOCKER_TAG}
+    build:
+      context: ./node-eth-contracts
+    container_name: btc-contracts-core
+    depends_on:
+      - testrpc
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+    command: npm run migrate -- --network testrpc
+    volumes:
+      - eth-contracts-volume:/home/node/app/build/contracts
+
+  # Ethereum TNT Transaction Service
+  # Accepts requests from other services related to the TNT token.
+  #
+  eth-tnt-tx-service:
+    restart: always
+    image: quay.io/chainpoint/node-eth-tnt-tx-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-tx-service
+    container_name: btc-tnt-tx-service-core
+    depends_on:
+      - testrpc
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      LISTEN_TX_PORT: 8085
+    ports:
+      - "8085:8085" # REST API
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
+
+
+  # Ethereum TNT Listener
+  # Listens for incoming TNT transfers from the nodes
+  #
+  eth-tnt-listener-service:
+    image: quay.io/chainpoint/node-eth-tnt-listener-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-listener-service
+    container_name: eth-tnt-listener-service-core
+    depends_on:
+      - testrpc
+      - roach1
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      ETH_TNT_LISTEN_ADDR: ${ETH_TNT_LISTEN_ADDR}
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
 
   testrpc:
     image: quay.io/chainpoint/testrpc:${DOCKER_TAG}

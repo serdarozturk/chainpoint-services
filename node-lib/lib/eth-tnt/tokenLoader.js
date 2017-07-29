@@ -7,13 +7,15 @@ const contract = require('truffle-contract')
 */
 module.exports = async (provider, tokenAddr) => {
   // Create the provider
+  console.log('Creating web3')
   let web3 = new Web3(provider)
 
   // Set the default "from" account to the accounts
   web3.eth.defaultAccount = web3.eth.accounts[0]
 
   // Load the token json obj
-  let tokenDef = require('../build/contracts/BCAPTestToken.json')
+  console.log('loding bcap token')
+  let tokenDef = require('../../contracts/BCAPTestToken.json')
 
   // If the token addr is specified in the environment var, use that as highest priority
   if (tokenAddr) {
