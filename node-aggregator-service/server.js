@@ -78,7 +78,7 @@ let aggregate = () => {
 
   let nistTimestamp = nistDataAvailable ? nistLastestString.split(':')[0].toString() : null
   let nistValue = nistDataAvailable ? nistLastestString.split(':')[1].toString() : null
-  let nistDataString = nistDataAvailable ? (nistTimestamp + ':' + nistValue).toLowerCase() : null
+  let nistDataString = nistDataAvailable ? ('nist:' + nistTimestamp + ':' + nistValue).toLowerCase() : null
   let nistDataBuffer = nistDataAvailable ? Buffer.from(nistDataString, 'utf8') : null
 
   // create merkle tree only if there is at least one hash to process
