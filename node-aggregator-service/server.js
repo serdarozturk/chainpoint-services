@@ -78,7 +78,7 @@ let aggregate = () => {
 
   let nistTimestamp = nistDataAvailable ? nistLastestString.split(':')[0].toString() : null
   let nistValue = nistDataAvailable ? nistLastestString.split(':')[1].toString() : null
-  let nistDataString = nistDataAvailable ? (nistTimestamp + ':' + nistValue).toLowerCase() : null
+  let nistDataString = nistDataAvailable ? ('nist:' + nistTimestamp + ':' + nistValue).toLowerCase() : null
   let nistDataBuffer = nistDataAvailable ? Buffer.from(nistDataString, 'utf8') : null
 
   // create merkle tree only if there is at least one hash to process
@@ -128,7 +128,7 @@ let aggregate = () => {
     treeData.proofData = proofData
 
     TREES.push(treeData)
-    console.log('hashesForTree length : %s', hashesForTree.length)
+    // console.log('hashesForTree length : %s', hashesForTree.length)
   }
 }
 
@@ -142,7 +142,7 @@ let finalize = () => {
   // process each set of tree data
   let treesToFinalize = TREES.splice(0)
   _.forEach(treesToFinalize, (treeDataObj) => {
-    console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
+    // console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
     // queue state messages, and when complete, queue message for calendar service to continue processing
     async.series([
@@ -173,7 +173,7 @@ let finalize = () => {
             console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
             return callback(err)
           } else {
-            console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
+            // console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
             // pass all the hash_msg objects to the series() callback
             let messages = treeDataObj.proofData.map((proofDataItem) => {
               return proofDataItem.hash_msg
