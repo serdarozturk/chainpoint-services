@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
 const _ = require('lodash')
@@ -52,7 +53,48 @@ function generatePostHashesResponse (hashes) {
   let lcHashes = utils.lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map((hash) => {
     let hashObj = {}
-    hashObj.hash_id = uuidv1()
+    // Capture a five byte segment of the SHA256 of the
+    // time that will be embedded in the UUID and the
+    // hash submitted. This allows the UUID to
+    // verifiably reflect (albeit weakly) the combined NTP time on
+    // the server and the hash submitted. Thus the NTP time is
+    // represented both in this hash fragment and in
+    // the full timestamp embedded in the v1 UUID.
+    //
+    // RFC 4122 does allow the MAC address in a version 1
+    // (or 2) UUID to be replaced by a random 48-bit node id,
+    // either because the node does not have a MAC address, or
+    // because it is not desirable to expose it. In that case, the
+    // RFC requires that the least significant bit of the first
+    // octet of the node id should be set to 1. This code
+    // uses the first five bytes of the SHA256 as a weak
+    // verifier.
+    //
+    // This value can be checked on receipt of the hash_id UUID
+    // by extracting the bytes of the last segment of the UUID.
+    // e.g. If the UUID is 'b609358d-7979-11e7-ae31-01ba7816bf8f'
+    // the node hash is the six bytes shown in '01ba7816bf8f'.
+    //
+    // The UUID can also be verified for correct time by a
+    // client that itself has an accurate NTP clock at the
+    // moment it is returned to the client. This would allow
+    // a client to verify, likely within 500ms or so depending
+    // on network latency, the accuracy of the returned
+    // timestamp UUID.
+    //
+    // See API for injecting time and node in the UUID API:
+    // https://github.com/kelektiv/node-uuid/blob/master/README.md
+    //
+    let t = new Date().getTime()
+    let shortHashStrBuf = Buffer.from(t.toString() + hash)
+    let shortHashBuf = crypto.createHash('sha256').update(shortHashStrBuf).digest().slice(0, 5)
+    let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), shortHashBuf])
+    let uuidV1Options = {
+      node: shortHashNodeBuf,
+      msecs: t
+    }
+
+    hashObj.hash_id = uuidv1(uuidV1Options)
     hashObj.hash = hash
     return hashObj
   })

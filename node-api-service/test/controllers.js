@@ -7,6 +7,7 @@ const expect = require('chai').expect
 const request = require('supertest')
 const crypto = require('crypto')
 const moment = require('moment')
+const uuidTime = require('uuid-time')
 
 const app = require('../server')
 const server = app.server
@@ -328,7 +329,55 @@ describe('Hashes Controller', () => {
         })
     })
 
-    it('should return proper result with on valid call', (done) => {
+    it('should return a matched set of metadata and UUID embedded timestamps', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+
+      request(server)
+        .post('/hashes')
+        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(res.body.hashes[0]).to.have.property('hash_id')
+          expect(res.body.meta).to.have.property('submitted_at')
+          // The UUID timestamp has ms level precision, ISO8601 only to the second.
+          // Check that they are within 1000ms of each other.
+          expect(uuidTime.v1(res.body.hashes[0].hash_id) - Date.parse(res.body.meta.submitted_at)).to.be.within(0, 1000)
+          done()
+        })
+    })
+
+    it('should return a v1 UUID node embedded with a partial SHA256 over timestamp and hash', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+
+      let hash = 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'
+
+      request(server)
+        .post('/hashes')
+        .send({ hashes: [hash] })
+        .expect('Content-type', /json/)
+        .expect(200)
+        .end((err, res) => {
+          expect(res.body.hashes[0]).to.have.property('hash_id')
+          // If you know the original hash, you should be able to calculate
+          // whether the UUID 'Node' data commits to the partial hash of the timestamp
+          // embedded in the UUID and the hash submitted to get this UUID.
+          let t = uuidTime.v1(res.body.hashes[0].hash_id)
+          let shortHashStrBuf = Buffer.from(t.toString() + hash)
+          let shortHashBuf = crypto.createHash('sha256').update(shortHashStrBuf).digest().slice(0, 5)
+          let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), shortHashBuf])
+          expect(res.body.hashes[0].hash_id.split('-')[4]).to.equal(shortHashNodeBuf.toString('hex'))
+          done()
+        })
+    })
+
+    it('should return proper result with valid call', (done) => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
@@ -976,7 +1025,7 @@ describe('Nodes Controller', () => {
 
 describe('Functions', () => {
   describe('calling generatePostHashesResponse with one hash', () => {
-    it('should return proper repsonse object', (done) => {
+    it('should return proper response object', (done) => {
       let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
       expect(res).to.have.property('meta')
       expect(res.meta).to.have.property('submitted_at')
@@ -998,7 +1047,7 @@ describe('Functions', () => {
   })
 
   describe('calling generatePostHashesResponse with three hashes', () => {
-    it('should return proper repsonse object', (done) => {
+    it('should return proper response object', (done) => {
       let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
         'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
