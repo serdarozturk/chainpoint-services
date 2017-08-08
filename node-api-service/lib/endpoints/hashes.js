@@ -1,8 +1,8 @@
-const crypto = require('crypto')
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
 const _ = require('lodash')
 const utils = require('../utils.js')
+const BLAKE2s = require('blake2s-js')
 
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
@@ -53,49 +53,63 @@ function generatePostHashesResponse (hashes) {
   let lcHashes = utils.lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map((hash) => {
     let hashObj = {}
-    // Capture a five byte segment of the SHA256 of the
-    // time that will be embedded in the UUID and the
-    // hash submitted. This allows the UUID to
-    // verifiably reflect (albeit weakly) the combined NTP time on
-    // the server and the hash submitted. Thus the NTP time is
-    // represented both in this hash fragment and in
+    hashObj.hash = hash
+    hashObj.nist = _.isEmpty(nistLatest) ? '' : nistLatest
+
+    // Compute a five byte BLAKE2s hash of the
+    // timestamp that will be embedded in the UUID.
+    // This allows the UUID to verifiably reflect the
+    // combined NTP time, the hash submitted, and the current
+    // NIST Beacon value if available. Thus these values
+    // are represented both in the BLAKE2s hash and in
     // the full timestamp embedded in the v1 UUID.
     //
-    // RFC 4122 does allow the MAC address in a version 1
-    // (or 2) UUID to be replaced by a random 48-bit node id,
+    // RFC 4122 allows the MAC address in a version 1
+    // (or 2) UUID to be replaced by a random 48-bit Node ID,
     // either because the node does not have a MAC address, or
     // because it is not desirable to expose it. In that case, the
     // RFC requires that the least significant bit of the first
-    // octet of the node id should be set to 1. This code
-    // uses the first five bytes of the SHA256 as a weak
-    // verifier.
+    // octet of the Node ID should be set to `1`. This code
+    // uses a five byte BLAKE2s hash as a verifier in place
+    // of the MAC address. This also prevents leakage of server
+    // info.
     //
     // This value can be checked on receipt of the hash_id UUID
     // by extracting the bytes of the last segment of the UUID.
     // e.g. If the UUID is 'b609358d-7979-11e7-ae31-01ba7816bf8f'
-    // the node hash is the six bytes shown in '01ba7816bf8f'.
+    // the Node ID hash is the six bytes shown in '01ba7816bf8f'.
+    // Any client that can access the timestamp in the UUID,
+    // the NIST Beacon value, and the original hash can recompute
+    // the verification hash and compare it.
     //
     // The UUID can also be verified for correct time by a
     // client that itself has an accurate NTP clock at the
-    // moment it is returned to the client. This would allow
-    // a client to verify, likely within 500ms or so depending
-    // on network latency, the accuracy of the returned
-    // timestamp UUID.
+    // moment when returned to the client. This allows
+    // a client to verify, likely within a practical limit
+    // of approximately 500ms depending on network latency,
+    // the accuracy of the returned UUIDv1 timestamp.
     //
-    // See API for injecting time and node in the UUID API:
+    // See JS API for injecting time and Node ID in the UUID API:
     // https://github.com/kelektiv/node-uuid/blob/master/README.md
     //
-    let t = new Date().getTime()
-    let shortHashStrBuf = Buffer.from(t.toString() + hash)
-    let shortHashBuf = crypto.createHash('sha256').update(shortHashStrBuf).digest().slice(0, 5)
-    let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), shortHashBuf])
-    let uuidV1Options = {
-      node: shortHashNodeBuf,
-      msecs: t
-    }
+    let uuidTimestamp = new Date().getTime()
+    // 5 byte length BLAKE2s hash w/ personalization
+    let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })
+    let hashStr = [
+      uuidTimestamp.toString(),
+      uuidTimestamp.toString().length,
+      hashObj.hash,
+      hashObj.hash.length,
+      hashObj.nist,
+      hashObj.nist.length
+    ].join(':')
 
-    hashObj.hash_id = uuidv1(uuidV1Options)
-    hashObj.hash = hash
+    h.update(Buffer.from(hashStr))
+
+    hashObj.hash_id = uuidv1({
+      msecs: uuidTimestamp,
+      node: Buffer.concat([Buffer.from([0x01]), h.digest()])
+    })
     return hashObj
   })
 

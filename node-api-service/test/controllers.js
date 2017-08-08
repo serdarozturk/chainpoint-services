@@ -8,6 +8,7 @@ const request = require('supertest')
 const crypto = require('crypto')
 const moment = require('moment')
 const uuidTime = require('uuid-time')
+const BLAKE2s = require('blake2s-js')
 
 const app = require('../server')
 const server = app.server
@@ -365,13 +366,27 @@ describe('Hashes Controller', () => {
         .expect(200)
         .end((err, res) => {
           expect(res.body.hashes[0]).to.have.property('hash_id')
-          // If you know the original hash, you should be able to calculate
-          // whether the UUID 'Node' data commits to the partial hash of the timestamp
+          // Knowing the original hash, the timestamp from the UUID, the
+          // latest available NIST data, and the personalization bytes,
+          // you should be able to calculate whether the UUID 'Node ID'
+          // data segment is the 5 byte BLAKE2s hash of the timestamp
           // embedded in the UUID and the hash submitted to get this UUID.
           let t = uuidTime.v1(res.body.hashes[0].hash_id)
-          let shortHashStrBuf = Buffer.from(t.toString() + hash)
-          let shortHashBuf = crypto.createHash('sha256').update(shortHashStrBuf).digest().slice(0, 5)
-          let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), shortHashBuf])
+
+          // 5 byte length BLAKE2s hash w/ personalization
+          let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })
+          let hashStr = [
+            t.toString(),
+            t.toString().length,
+            res.body.hashes[0].hash,
+            res.body.hashes[0].hash.length,
+            res.body.hashes[0].nist,
+            res.body.hashes[0].nist.length
+          ].join(':')
+
+          h.update(Buffer.from(hashStr))
+          let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), h.digest()])
+          // Last segment of UUIDv1 contains BLAKE2s hash to be matched
           expect(res.body.hashes[0].hash_id.split('-')[4]).to.equal(shortHashNodeBuf.toString('hex'))
           done()
         })
