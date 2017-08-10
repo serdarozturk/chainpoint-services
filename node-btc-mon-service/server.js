@@ -21,7 +21,8 @@ var amqpChannel = null
 let anchor = new BlockchainAnchor({
   btcUseTestnet: true, // todo: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
   service: 'insightapi',
-  insightApiBase: env.INSIGHT_API_BASE_URI
+  insightApiBase: env.INSIGHT_API_BASE_URI,
+  insightFallback: true
 })
 
 function consumeBtcTxIdMessage (msg) {
