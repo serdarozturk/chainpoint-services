@@ -56,7 +56,7 @@ let monitorTransactionsAsync = async () => {
       if (txStats.confirmations < env.MIN_BTC_CONFIRMS) throw new Error(`transaction ${txStats.id} not ready`)
 
       // if ready, Get BTC Block Stats with Transaction Ids
-      let blockStats = await anchor.getBTCBlockStatsAsync(txStats.blockHash)
+      let blockStats = await anchor.btcGetBlockStatsAsync(txStats.blockHash)
       let txIndex = blockStats.txIds.indexOf(txStats.id)
       if (txIndex === -1) throw new Error(`transaction ${txStats.id} not found in block ${txStats.blockHeight}`)
       // adjusting for endieness, reverse txids for further processing
