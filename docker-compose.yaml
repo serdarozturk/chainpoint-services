@@ -238,10 +238,8 @@ services:
     environment:
       NODE_ENV: development
       CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
+      INSIGHT_API_BASE_URI: ${INSIGHT_API_BASE_URI}
+      BITCOIN_WIF: ${BITCOIN_WIF}
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
@@ -258,10 +256,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
+      INSIGHT_API_BASE_URI: ${INSIGHT_API_BASE_URI}
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
@@ -416,26 +411,3 @@ services:
       - --insecure
     networks:
       - chainpoint
-
-  # bcoin:
-  #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
-  #   build:
-  #     context: ./bcoin
-  #   container_name: bcoin-core
-  #   restart: unless-stopped
-  #   ports:
-  #     #-- Mainnet
-  #     # - "8333:8333"
-  #     # - "8332:8332" # RPC
-  #     #-- Testnet
-  #     - "18333:18333"
-  #     - "18332:18332" # RPC
-  #   environment:
-  #     BCOIN_CONFIG: /root/.bcoin/bcoin.conf
-  #     # VIRTUAL_HOST: bcoin.chainpoint.org
-  #     # VIRTUAL_PORT: 8332 # Mainnet
-  #     VIRTUAL_PORT: 18332 # Testnest
-  #   volumes:
-  #     - ./data/bcoin:/root/.bcoin
-  #   networks:
-  #     - chainpoint

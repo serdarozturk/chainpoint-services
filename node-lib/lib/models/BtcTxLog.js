@@ -60,58 +60,31 @@ var BtcTxLog = sequelize.define(env.COCKROACH_BTC_TX_LOG_TABLE_NAME,
       allowNull: false,
       unique: true
     },
-    txSizeBytes: {
-      comment: 'Size of the transaction in bytes',
-      type: Sequelize.INTEGER,
+    rawTx: {
+      comment: 'The raw transaction body hex',
+      type: Sequelize.STRING,
       validate: {
-        isInt: true
+        is: ['^([a-f0-9]{2})+$', 'i']
       },
       field: 'tx_size_bytes',
       allowNull: false
     },
-    feeBtcPerKb: {
-      comment: 'The fee expressed in BTC per kilobyte',
-      type: Sequelize.FLOAT,
+    feeSatoshiPerByte: {
+      comment: 'The fee expressed in Satoshi per byte',
+      type: Sequelize.INTEGER,
       validate: {
-        isFloat: true
+        isInt: true
       },
-      field: 'fee_btc_per_kb',
+      field: 'fee_satoshi_per_byte',
       allowNull: false
     },
-    feePaidBtc: {
-      comment: 'The fee paid for this transaction expressed in BTC',
-      type: Sequelize.FLOAT,
+    feePaidSatoshi: {
+      comment: 'The final fee paid for this transaction expressed in Satoshi',
+      type: Sequelize.INTEGER,
       validate: {
-        isFloat: true
+        isInt: true
       },
-      field: 'fee_paid_btc',
-      allowNull: false
-    },
-    inputAddress: {
-      comment: 'The bitcoin input address',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
-      },
-      field: 'input_address',
-      allowNull: false
-    },
-    outputAddress: {
-      comment: 'The bitcoin output address',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
-      },
-      field: 'output_address',
-      allowNull: false
-    },
-    balanceBtc: {
-      comment: 'The remaining balance for the stack\'s bitcoin wallet expressed in BTC',
-      type: Sequelize.FLOAT,
-      validate: {
-        isFloat: true
-      },
-      field: 'balance_btc',
+      field: 'fee_paid_satoshi',
       allowNull: false
     },
     stackId: {

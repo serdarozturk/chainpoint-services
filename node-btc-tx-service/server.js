@@ -2,9 +2,7 @@
 const env = require('./lib/parse-env.js')('btc-tx')
 
 const amqp = require('amqplib')
-const bcoin = require('bcoin')
-const request = require('request')
-const sb = require('satoshi-bitcoin')
+const BlockchainAnchor = require('blockchain-anchor')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
 const cnsl = require('consul')
 const utils = require('./lib/utils.js')
@@ -25,17 +23,21 @@ var BTCRecommendedFee = null
 let sequelize = btcTxLog.sequelize
 let BtcTxLog = btcTxLog.BtcTxLog
 
+// initialize blockchainanchor object
+let anchor = new BlockchainAnchor({
+  btcUseTestnet: true, // todo: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
+  service: 'insightapi',
+  insightApiBase: env.INSIGHT_API_BASE_URI
+})
+
 // The write function used write all btc tx log events
-let logBtcTxDataAsync = async (txObj) => {
+let logBtcTxDataAsync = async (txResult) => {
   let row = {}
-  row.txId = txObj.hash
-  row.publishDate = Date.parse(txObj.date)
-  row.txSizeBytes = txObj.size
-  row.feeBtcPerKb = parseFloat(txObj.rate)
-  row.feePaidBtc = parseFloat(txObj.fee)
-  row.inputAddress = txObj.inputs[0].address
-  row.outputAddress = txObj.outputs[1].address
-  row.balanceBtc = parseFloat(txObj.outputs[1].value)
+  row.txId = txResult.txId
+  row.publishDate = txResult.publishDate
+  row.rawTx = txResult.rawTx
+  row.feeSatoshiPerByte = parseInt(txResult.feeSatoshiPerByte)
+  row.feePaidSatoshi = parseInt(txResult.feePaidSatoshi)
   row.stackId = env.CHAINPOINT_CORE_BASE_URI
 
   try {
@@ -48,79 +50,36 @@ let logBtcTxDataAsync = async (txObj) => {
 }
 
 /**
-* Convert string into compiled bcoin TX value for a null data OP_RETURN
-*
-* @param {string} hash - The hash to embed in an OP_RETURN
-*/
-const genTxScript = (hash) => {
-  const opcodes = bcoin.script.opcodes
-  const script = new bcoin.script()
-  script.push(opcodes.OP_RETURN)
-  // hash must be Buffer to avoid extra string to buffer conversion
-  script.push(Buffer.from(hash, 'hex'))
-  script.compile()
-
-  return script.toJSON()
-}
-
-/**
-* Generate a POST body suitable for submission to bcoin REST API
-*
-* @param {string} fee - The miners fee for this TX in Satoshi's per byte
-* @param {string} hash - The hash to embed in an OP_RETURN
-*/
-const genTxBody = (feeSatPerByte, hash) => {
-  // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
-  if (feeSatPerByte > env.BTC_MAX_FEE_SAT_PER_BYTE) {
-    console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${env.BTC_MAX_FEE_SAT_PER_BYTE}`)
-    feeSatPerByte = env.BTC_MAX_FEE_SAT_PER_BYTE
-  }
-  // bcoin now wants the rate as an integer representing sat per kb (as of bcoin beta-13/beta-14)
-  let feeSatPerKilobyte = feeSatPerByte * 1024
-  let body = {
-    rate: feeSatPerKilobyte,
-    outputs: [{
-      script: genTxScript(hash)
-    }]
-  }
-  return body
-}
-
-/**
 * Send a POST request to /wallet/:id/send with a POST body
 * containing an OP_RETURN TX
 *
 * @param {string} hash - The hash to embed in an OP_RETURN
 */
-const sendTxToBTC = (hash, callback) => {
-  let body = genTxBody(BTCRecommendedFee.recFeeInSatPerByte, hash)
-  // console.log(`Recommended fee = ${BTCRecommendedFee.recFeeInSatPerByte}`)
-
-  let options = {
-    headers: [
-      {
-        name: 'Content-Type',
-        value: 'application/json'
-      }
-    ],
-    method: 'POST',
-    uri: env.BCOIN_API_BASE_URI + '/wallet/' + env.BCOIN_API_WALLET_ID + '/send',
-    body: body,
-    json: true,
-    gzip: true,
-    auth: {
-      user: env.BCOIN_API_USERNAME,
-      pass: env.BCOIN_API_PASS
+const sendTxToBTCAsync = async (hash) => {
+  let privateKeyWIF = env.BITCOIN_WIF
+  let feeSatPerByte = 160 // if BTCRecommendedFee is not initalized, use a default value
+  if (BTCRecommendedFee) {
+    let feeSatPerByte = BTCRecommendedFee.recFeeInSatPerByte
+    // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
+    if (feeSatPerByte > env.BTC_MAX_FEE_SAT_PER_BYTE) {
+      console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${env.BTC_MAX_FEE_SAT_PER_BYTE}`)
+      feeSatPerByte = env.BTC_MAX_FEE_SAT_PER_BYTE
     }
+  } else {
+    console.error('BTCRecommendedFee not initialized, using default values')
   }
-  request(options, function (err, response, body) {
-    if (err || response.statusCode !== 200) {
-      // TODO: Implement alternative if POST fails
-      if (!err) err = `POST failed with status code ${response.statusCode}`
-      return callback(err)
-    }
-    return callback(null, body)
-  })
+  let feeTotalSatoshi = feeSatPerByte * 235 // 235 represents the average transaction size in bytes
+
+  let txResult
+  try {
+    txResult = await anchor.btcOpReturnAsync(privateKeyWIF, hash, feeTotalSatoshi)
+    txResult.publishDate = Date.now()
+    txResult.feeSatoshiPerByte = feeSatPerByte
+    txResult.feePaidSatoshi = feeTotalSatoshi
+    return txResult
+  } catch (error) {
+    throw new Error(`Error sending anchor transaction : ${error.message}`)
+  }
 }
 
 /**
@@ -128,7 +87,7 @@ const sendTxToBTC = (hash, callback) => {
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
 */
-function processIncomingAnchorJob (msg) {
+async function processIncomingAnchorJobAsync (msg) {
   if (msg !== null) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
@@ -137,36 +96,35 @@ function processIncomingAnchorJob (msg) {
     // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
     if (!amqpChannel) throw new Error('no amqpConnection available')
     // create and publish the transaction
-    sendTxToBTC(anchorData, async (err, body) => {
-      try {
-        if (err) throw new Error(err)
-        // log the btc tx transaction
-        let newLogEntry = await logBtcTxDataAsync(body)
-        console.log(newLogEntry)
-        // queue return message for calendar containing the new transaction information
-        // adding btc transaction id and full transaction body to original message and returning
-        messageObj.btctx_id = body.hash
-        messageObj.btctx_body = body.tx
-        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
-          (err, ok) => {
-            if (err !== null) {
-              console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
-              throw new Error(err)
-            } else {
-              console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
-              amqpChannel.ack(msg)
-            }
-          })
-      } catch (error) {
-        // An error has occurred publishing the transaction, nack consumption of message
-        console.error('error publishing transaction : ' + error.message)
-        // set a 30 second delay for nacking this message to prevent a flood of retries hitting bcoin
-        setTimeout(() => {
-          amqpChannel.nack(msg)
-          console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
-        }, 30000)
-      }
-    })
+
+    try {
+      let txResult = await sendTxToBTCAsync(anchorData)
+      // log the btc tx transaction
+      let newLogEntry = await logBtcTxDataAsync(txResult)
+      console.log(newLogEntry)
+      // queue return message for calendar containing the new transaction information
+      // adding btc transaction id and full transaction body to original message and returning
+      messageObj.btctx_id = txResult.txId
+      messageObj.btctx_body = txResult.rawTx
+      amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
+        (err, ok) => {
+          if (err !== null) {
+            console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
+            throw new Error(err)
+          } else {
+            console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+            amqpChannel.ack(msg)
+          }
+        })
+    } catch (error) {
+      // An error has occurred publishing the transaction, nack consumption of message
+      // set a 30 second delay for nacking this message to prevent a flood of retries hitting insight api
+      console.error(error.message)
+      setTimeout(() => {
+        amqpChannel.nack(msg)
+        console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
+      }, 30000)
+    }
   }
 }
 
@@ -209,7 +167,7 @@ async function openRMQConnectionAsync (connectionString) {
       amqpChannel = chan
       // Receive and process messages meant to initiate btc tx generation and publishing
       chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
-        processIncomingAnchorJob(msg)
+        processIncomingAnchorJobAsync(msg)
       })
       // if the channel closes for any reason, attempt to reconnect
       conn.on('close', async () => {

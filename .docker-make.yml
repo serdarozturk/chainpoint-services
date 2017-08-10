@@ -1,13 +1,4 @@
 builds:
-  bcoin:
-    context: bcoin
-    dockerfile: Dockerfile
-    pushes:
-      - 'on_tag=quay.io/chainpoint/bcoin:{git_tag}'
-      - 'on_branch:master=quay.io/chainpoint/bcoin:latest'
-      - 'on_branch:master=quay.io/chainpoint/bcoin:{fcommitid}'
-    labels:
-      - 'org.chainpoint.git.commitid={fcommitid}'
 
   node-base:
     context: node-base

@@ -155,16 +155,12 @@ module.exports = (service) => {
       envDefinitions.SIGNING_SECRET_KEY = envalid.str({ desc: 'A Base64 encoded NaCl secret signing key' })
       break
     case 'btc-mon':
-      envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })
-      envDefinitions.BCOIN_API_USERNAME = envalid.str({ desc: 'The API username for the Bcoin instance' })
-      envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
+      envDefinitions.INSIGHT_API_BASE_URI = envalid.url({ desc: 'The Bitcore Insight-API base URI' })
       break
     case 'btc-tx':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
-      envDefinitions.BCOIN_API_WALLET_ID = envalid.str({ desc: 'The wallet Id to be used' })
-      envDefinitions.BCOIN_API_BASE_URI = envalid.url({ desc: 'The Bcoin base URI' })
-      envDefinitions.BCOIN_API_USERNAME = envalid.str({ desc: 'The API username for the Bcoin instance' })
-      envDefinitions.BCOIN_API_PASS = envalid.str({ desc: 'The API password for the Bcoin instance' })
+      envDefinitions.INSIGHT_API_BASE_URI = envalid.url({ desc: 'The Bitcore Insight-API base URI' })
+      envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
   }
   return envalid.cleanEnv(process.env, envDefinitions, {
