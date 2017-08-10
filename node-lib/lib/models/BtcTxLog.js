@@ -62,11 +62,11 @@ var BtcTxLog = sequelize.define(env.COCKROACH_BTC_TX_LOG_TABLE_NAME,
     },
     rawTx: {
       comment: 'The raw transaction body hex',
-      type: Sequelize.STRING,
+      type: Sequelize.TEXT,
       validate: {
         is: ['^([a-f0-9]{2})+$', 'i']
       },
-      field: 'tx_size_bytes',
+      field: 'raw_tx',
       allowNull: false
     },
     feeSatoshiPerByte: {
