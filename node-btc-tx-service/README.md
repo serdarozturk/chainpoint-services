@@ -1,5 +1,4 @@
 # chainpoint-node-btc-tx-service
 
-A Node.js service that is responsible for creating and sending
-transactions to an instance of `bcoin` which are then
-broadast to the Bitcoin network.
+A Node.js service that is responsible for creating and broadcasting
+transactions to the Bitcoin Network using an instance of `Bitcore Insight-API`.

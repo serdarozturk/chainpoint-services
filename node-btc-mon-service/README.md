@@ -13,9 +13,7 @@ The following are the descriptions of the configuration parameters:
 | RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the calendar service |
 | RMQ\_WORK\_OUT\_CAL\_QUEUE       | the queue name for outgoing message to the calendar service | 
 | RABBITMQ\_CONNECT\_URI       | the RabbitMQ connection URI | 
-| BCOIN\_API\_BASE\_URI       | the bcoin instance connection URI | 
-| BCOIN\_API\_USERNAME       | the bcoin instance username | 
-| BCOIN\_API\_PASS       | the bcoin instance password | 
+| INSIGHT\_API\_BASE\_URI       | the Bitcore Insight-API base URI | 
 
 The following are the types, defaults, and acceptable ranges of the configuration parameters: 
 
@@ -27,9 +25,7 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 | RMQ\_WORK\_IN\_QUEUE      | string      | 'work.btcmon' | | |
 | RMQ\_WORK\_OUT\_CAL\_QUEUE       | string      | 'work.cal' | | |
 | RABBITMQ\_CONNECT\_URI       | string      | 'amqp://chainpoint:chainpoint@rabbitmq' |  | |
-| BCOIN\_API\_BASE\_URI       | string      | null |  | |
-| BCOIN\_API\_USERNAME       | string      | null |  | |
-| BCOIN\_API\_PASS       | string      | null |  | |
+| INSIGHT\_API\_BASE\_URI       | string      | null |  | |
 
 
 ## Data In
