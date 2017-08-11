@@ -184,6 +184,10 @@ http-signature@~1.1.0:
     jsprim "^1.2.2"
     sshpk "^1.7.0"
 
+int64-buffer@^0.1.9:
+  version "0.1.9"
+  resolved "https://registry.yarnpkg.com/int64-buffer/-/int64-buffer-0.1.9.tgz#9e039da043b24f78b196b283e04653ef5e990f61"
+
 is-typedarray@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/is-typedarray/-/is-typedarray-1.0.0.tgz#e479c80858df0c1b11ddda6940f96011fcda4a9a"
@@ -243,10 +247,11 @@ mime-types@^2.1.12, mime-types@~2.1.7:
   dependencies:
     mime-db "~1.27.0"
 
-nist-randomness-beacon@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/nist-randomness-beacon/-/nist-randomness-beacon-1.0.0.tgz#32beb4fd6da677bbc49ce53df6a9d7fef6518caf"
+nist-randomness-beacon@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/nist-randomness-beacon/-/nist-randomness-beacon-1.1.0.tgz#2962eddbab4c8b300c3b7eadbce6c5bd4e2bd2b1"
   dependencies:
+    int64-buffer "^0.1.9"
     request "^2.81.0"
     xml2js "~0.4.17"
 
