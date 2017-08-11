@@ -25,7 +25,6 @@
     "restify-cors-middleware": "^0.0.8",
     "sequelize-cockroachdb": "^1.0.1",
     "uuid": "^3.1.0",
-    "uuid-time": "^1.0.0",
     "uuid-validate": "^0.0.2",
     "valid-url": "^1.0.9",
     "ws": "^2.3.1"
