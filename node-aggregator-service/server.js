@@ -8,7 +8,6 @@ const MerkleTools = require('merkle-tools')
 const crypto = require('crypto')
 const async = require('async')
 const uuidv1 = require('uuid/v1')
-const cnsl = require('consul')
 
 // An array of all hashes needing to be processed.
 // Will be filled as new hashes arrive on the queue.
@@ -24,15 +23,9 @@ let TREES = []
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
 
-let consul = null
-
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
-
-// The latest NIST data
-// This value is updated from consul events as changes are detected
-let nistLatest = null
 
 function consumeHashMessage (msg) {
   if (msg !== null) {
@@ -72,15 +65,6 @@ function formatAsChainpointV3Ops (proof, op) {
 let aggregate = () => {
   let hashesForTree = HASHES.splice(0, env.HASHES_PER_MERKLE_TREE)
 
-  // get snapshot of last NIST data and determine if it is valid and available to use for this aggregation
-  let nistLastestString = nistLatest
-  let nistDataAvailable = nistLastestString !== null
-
-  let nistTimestamp = nistDataAvailable ? nistLastestString.split(':')[0].toString() : null
-  let nistValue = nistDataAvailable ? nistLastestString.split(':')[1].toString() : null
-  let nistDataString = nistDataAvailable ? ('nist:' + nistTimestamp + ':' + nistValue).toLowerCase() : null
-  let nistDataBuffer = nistDataAvailable ? Buffer.from(nistDataString, 'utf8') : null
-
   // create merkle tree only if there is at least one hash to process
   if (hashesForTree.length > 0) {
     // clear the merkleTools instance to prepare for a new tree
@@ -92,10 +76,12 @@ let aggregate = () => {
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
       let concatAndHashBuffer = crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest()
 
-      if (!nistDataAvailable) { // no NIST data is available, return only the addition of the hashId
-        return concatAndHashBuffer
-      } else { // add a concat and hash operation embedding NIST data into proof path
+      if (hashObj.nist) { // add a concat and hash operation embedding NIST data into proof path
+        let nistDataString = (`nist:${hashObj.nist}`).toLowerCase()
+        let nistDataBuffer = Buffer.from(nistDataString, 'utf8')
         return crypto.createHash('sha256').update(Buffer.concat([nistDataBuffer, concatAndHashBuffer])).digest('hex')
+      } else { // no NIST data is available, return only the addition of the hashId
+        return concatAndHashBuffer
       }
     })
 
@@ -120,7 +106,7 @@ let aggregate = () => {
       proofDataItem.hash_msg = hashesForTree[x].msg
       let proof = merkleTools.getProof(x)
       // only add the NIST item to the proof path if it was available and used in the tree calculation
-      if (nistDataAvailable) proof.unshift({ left: nistDataString })
+      if (hashesForTree[x].nist) proof.unshift({ left: (`nist:${hashesForTree[x].nist}`).toLowerCase() })
       proof.unshift({ left: hashesForTree[x].hash_id })
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
@@ -224,24 +210,9 @@ let finalize = () => {
   })
 }
 
-// This initalizes all the consul watches and JS intervals that fire all aggregator events
-function startWatchesAndIntervals () {
-  console.log('starting watches and intervals')
-
-  // Continuous watch on the consul key holding the NIST object.
-  var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
-
-  // Store the updated fee object on change
-  nistWatch.on('change', function (data, res) {
-    // process only if a value has been returned and it is different than what is already stored
-    if (data && data.Value && nistLatest !== data.Value) {
-      nistLatest = data.Value
-    }
-  })
-
-  nistWatch.on('error', function (err) {
-    console.error('nistWatch error: ', err)
-  })
+// This initalizes all the JS intervals that fire all aggregator events
+function startIntervals () {
+  console.log('starting intervals')
 
   // PERIODIC TIMERS
 
@@ -298,13 +269,10 @@ async function openRMQConnectionAsync (connectionString) {
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
-    // init consul
-    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
-    console.log('Consul connection established')
     // init rabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
-    // init watches and interval functions
-    startWatchesAndIntervals()
+    // init interval functions
+    startIntervals()
     console.log('startup completed successfully')
   } catch (err) {
     console.error(`An error has occurred on startup: ${err}`)
