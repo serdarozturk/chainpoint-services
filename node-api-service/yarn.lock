@@ -993,6 +993,10 @@ util-deprecate@~1.0.1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/util-deprecate/-/util-deprecate-1.0.2.tgz#450d4dc9fa70de732762fbd2d4a28981419a0ccf"
 
+uuid-time@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/uuid-time/-/uuid-time-1.0.0.tgz#8bb18fa7089987ef25b0c4047190133cfa3a14c6"
+
 uuid-validate@^0.0.2:
   version "0.0.2"
   resolved "https://registry.yarnpkg.com/uuid-validate/-/uuid-validate-0.0.2.tgz#ed883d26cf0d1819763abfa315e9626ddb67c8e8"

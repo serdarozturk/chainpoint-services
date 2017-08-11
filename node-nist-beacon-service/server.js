@@ -14,7 +14,7 @@ let getNistLatest = () => {
       // console.log(res)
 
       if (res && res.timeStamp && res.seedValue) {
-        let timeAndSeed = res.timeStamp.toString() + ':' + res.seedValue
+        let timeAndSeed = `${res.timeStamp.toString()}:${res.seedValue}`.toLowerCase()
 
         // The latest NIST value will always be stored under
         // a known key which can always be used if present.

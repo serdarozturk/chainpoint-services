@@ -52,8 +52,8 @@ function generatePostHashesResponse (hashes) {
   let lcHashes = utils.lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map((hash) => {
     let hashObj = {}
-    hashObj.hash = hash
-    hashObj.nist = nistLatest || ''
+
+    let hashNIST = nistLatest || ''
 
     // Compute a five byte BLAKE2s hash of the
     // timestamp that will be embedded in the UUID.
@@ -97,10 +97,10 @@ function generatePostHashesResponse (hashes) {
     let hashStr = [
       uuidTimestamp.toString(),
       uuidTimestamp.toString().length,
-      hashObj.hash,
-      hashObj.hash.length,
-      hashObj.nist,
-      hashObj.nist.length
+      hash,
+      hash.length,
+      hashNIST,
+      hashNIST.length
     ].join(':')
 
     h.update(Buffer.from(hashStr))
@@ -109,6 +109,10 @@ function generatePostHashesResponse (hashes) {
       msecs: uuidTimestamp,
       node: Buffer.concat([Buffer.from([0x01]), h.digest()])
     })
+
+    hashObj.hash = hash
+    hashObj.nist = hashNIST
+
     return hashObj
   })
 
