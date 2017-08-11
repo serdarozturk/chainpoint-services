@@ -7,7 +7,6 @@ const BLAKE2s = require('blake2s-js')
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
 const uuidv1 = require('uuid/v1')
-const uuidTime = require('uuid-time')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -53,8 +52,8 @@ function generatePostHashesResponse (hashes) {
   let lcHashes = utils.lowerCaseHashes(hashes)
   let hashObjects = lcHashes.map((hash) => {
     let hashObj = {}
-    hashObj.hash = hash
-    hashObj.nist = _.isEmpty(nistLatest) ? '' : nistLatest
+
+    let hashNIST = nistLatest || ''
 
     // Compute a five byte BLAKE2s hash of the
     // timestamp that will be embedded in the UUID.
@@ -98,10 +97,10 @@ function generatePostHashesResponse (hashes) {
     let hashStr = [
       uuidTimestamp.toString(),
       uuidTimestamp.toString().length,
-      hashObj.hash,
-      hashObj.hash.length,
-      hashObj.nist,
-      hashObj.nist.length
+      hash,
+      hash.length,
+      hashNIST,
+      hashNIST.length
     ].join(':')
 
     h.update(Buffer.from(hashStr))
@@ -110,6 +109,10 @@ function generatePostHashesResponse (hashes) {
       msecs: uuidTimestamp,
       node: Buffer.concat([Buffer.from([0x01]), h.digest()])
     })
+
+    hashObj.hash = hash
+    hashObj.nist = hashNIST
+
     return hashObj
   })
 
@@ -171,11 +174,11 @@ function postHashesV1 (req, res, next) {
 
   // if NIST value is present, ensure NTP time is >= latest NIST value
   if (nistLatest) {
-    let newUUIDEpoch = uuidTime.v1(uuidv1())
-    if (newUUIDEpoch < nistLatestEpoch) {
+    let NTPEpoch = Math.ceil(Date.now() / 1000) + 1 // round up and add 1 second forgiveness in time sync
+    if (NTPEpoch < nistLatestEpoch) {
       // this shoud not occur, log and return error to initiate retry
-      console.error(`Bad UUID time generated : NTP ${newUUIDEpoch} < NIST ${nistLatestEpoch}`)
-      return next(new restify.InternalServerError('Bad UUID time'))
+      console.error(`Bad NTP time generated in UUID : NTP ${NTPEpoch} < NIST ${nistLatestEpoch}`)
+      return next(new restify.InternalServerError('Bad NTP time'))
     }
   }
 
@@ -205,13 +208,12 @@ function updateNistVars (nistValue) {
   try {
     let nistTimestampString = nistValue.split(':')[0].toString()
     let nistTimestampInt = parseInt(nistTimestampString) // epoch in seconds
-    if (!nistTimestampInt) throw new Error()
-    let nistDate = new Date(nistTimestampInt * 1000) // multiple x 1000 to get ms
+    if (!nistTimestampInt) throw new Error('Bad NIST time encountered, skipping NTP/UUID > NIST validation')
     nistLatest = nistValue
-    nistLatestEpoch = nistDate.getTime()
+    nistLatestEpoch = nistTimestampInt
   } catch (error) {
     // the nist value being set must be bad, disable UUID / NIST validation until valid value is received
-    console.error('Bad NIST time encountered, skipping UUID > NIST validation')
+    console.error(error.message)
     nistLatest = null
     nistLatestEpoch = null
   }

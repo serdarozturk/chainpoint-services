@@ -308,7 +308,7 @@ describe('Hashes Controller', () => {
         })
     })
 
-    it('should return proper error with UUID < NIST value', (done) => {
+    it('should return proper error with NTP < NIST value', (done) => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
@@ -325,7 +325,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InternalServerError')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('Bad UUID time')
+            .and.to.equal('Bad NTP time')
           done()
         })
     })
