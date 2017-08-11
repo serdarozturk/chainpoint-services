@@ -205,13 +205,12 @@ function updateNistVars (nistValue) {
   try {
     let nistTimestampString = nistValue.split(':')[0].toString()
     let nistTimestampInt = parseInt(nistTimestampString) // epoch in seconds
-    if (!nistTimestampInt) throw new Error()
-    let nistDate = new Date(nistTimestampInt * 1000) // multiple x 1000 to get ms
+    if (!nistTimestampInt) throw new Error('Bad NIST time encountered, skipping UUID > NIST validation')
     nistLatest = nistValue
-    nistLatestEpoch = nistDate.getTime()
+    nistLatestEpoch = nistTimestampInt
   } catch (error) {
     // the nist value being set must be bad, disable UUID / NIST validation until valid value is received
-    console.error('Bad NIST time encountered, skipping UUID > NIST validation')
+    console.error(error.message)
     nistLatest = null
     nistLatestEpoch = null
   }
