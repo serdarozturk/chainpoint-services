@@ -121,7 +121,7 @@ let createCalendarBlockAsync = async (root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   try {
-    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' })
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       return await writeBlockAsync(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL')
@@ -137,7 +137,7 @@ let createNistBlockAsync = async (nistDataObj) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   try {
-    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' })
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       let dataId = nistDataObj.split(':')[0].toString() // the epoch timestamp for this NIST entry
@@ -155,7 +155,7 @@ let createBtcAnchorBlockAsync = async (root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   try {
-    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' })
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
@@ -172,7 +172,7 @@ let createBtcConfirmBlockAsync = async (height, root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   try {
-    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' })
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       return await writeBlockAsync(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM')
@@ -453,7 +453,7 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
   try {
     // Retrieve calendar blocks since last anchor block
     if (!lastBtcAnchorBlockId) lastBtcAnchorBlockId = -1
-    let blocks = await CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: 'id ASC' })
+    let blocks = await CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: [['id', 'ASC']] })
 
     // Build merkle tree with block hashes
     let leaves = blocks.map((blockObj) => {
@@ -671,7 +671,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
   // checks if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
-    let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: 'id DESC' })
+    let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
       // if not, release lock and return
@@ -774,7 +774,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
   // checks if the eth last anchor block is at least ANCHOR_ETH_INTERVAL_MS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
-    let lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: 'id DESC' })
+    let lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (lastEthAnchorBlock) {
       // check if the last eth anchor block is at least ANCHOR_ETH_INTERVAL_MS old
       // if not, release lock and return

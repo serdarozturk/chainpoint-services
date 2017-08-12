@@ -14,7 +14,7 @@
     "blockchain-anchor": "^2.2.2",
     "consul": "^0.29.0",
     "envalid": "^3.1.1",
-    "sequelize": "^4.1.0",
-    "sequelize-cockroachdb": "^1.0.1"
+    "sequelize": "^4.4.3",
+    "sequelize-cockroachdb": "^1.0.2"
   }
 }
