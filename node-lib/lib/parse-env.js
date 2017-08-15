@@ -63,7 +63,6 @@ let envDefinitions = {
   RMQ_WORK_OUT_BTCTX_QUEUE: envalid.str({ default: 'work.btctx', desc: 'The queue name for outgoing message to the btc tx service' }),
   RMQ_WORK_OUT_BTCMON_QUEUE: envalid.str({ default: 'work.btcmon', desc: 'The queue name for outgoing message to the btc mon service' }),
   RMQ_WORK_OUT_GEN_QUEUE: envalid.str({ default: 'work.gen', desc: 'The queue name for outgoing message to the proof gen service' }),
-  RMQ_WORK_OUT_SPLITTER_QUEUE: envalid.str({ default: 'work.splitter', desc: 'The queue name for outgoing message to the splitter service' }),
   RMQ_WORK_OUT_API_QUEUE: envalid.str({ default: 'work.api', desc: 'The queue name for outgoing message to the api service' }),
 
   // Redis related variables
@@ -81,7 +80,7 @@ let envDefinitions = {
 
   // Aggregator service specific variables
   RMQ_PREFETCH_COUNT_AGG: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
-  RMQ_WORK_IN_AGG_QUEUE: envalid.str({ default: 'work.agg', desc: 'The queue name for message consumption originating from the splitter service' }),
+  RMQ_WORK_IN_AGG_QUEUE: envalid.str({ default: 'work.agg', desc: 'The queue name for message consumption originating from the api service' }),
   AGGREGATION_INTERVAL: validateAggInterval({ default: 1000, desc: 'The frequency of the aggregation process, in milliseconds' }),
   FINALIZATION_INTERVAL: validateFinInterval({ default: 250, desc: 'The frequency of the finalization of trees and delivery to state service, in milliseconds' }),
   HASHES_PER_MERKLE_TREE: validateMaxHashes({ default: 25000, desc: 'The maximum number of hashes to be used when constructing an aggregation tree' }),
@@ -134,12 +133,9 @@ let envDefinitions = {
 
   // Proof State service specific variables
   RMQ_PREFETCH_COUNT_STATE: envalid.num({ default: 10, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
-  RMQ_WORK_IN_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for message consumption originating from the splitter, aggregator, calendar, and proof state services' }),
-  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 1, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' }),
+  RMQ_WORK_IN_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for message consumption originating from the aggregator, calendar, and proof state services' }),
+  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 1, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' })
 
-  // Splitter service specific variables
-  RMQ_PREFETCH_COUNT_SPLITTER: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
-  RMQ_WORK_IN_SPLITTER_QUEUE: envalid.str({ default: 'work.splitter', desc: 'The queue name for message consumption originating from the api service' })
 }
 
 module.exports = (service) => {

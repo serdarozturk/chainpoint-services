@@ -69,13 +69,8 @@ test-aggregator:
 	./bin/docker-make --no-push node-aggregator-service-test
 	docker-compose up --build aggregator-test
 
-## Run splitter test suite with Mocha
-test-splitter:
-	./bin/docker-make --no-push node-splitter-service-test
-	docker-compose up --build splitter-test
-
 ## Run all application tests
-test: test-api test-aggregator test-splitter 
+test: test-api test-aggregator
 
 ## Build and start all
 up: build cockroachdb-setup
@@ -117,4 +112,4 @@ burn: clean prune
 	@echo "Services stopped, and data pruned. Run 'make up' or 'make up-no-build' now."
 	@echo "****************************************************************************"
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test build-config build up down clean prune prune-oldskool burn
+.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test build-config build up down clean prune prune-oldskool burn

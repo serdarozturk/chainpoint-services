@@ -215,7 +215,7 @@ async function openRMQConnectionAsync (connectionString) {
       // create communication channel
       let chan = await conn.createConfirmChannel()
       // the connection and channel have been established
-      chan.assertQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_AGG_QUEUE, { durable: true })
       chan.prefetch(env.RMQ_PREFETCH_COUNT_API)
       // set 'amqpChannel' so that publishers have access to the channel
       amqpChannel = chan

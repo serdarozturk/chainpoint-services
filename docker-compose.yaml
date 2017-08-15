@@ -88,37 +88,6 @@ services:
       ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
 
-  # Splitter
-  #
-  # SCALED: true
-  # 
-  # PORTS : none
-  #
-  splitter:
-    restart: always
-    image: quay.io/chainpoint/node-splitter-service:${DOCKER_TAG}
-    build:
-      context: ./node-splitter-service
-    depends_on:
-      - rabbitmq
-    networks:
-      - chainpoint
-    environment:
-      NODE_ENV: development
-
-  splitter-test:
-    image: quay.io/chainpoint/node-splitter-service-test:${DOCKER_TAG}
-    container_name: node-splitter-service-test
-    build:
-      context: ./node-splitter-service
-      dockerfile: Dockerfile.test
-    depends_on:
-      - rabbitmq
-    networks:
-      - chainpoint
-    environment:
-      NODE_ENV: test
-
   # Aggregator
   #
   # SCALED: true

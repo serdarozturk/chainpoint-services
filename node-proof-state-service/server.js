@@ -12,25 +12,6 @@ const storageClient = require('./storage-adapters/postgres.js')
 var amqpChannel = null
 
 /**
-* Logs Splitter service event to hash tracker
-*
-* @param {amqp message object} msg - The AMQP message received from the queue
-*/
-async function ConsumeSplitterMessageAsync (msg) {
-  // Store this state information
-  try {
-    let messageObj = JSON.parse(msg.content.toString())
-    await storageClient.logSplitterEventForHashIdAsync(messageObj.hash_id, messageObj.hash)
-    // vent has been logged, ack consumption of original message
-    amqpChannel.ack(msg)
-    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
-  } catch (error) {
-    amqpChannel.nack(msg)
-    console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
-  }
-}
-
-/**
 * Writes the state data to persistent storage and logs aggregation event
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
@@ -379,11 +360,6 @@ function processMessage (msg) {
   if (msg !== null) {
     // determine the source of the message and handle appropriately
     switch (msg.properties.type) {
-      case 'splitter':
-        // Consumes a state message from the Splitter service
-        // Logs event in hash tracker
-        ConsumeSplitterMessageAsync(msg)
-        break
       case 'aggregator':
         // Consumes a state message from the Aggregator service
         // Stores state information and logs event in hash tracker

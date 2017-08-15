@@ -213,6 +213,24 @@ describe('Hashes Controller', () => {
         })
     })
 
+    it('should return proper error with hash not a string', (done) => {
+      request(server)
+        .post('/hashes')
+        .send({ hash: ['badhash'] })
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, bad hash submitted')
+          done()
+        })
+    })
+
     it('should return proper error with invalid hash', (done) => {
       request(server)
         .post('/hashes')
@@ -226,7 +244,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, invalid hash present')
+            .and.to.equal('invalid JSON body, bad hash submitted')
           done()
         })
     })

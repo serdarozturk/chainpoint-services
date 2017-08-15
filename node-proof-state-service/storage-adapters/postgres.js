@@ -9,9 +9,9 @@ const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_C
 
 // Set the number of tracking log events to complete in order for the hash to be considered fully processed
 // The value is determined by the number of anchoring services enabled
-// The base of 3 represents the splitter, aggregator, and calendar events
+// The base of 2 represents the aggregator and calendar events
 // This number will increase as additional anchor services are enabled
-const PROOF_STEP_COUNT = 3 + (env.ANCHOR_BTC === 'enabled' ? 1 : 0) + (env.ANCHOR_ETH === 'enabled' ? 1 : 0)
+const PROOF_STEP_COUNT = 2 + (env.ANCHOR_BTC === 'enabled' ? 1 : 0) + (env.ANCHOR_ETH === 'enabled' ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
@@ -89,7 +89,6 @@ let BtcHeadStates = sequelize.define('btchead_states', {
 sequelize.define('hash_tracker_log', {
   hash_id: { type: Sequelize.UUID, primaryKey: true },
   hash: { type: Sequelize.STRING },
-  splitter_at: { type: Sequelize.DATE },
   aggregator_at: { type: Sequelize.DATE },
   calendar_at: { type: Sequelize.DATE },
   btc_at: { type: Sequelize.DATE },
@@ -282,15 +281,6 @@ async function writeBTCHeadStateObjectAsync (stateObject) {
   return true
 }
 
-async function logSplitterEventForHashIdAsync (hashId, hash) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, splitter_at, steps_complete)
-    VALUES ('${hashId}', '${hash}', clock_timestamp(), 1)
-    ON CONFLICT (hash_id)
-    DO UPDATE SET (splitter_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
-    WHERE hash_tracker_logs.hash_id = '${hashId}'`)
-  return true
-}
-
 async function logAggregatorEventForHashIdAsync (hashId) {
   await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, aggregator_at, steps_complete)
     VALUES ('${hashId}', clock_timestamp(), 1)
@@ -397,7 +387,6 @@ module.exports = {
   writeAnchorAggStateObjectAsync: writeAnchorAggStateObjectAsync,
   writeBTCTxStateObjectAsync: writeBTCTxStateObjectAsync,
   writeBTCHeadStateObjectAsync: writeBTCHeadStateObjectAsync,
-  logSplitterEventForHashIdAsync: logSplitterEventForHashIdAsync,
   logAggregatorEventForHashIdAsync: logAggregatorEventForHashIdAsync,
   logCalendarEventForHashIdAsync: logCalendarEventForHashIdAsync,
   logBtcEventForHashIdAsync: logBtcEventForHashIdAsync,

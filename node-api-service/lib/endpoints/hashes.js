@@ -2,6 +2,7 @@ const restify = require('restify')
 const env = require('../parse-env.js')('api')
 const utils = require('../utils.js')
 const BLAKE2s = require('blake2s-js')
+const _ = require('lodash')
 
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
@@ -124,10 +125,15 @@ function postHashV1 (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, missing hash'))
   }
 
+  // validate 'hash' is a string
+  if (!_.isString(req.params.hash)) {
+    return next(new restify.InvalidArgumentError('invalid JSON body, bad hash submitted'))
+  }
+  
   // validate hash param is a valid hex string
   let isValidHash = /^([a-fA-F0-9]{2}){20,64}$/.test(req.params.hash)
   if (!isValidHash) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, invalid hash present'))
+    return next(new restify.InvalidArgumentError('invalid JSON body, bad hash submitted'))
   }
 
   // if NIST value is present, ensure NTP time is >= latest NIST value
@@ -142,19 +148,25 @@ function postHashV1 (req, res, next) {
 
   let responseObj = generatePostHashResponse(req.params.hash)
 
+  let hashObj = {
+    hash_id: responseObj.hash_id,
+    hash: responseObj.hash,
+    nist: responseObj.nist
+  }
+
   // AMQP / RabbitMQ
 
   // validate amqp channel has been established
   if (!amqpChannel) {
     return next(new restify.InternalServerError('Message could not be delivered'))
   }
-  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_SPLITTER_QUEUE, Buffer.from(JSON.stringify(responseObj)), { persistent: true },
+  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
     (err) => {
       if (err !== null) {
-        console.error(env.RMQ_WORK_OUT_SPLITTER_QUEUE, 'publish message nacked')
+        console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
         return next(new restify.InternalServerError('Message could not be delivered'))
       } else {
-        console.log(env.RMQ_WORK_OUT_SPLITTER_QUEUE, 'publish message acked')
+        console.log(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message acked')
       }
     })
 

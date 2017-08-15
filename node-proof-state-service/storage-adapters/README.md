@@ -27,7 +27,6 @@ The following is a description of methods that must be defined in a storage adap
 | writeAnchorAggStateObjectAsync(stateObject)     | write the anchor agg state object to storage | boolean indicating success |
 | writeBTCTxStateObjectAsync(stateObject)     | write the btctx state object to storage | boolean indicating success |
 | writeBTCHeadStateObjectAsync(stateObject)     | write the btchead state object to storage | boolean indicating success |
-| logSplitterEventForHashIdAsync(hashId, hash,)     | log a splitter event for the given hash id to the hash tracker | boolean indicating success |
 | logAggregationEventForHashIdAsync(hashId)     | log an aggregation event for the given hash id to the hash tracker | boolean indicating success |
 | logCalendarEventForHashIdAsync(hashId)     | log a calendar event for the given hash id to the hash tracker | boolean indicating success |
 | logEthEventForHashIdAsync(hashId)     | log an eth event for the given hash id to the hash tracker | boolean indicating success |
@@ -104,7 +103,6 @@ The following are the descriptions of the configuration parameters:
 | :-------------  |:-------------|:-------------|:--------|
 | hash\_id | UUID           | the submitted hash's unique identifier | primary key |
 | hash     | String         | the submitted hash value | y |
-| splitter_at     | Date         | the timestamp when the hash was processed by the splitter service |  |
 | aggregator_at     | Date         | the timestamp when the hash was processed by the aggregator service |  |
 | calendar_at     | Date         | the timestamp when the calendar proof was ready for this hash |  |
 | btc_at     | Date         | the timestamp when the btc proof was ready for this hash |  |

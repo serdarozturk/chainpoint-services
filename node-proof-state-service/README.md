@@ -29,20 +29,6 @@ The following are the types, defaults, and acceptable ranges of the configuratio
 ## Data In
 The proof state service serves as the a proof state storage mechanism for all hashes as they are being processed. As proofs are constructed for each hash, state data is received and stored in Postgres from other services. As anchors objects are completed and added to the proof, a proof ready message is also queued for the proof generator service indicating that a Chainpoint proof is ready to be created for the current state data. These proof ready messages are both published and consumed by this service. Milestone events occurring during the proof building process are logged to a hash tracker table.
 
-#### Splitter Message
-When the splitter service splits a batch of hashes received from the api service, it queues hash object messages bound for the proof state service for tracking of that event.
-The following is an example of a hash object message published from the splitter service: 
-```json
-{
-  "hash_id": "34712680-14bb-11e7-9598-0800200c9a66",
-  "hash": "a0ec06301bf1814970a70f89d1d373afdff9a36d1ba6675fc02f8a975f4efaeb"
-}
-```
-| Name             | Description                                                            |
-| :--------------- |:-----------------------------------------------------------------------|
-| hash_id          | The UUIDv1 unique identifier for a hash object with embedded timestamp |
-| hash          | A hex string representing the hash to be processed  |
-
 
 #### Aggregator Message
 When an aggregation event occurs, the aggregation service will queue messages bound for the proof state service for each hash in that aggregation event.
@@ -171,7 +157,6 @@ In addition to storing state data, the proof state service also updates the hash
 
 | Name | Description                                                            |
 | :--- |:-----------------------------------------------------------------------|
-| splitter_at          | A timestamp value indicating when the hash was processed by the splitter service |
 | aggregator_at          | A timestamp value indicating when the hash was processed by the aggregator service |
 | calendar_at          | A timestamp value indicating when calendar proof generation has begun for this hash |
 | btc_at          | A timestamp value indicating when btc proof generation has begun for this hash |
