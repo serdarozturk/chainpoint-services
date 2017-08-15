@@ -51,7 +51,6 @@ let envDefinitions = {
   // Consul related variables and keys
   CONSUL_HOST: envalid.str({ default: 'consul', desc: 'Consul server host' }),
   CONSUL_PORT: envalid.num({ default: 8500, desc: 'Consul server port' }),
-  BTC_REC_FEE_KEY: envalid.str({ default: 'service/btc-fee/recommendation', desc: 'The consul key to write to, watch to receive updated fee object' }),
   NIST_KEY: envalid.str({ default: 'service/nist/latest', desc: 'The consul key to write to, watch to receive updated NIST object' }),
   CALENDAR_LOCK_KEY: envalid.str({ default: 'service/calendar/blockchain/lock', desc: 'Key used for acquiring calendar write locks' }),
 
@@ -95,9 +94,6 @@ let envDefinitions = {
   POST_VERIFY_PROOFS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of proofs allowed to be verified in one request' }),
   GET_CALENDAR_BLOCKS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of calendar blocks allowed to be retrieved in one request' }),
 
-  // BTC Fee service specific variables
-  REC_FEES_URI: envalid.str({ default: 'https://bitcoinfees.21.co/api/v1/fees/recommended', desc: 'The endpoint from which to retrieve recommended fee data' }),
-
   // BTC Mon service specific variables
   RMQ_PREFETCH_COUNT_BTCMON: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_BTCMON_QUEUE: envalid.str({ default: 'work.btcmon', desc: 'The queue name for message consumption originating from the calendar service' }),
@@ -114,7 +110,7 @@ let envDefinitions = {
   // 0.01 = 235 * BTC_MAX_FEE_SAT_PER_BYTE / 100000000
   // BTC_MAX_FEE_SAT_PER_BYTE = 0.01 *  100000000 / 235
   // BTC_MAX_FEE_SAT_PER_BYTE = 4255
-  BTC_MAX_FEE_SAT_PER_BYTE: envalid.num({ default: 4255, desc: 'The maximum recFeeInSatPerByte value accepted' }),
+  BTC_MAX_FEE_SAT_PER_BYTE: envalid.num({ default: 4255, desc: 'The maximum feeRateSatPerByte value accepted' }),
 
   // Calendar service specific variables
   RMQ_PREFETCH_COUNT_CAL: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),

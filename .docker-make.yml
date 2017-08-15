@@ -88,19 +88,6 @@ builds:
     labels:
       - 'org.chainpoint.git.commitid={fcommitid}'
 
-  node-btc-fee-service:
-    context: node-btc-fee-service
-    dockerfile: Dockerfile
-    rewrite_from: node-lib
-    depends_on:
-      - node-lib
-    pushes:
-      - 'on_tag=quay.io/chainpoint/node-btc-fee-service:{git_tag}'
-      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:latest'
-      - 'on_branch:master=quay.io/chainpoint/node-btc-fee-service:{fcommitid}'
-    labels:
-      - 'org.chainpoint.git.commitid={fcommitid}'
-
   node-btc-mon-service:
     context: node-btc-mon-service
     dockerfile: Dockerfile

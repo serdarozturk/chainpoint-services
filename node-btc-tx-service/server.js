@@ -4,20 +4,11 @@ const env = require('./lib/parse-env.js')('btc-tx')
 const amqp = require('amqplib')
 const BlockchainAnchor = require('blockchain-anchor')
 const btcTxLog = require('./lib/models/BtcTxLog.js')
-const cnsl = require('consul')
 const utils = require('./lib/utils.js')
-
-let consul = null
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 let amqpChannel = null
-
-// The local variable holding the Bitcoin recommended fee value, from Consul at key BTC_REC_FEE_KEY,
-// pushed from consul and refreshed automatically when any update in value is made
-// Sample BTCRecommendedFee Object ->
-// {"recFeeInSatPerByte":240,"recFeeInSatForAvgTx":56400,"recFeeInBtcForAvgTx":0.000564,"recFeeInUsdForAvgTx":0.86,"avgTxSizeBytes":235}
-var BTCRecommendedFee = null
 
 // pull in variables defined in shared BtcTxLog module
 let sequelize = btcTxLog.sequelize
@@ -25,7 +16,7 @@ let BtcTxLog = btcTxLog.BtcTxLog
 
 // initialize blockchainanchor object
 let anchor = new BlockchainAnchor({
-  btcUseTestnet: true, // todo: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
+  btcUseTestnet: true, // TODO: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
   service: 'insightapi',
   insightApiBase: env.INSIGHT_API_BASE_URI,
   insightFallback: true
@@ -58,18 +49,23 @@ let logBtcTxDataAsync = async (txResult) => {
 */
 const sendTxToBTCAsync = async (hash) => {
   let privateKeyWIF = env.BITCOIN_WIF
-  let feeSatPerByte = 160 // if BTCRecommendedFee is not initalized, use a default value
-  if (BTCRecommendedFee) {
-    let feeSatPerByte = BTCRecommendedFee.recFeeInSatPerByte
-    // of the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
+
+  let feeSatPerByte
+  let feeTotalSatoshi
+  try {
+    feeSatPerByte = await anchor.btcGetEstimatedFeeRateSatPerByteAsync()
+    // if the fee exceeds the maximum, revert to BTC_MAX_FEE_SAT_PER_BYTE for the fee
     if (feeSatPerByte > env.BTC_MAX_FEE_SAT_PER_BYTE) {
       console.error(`Fee of ${feeSatPerByte} sat per byte exceeded BTC_MAX_FEE_SAT_PER_BYTE of ${env.BTC_MAX_FEE_SAT_PER_BYTE}`)
       feeSatPerByte = env.BTC_MAX_FEE_SAT_PER_BYTE
     }
-  } else {
-    console.error('BTCRecommendedFee not initialized, using default values')
+    let feeExtra = 1.1 // the factor to use to increase the final transaction fee in order to better position this transaction for fast confirmation
+    feeSatPerByte = Math.ceil(feeSatPerByte * feeExtra) // Math.ceil to keep the value an integer, as expected in the log db
+    let averageTxInBytes = 235 // 235 represents the average btc anchor transaction size in bytes
+    feeTotalSatoshi = feeSatPerByte * averageTxInBytes
+  } catch (error) {
+    throw new Error(`Error retrieving estimated fee : ${error.message}`)
   }
-  let feeTotalSatoshi = feeSatPerByte * 235 // 235 represents the average transaction size in bytes
 
   let txResult
   try {
@@ -187,43 +183,14 @@ async function openRMQConnectionAsync (connectionString) {
   }
 }
 
-// This initalizes all the consul watches and JS intervals
-function startWatchesAndIntervals () {
-  console.log('starting watches and intervals')
-
-  // console.log('starting watches and intervals')
-  // Continuous watch on the consul key holding the fee object.
-  var watch = consul.watch({ method: consul.kv.get, options: { key: env.BTC_REC_FEE_KEY } })
-
-  // Store the updated fee object on change
-  watch.on('change', function (data, res) {
-    if (data && data.Value) {
-      // console.log('data:', data)
-      BTCRecommendedFee = JSON.parse(data.Value)
-      // console.log(BTCRecommendedFee)
-    }
-  })
-
-  // Oops, something is wrong with consul
-  // or the fee service key
-  watch.on('error', function (err) {
-    console.error('error:', err)
-  })
-}
-
 // process all steps need to start the application
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
-    // init consul
-    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
-    console.log('Consul connection established')
     // init DB
     await openStorageConnectionAsync()
     // init RabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
-    // init watches and interval functions
-    startWatchesAndIntervals()
     console.log('startup completed successfully')
   } catch (err) {
     console.error(`An error has occurred on startup: ${err}`)

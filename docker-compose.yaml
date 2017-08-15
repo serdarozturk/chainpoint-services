@@ -167,27 +167,6 @@ services:
       ANCHOR_ETH: ${ANCHOR_ETH}
       SIGNING_SECRET_KEY: ${SIGNING_SECRET_KEY}
 
-  # Bitcoin Fees
-  # Retrieve and store recommended transaction fees for Bitcoin
-  # 
-  # SCALED: false
-  #
-  # PORTS : none
-  #
-  btc-fee:
-    restart: always
-    image: quay.io/chainpoint/node-btc-fee-service:${DOCKER_TAG}
-    build:
-      context: ./node-btc-fee-service
-    container_name: btc-fee-core
-    depends_on:
-      - consul
-      - rabbitmq
-    networks:
-      - chainpoint
-    environment:
-      NODE_ENV: development
-
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
   # 
@@ -201,7 +180,6 @@ services:
       - roach1
       - consul
       - rabbitmq
-      - btc-fee
     networks:
       - chainpoint
     environment:

@@ -919,7 +919,7 @@ function startWatchesAndIntervals () {
   // Continuous watch on the consul key holding the NIST object.
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
 
-  // Store the updated fee object on change
+  // Store the updated nist object on change
   nistWatch.on('change', function (data, res) {
     // process only if a value has been returned and it is different than what is already stored
     if (data && data.Value && nistLatest !== data.Value) {

@@ -1,5 +1,5 @@
 {
-  "name": "chainpoint-node-btc-fee-service",
+  "name": "chainpoint-node-audit-service",
   "version": "0.0.1",
   "description": "Chainpoint audit service.",
   "author": "Glenn Rempe <glenn@tierion.com>",
