@@ -74,15 +74,6 @@ test-splitter:
 	./bin/docker-make --no-push node-splitter-service-test
 	docker-compose up --build splitter-test
 
-## Run a small load test submitting hashes
-run-load-test:
-	./bin/hey -m POST -H "Content-Type: application/json" \
-	-d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' \
-	-T 'application/json' \
-	-n 1000 \
-	-c 25 \
-	http://127.0.0.1/hashes
-
 ## Run all application tests
 test: test-api test-aggregator test-splitter 
 
@@ -126,4 +117,4 @@ burn: clean prune
 	@echo "Services stopped, and data pruned. Run 'make up' or 'make up-no-build' now."
 	@echo "****************************************************************************"
 
-.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test run-load-test build-config build up down clean prune prune-oldskool burn
+.PHONY: all cockroachdb-reset cockroachdb-setup run-api-test run-aggregator-test run-splitter-test build-config build up down clean prune prune-oldskool burn

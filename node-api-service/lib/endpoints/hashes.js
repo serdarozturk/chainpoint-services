@@ -1,6 +1,5 @@
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
-const _ = require('lodash')
 const utils = require('../utils.js')
 const BLAKE2s = require('blake2s-js')
 
@@ -18,118 +17,95 @@ let nistLatest = null
 let nistLatestEpoch = null
 
 /**
- * Generate the values for the 'meta' property in a POST /hashes response.
- *
- * Returns an Object with metadata about a POST /hashes request
- * including a 'timestamp', and hints for estimated time to completion
- * for various operations.
- *
- * @returns {Object}
- */
-function generatePostHashesResponseMetadata () {
-  let metaDataObj = {}
-  let timestamp = new Date()
-  metaDataObj.submitted_at = utils.formatDateISO8601NoMs(timestamp)
-
-  // FIXME : Calculate these based on last anchor time and known interval?
-  metaDataObj.processing_hints = {
-    cal: utils.formatDateISO8601NoMs(utils.addSeconds(timestamp, 10)),
-    eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 41)),
-    btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestamp, 61))
-  }
-
-  return metaDataObj
-}
-
-/**
  * Converts an array of hash strings to a object suitable to
  * return to HTTP clients.
  *
- * @param {string[]} hashes - An array of string hashes to process
- * @returns {Object} An Object with 'meta' and 'hashes' properties
+ * @param {string} hash - A hash string to process
+ * @returns {Object} An Object with 'hash_id', 'hash', 'nist', 'submitted_at' and 'processing_hints' properties
+ *
  */
-function generatePostHashesResponse (hashes) {
-  let lcHashes = utils.lowerCaseHashes(hashes)
-  let hashObjects = lcHashes.map((hash) => {
-    let hashObj = {}
+function generatePostHashResponse (hash) {
+  hash = hash.toLowerCase()
 
-    let hashNIST = nistLatest || ''
+  let hashNIST = nistLatest || ''
 
-    // Compute a five byte BLAKE2s hash of the
-    // timestamp that will be embedded in the UUID.
-    // This allows the UUID to verifiably reflect the
-    // combined NTP time, the hash submitted, and the current
-    // NIST Beacon value if available. Thus these values
-    // are represented both in the BLAKE2s hash and in
-    // the full timestamp embedded in the v1 UUID.
-    //
-    // RFC 4122 allows the MAC address in a version 1
-    // (or 2) UUID to be replaced by a random 48-bit Node ID,
-    // either because the node does not have a MAC address, or
-    // because it is not desirable to expose it. In that case, the
-    // RFC requires that the least significant bit of the first
-    // octet of the Node ID should be set to `1`. This code
-    // uses a five byte BLAKE2s hash as a verifier in place
-    // of the MAC address. This also prevents leakage of server
-    // info.
-    //
-    // This value can be checked on receipt of the hash_id UUID
-    // by extracting the bytes of the last segment of the UUID.
-    // e.g. If the UUID is 'b609358d-7979-11e7-ae31-01ba7816bf8f'
-    // the Node ID hash is the six bytes shown in '01ba7816bf8f'.
-    // Any client that can access the timestamp in the UUID,
-    // the NIST Beacon value, and the original hash can recompute
-    // the verification hash and compare it.
-    //
-    // The UUID can also be verified for correct time by a
-    // client that itself has an accurate NTP clock at the
-    // moment when returned to the client. This allows
-    // a client to verify, likely within a practical limit
-    // of approximately 500ms depending on network latency,
-    // the accuracy of the returned UUIDv1 timestamp.
-    //
-    // See JS API for injecting time and Node ID in the UUID API:
-    // https://github.com/kelektiv/node-uuid/blob/master/README.md
-    //
-    let uuidTimestamp = new Date().getTime()
-    // 5 byte length BLAKE2s hash w/ personalization
-    let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })
-    let hashStr = [
-      uuidTimestamp.toString(),
-      uuidTimestamp.toString().length,
-      hash,
-      hash.length,
-      hashNIST,
-      hashNIST.length
-    ].join(':')
+  // Compute a five byte BLAKE2s hash of the
+  // timestamp that will be embedded in the UUID.
+  // This allows the UUID to verifiably reflect the
+  // combined NTP time, the hash submitted, and the current
+  // NIST Beacon value if available. Thus these values
+  // are represented both in the BLAKE2s hash and in
+  // the full timestamp embedded in the v1 UUID.
+  //
+  // RFC 4122 allows the MAC address in a version 1
+  // (or 2) UUID to be replaced by a random 48-bit Node ID,
+  // either because the node does not have a MAC address, or
+  // because it is not desirable to expose it. In that case, the
+  // RFC requires that the least significant bit of the first
+  // octet of the Node ID should be set to `1`. This code
+  // uses a five byte BLAKE2s hash as a verifier in place
+  // of the MAC address. This also prevents leakage of server
+  // info.
+  //
+  // This value can be checked on receipt of the hash_id UUID
+  // by extracting the bytes of the last segment of the UUID.
+  // e.g. If the UUID is 'b609358d-7979-11e7-ae31-01ba7816bf8f'
+  // the Node ID hash is the six bytes shown in '01ba7816bf8f'.
+  // Any client that can access the timestamp in the UUID,
+  // the NIST Beacon value, and the original hash can recompute
+  // the verification hash and compare it.
+  //
+  // The UUID can also be verified for correct time by a
+  // client that itself has an accurate NTP clock at the
+  // moment when returned to the client. This allows
+  // a client to verify, likely within a practical limit
+  // of approximately 500ms depending on network latency,
+  // the accuracy of the returned UUIDv1 timestamp.
+  //
+  // See JS API for injecting time and Node ID in the UUID API:
+  // https://github.com/kelektiv/node-uuid/blob/master/README.md
+  //
+  let timestampDate = new Date()
+  let timestampMS = timestampDate.getTime()
+  // 5 byte length BLAKE2s hash w/ personalization
+  let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })
+  let hashStr = [
+    timestampMS.toString(),
+    timestampMS.toString().length,
+    hash,
+    hash.length,
+    hashNIST,
+    hashNIST.length
+  ].join(':')
 
-    h.update(Buffer.from(hashStr))
+  h.update(Buffer.from(hashStr))
 
-    hashObj.hash_id = uuidv1({
-      msecs: uuidTimestamp,
-      node: Buffer.concat([Buffer.from([0x01]), h.digest()])
-    })
-
-    hashObj.hash = hash
-    hashObj.nist = hashNIST
-
-    return hashObj
+  let hashId = uuidv1({
+    msecs: timestampMS,
+    node: Buffer.concat([Buffer.from([0x01]), h.digest()])
   })
 
-  return {
-    meta: generatePostHashesResponseMetadata(hashObjects),
-    hashes: hashObjects
+  let result = {}
+  result.hash_id = hashId
+  result.hash = hash
+  result.nist = hashNIST
+  result.submitted_at = utils.formatDateISO8601NoMs(timestampDate)
+  result.processing_hints = {
+    cal: utils.formatDateISO8601NoMs(utils.addSeconds(timestampDate, 10)),
+    eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 41)),
+    btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 61))
   }
+
+  return result
 }
 
 /**
- * POST /hashes handler
+ * POST /hash handler
  *
  * Expects a JSON body with the form:
- *   {"hashes": ["hash1", "hash2", "hashN"]}
+ *   {"hash": "11cd8a380e8d5fd3ac47c1f880390341d40b11485e8ae946d8fa3d466f23fe89"}
  *
- * The `hashes` key must reference a JSON Array
- * of strings representing each hash to anchor.
+ * The `hash` key must reference valid hex string representing the hash to anchor.
  *
  * Each hash must be:
  * - in Hexadecimal form [a-fA-F0-9]
@@ -137,39 +113,21 @@ function generatePostHashesResponse (hashes) {
  * - maximum 128 chars long (e.g. 64 byte SHA512)
  * - an even length string
  */
-function postHashesV1 (req, res, next) {
+function postHashV1 (req, res, next) {
   // validate content-type sent was 'application/json'
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
 
-  // validate params has parse a 'hashes' key
-  if (!req.params.hasOwnProperty('hashes')) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, missing hashes'))
+  // validate params has parse a 'hash' key
+  if (!req.params.hasOwnProperty('hash')) {
+    return next(new restify.InvalidArgumentError('invalid JSON body, missing hash'))
   }
 
-  // validate hashes param is an Array
-  if (!_.isArray(req.params.hashes)) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, hashes is not an Array'))
-  }
-
-  // validate hashes param Array has at least one hash
-  if (_.size(req.params.hashes) < 1) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, hashes Array is empty'))
-  }
-
-  // validate hashes param Array is not larger than allowed max length
-  if (_.size(req.params.hashes) > env.POST_HASHES_MAX) {
-    return next(new restify.InvalidArgumentError(`invalid JSON body, hashes Array max size of ${env.POST_HASHES_MAX} exceeded`))
-  }
-
-  // validate hashes are individually well formed
-  let containsValidHashes = _.every(req.params.hashes, (hash) => {
-    return /^([a-fA-F0-9]{2}){20,64}$/.test(hash)
-  })
-
-  if (!containsValidHashes) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, invalid hashes present'))
+  // validate hash param is a valid hex string
+  let isValidHash = /^([a-fA-F0-9]{2}){20,64}$/.test(req.params.hash)
+  if (!isValidHash) {
+    return next(new restify.InvalidArgumentError('invalid JSON body, invalid hash present'))
   }
 
   // if NIST value is present, ensure NTP time is >= latest NIST value
@@ -182,7 +140,7 @@ function postHashesV1 (req, res, next) {
     }
   }
 
-  let responseObj = generatePostHashesResponse(req.params.hashes)
+  let responseObj = generatePostHashResponse(req.params.hash)
 
   // AMQP / RabbitMQ
 
@@ -220,8 +178,8 @@ function updateNistVars (nistValue) {
 }
 
 module.exports = {
-  postHashesV1: postHashesV1,
-  generatePostHashesResponse: generatePostHashesResponse,
+  postHashV1: postHashV1,
+  generatePostHashResponse: generatePostHashResponse,
   setAMQPChannel: (chan) => { amqpChannel = chan },
   getNistLatest: () => { return nistLatest },
   setNistLatest: (val) => { updateNistVars(val) }

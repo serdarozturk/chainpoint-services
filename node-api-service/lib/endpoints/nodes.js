@@ -9,7 +9,7 @@ const nodeRegistration = require('../../lib/models/NodeRegistration.js')
 let sequelize = nodeRegistration.sequelize
 let NodeRegistration = nodeRegistration.NodeRegistration
 
-// validate hashes are individually well formed
+// validate eth address is well formed
 let isEthereumAddr = (address) => {
   return /^0x[0-9a-fA-F]{40}$/i.test(address)
 }

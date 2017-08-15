@@ -88,7 +88,7 @@ server.pre(restify.pre.userAgentConnection())
 // curl \
 // --verbose \
 // --request OPTIONS \
-// http://127.0.0.1:8080/hashes \
+// http://127.0.0.1:8080/hash \
 // --header 'Origin: http://localhost:9292' \
 // --header 'Access-Control-Request-Headers: Origin, Accept, Content-Type' \
 // --header 'Access-Control-Request-Method: POST'
@@ -109,7 +109,7 @@ server.use(restify.bodyParser({
 // API RESOURCES
 
 // submit hash(es)
-server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashesV1)
+server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashV1)
 // get a single proof with a single hash_id
 server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV1)
 // get multiple proofs with 'hashids' header param

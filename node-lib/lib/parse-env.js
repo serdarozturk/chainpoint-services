@@ -30,7 +30,6 @@ let envDefinitions = {
   // PROOF_EXPIRE_MINUTES: The lifespan of stored proofs, in minutes
   // GET_PROOFS_MAX_REST: The maximum number of proofs that can be requested in one GET /proofs request
   // GET_PROOFS_MAX_WS: The maximum number of proofs that can be requested/subscribed to in one call
-  // POST_HASHES_MAX: The maximum number of hashes allowed to be submitted in one request
   // POST_VERIFY_PROOFS_MAX: The maximum number of proofs allowed to be verified in one request
   // GET_CALENDAR_BLOCKS_MAX: The maximum number of calendar blocks allowed to be retrieved in one request
 
@@ -94,7 +93,6 @@ let envDefinitions = {
   GET_PROOFS_MAX_REST: envalid.num({ default: 250, desc: 'The maximum number of proofs that can be requested in one GET /proofs request' }),
   GET_PROOFS_MAX_WS: envalid.num({ default: 250, desc: 'The maximum number of proofs that can be requested/subscribed to in one call' }),
   MAX_BODY_SIZE: envalid.num({ default: 131072, desc: 'Max body size in bytes for incoming requests' }),
-  POST_HASHES_MAX: envalid.num({ default: 1000, desc: 'The maximum number of hashes allowed to be submitted in one request' }),
   POST_VERIFY_PROOFS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of proofs allowed to be verified in one request' }),
   GET_CALENDAR_BLOCKS_MAX: envalid.num({ default: 1000, desc: 'The maximum number of calendar blocks allowed to be retrieved in one request' }),
 

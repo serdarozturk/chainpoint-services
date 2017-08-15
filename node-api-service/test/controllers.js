@@ -195,7 +195,7 @@ describe('Hashes Controller', () => {
         })
     })
 
-    it('should return proper error with missing hashes', (done) => {
+    it('should return proper error with missing hash', (done) => {
       request(server)
         .post('/hashes')
         .send({ name: 'Manny' })
@@ -208,15 +208,15 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, missing hashes')
+            .and.to.equal('invalid JSON body, missing hash')
           done()
         })
     })
 
-    it('should return proper error with bad hash array', (done) => {
+    it('should return proper error with invalid hash', (done) => {
       request(server)
         .post('/hashes')
-        .send({ hashes: 'Manny' })
+        .send({ hash: 'badhash' })
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -226,66 +226,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, hashes is not an Array')
-          done()
-        })
-    })
-
-    it('should return proper error with empty hash array', (done) => {
-      request(server)
-        .post('/hashes')
-        .send({ hashes: [] })
-        .expect('Content-type', /json/)
-        .expect(409)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidArgument')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, hashes Array is empty')
-          done()
-        })
-    })
-
-    it('should return proper error with too many hashes', (done) => {
-      let hashes = []
-      for (let x = 0; x < 1100; x++) {
-        hashes.push('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
-      }
-
-      request(server)
-        .post('/hashes')
-        .send({ hashes: hashes })
-        .expect('Content-type', /json/)
-        .expect(409)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidArgument')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, hashes Array max size of 1000 exceeded')
-          done()
-        })
-    })
-
-    it('should return proper error with invalid hashes', (done) => {
-      request(server)
-        .post('/hashes')
-        .send({ hashes: ['badhash'] })
-        .expect('Content-type', /json/)
-        .expect(409)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidArgument')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, invalid hashes present')
+            .and.to.equal('invalid JSON body, invalid hash present')
           done()
         })
     })
@@ -293,7 +234,7 @@ describe('Hashes Controller', () => {
     it('should return proper error with no AMQP connection', (done) => {
       request(server)
         .post('/hashes')
-        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(500)
         .end((err, res) => {
@@ -312,10 +253,10 @@ describe('Hashes Controller', () => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
-      app.setNistLatest('3000585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNistLatest('3002759084:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
       request(server)
         .post('/hashes')
-        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(500)
         .end((err, res) => {
@@ -338,15 +279,15 @@ describe('Hashes Controller', () => {
 
       request(server)
         .post('/hashes')
-        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
-          expect(res.body.hashes[0]).to.have.property('hash_id')
-          expect(res.body.meta).to.have.property('submitted_at')
+          expect(res.body).to.have.property('hash_id')
+          expect(res.body).to.have.property('submitted_at')
           // The UUID timestamp has ms level precision, ISO8601 only to the second.
           // Check that they are within 1000ms of each other.
-          expect(uuidTime.v1(res.body.hashes[0].hash_id) - Date.parse(res.body.meta.submitted_at)).to.be.within(0, 1000)
+          expect(uuidTime.v1(res.body.hash_id) - Date.parse(res.body.submitted_at)).to.be.within(0, 1000)
           done()
         })
     })
@@ -361,33 +302,33 @@ describe('Hashes Controller', () => {
 
       request(server)
         .post('/hashes')
-        .send({ hashes: [hash] })
+        .send({ hash: hash })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
-          expect(res.body.hashes[0]).to.have.property('hash_id')
+          expect(res.body).to.have.property('hash_id')
           // Knowing the original hash, the timestamp from the UUID, the
           // latest available NIST data, and the personalization bytes,
           // you should be able to calculate whether the UUID 'Node ID'
           // data segment is the 5 byte BLAKE2s hash of the timestamp
           // embedded in the UUID and the hash submitted to get this UUID.
-          let t = uuidTime.v1(res.body.hashes[0].hash_id)
+          let t = uuidTime.v1(res.body.hash_id)
 
           // 5 byte length BLAKE2s hash w/ personalization
           let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })
           let hashStr = [
             t.toString(),
             t.toString().length,
-            res.body.hashes[0].hash,
-            res.body.hashes[0].hash.length,
-            res.body.hashes[0].nist,
-            res.body.hashes[0].nist.length
+            res.body.hash,
+            res.body.hash.length,
+            res.body.nist,
+            res.body.nist.length
           ].join(':')
 
           h.update(Buffer.from(hashStr))
           let shortHashNodeBuf = Buffer.concat([Buffer.from([0x01]), h.digest()])
           // Last segment of UUIDv1 contains BLAKE2s hash to be matched
-          expect(res.body.hashes[0].hash_id.split('-')[4]).to.equal(shortHashNodeBuf.toString('hex'))
+          expect(res.body.hash_id.split('-')[4]).to.equal(shortHashNodeBuf.toString('hex'))
           done()
         })
     })
@@ -400,27 +341,20 @@ describe('Hashes Controller', () => {
 
       request(server)
         .post('/hashes')
-        .send({ hashes: ['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'] })
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
           expect(res).to.have.property('body')
-          expect(res.body).to.have.property('meta')
-          expect(res.body.meta).to.have.property('submitted_at')
-          expect(res.body.meta).to.have.property('processing_hints')
-          expect(res.body.meta.processing_hints).to.have.property('cal')
-            .and.to.be.a('string')
-          expect(res.body.meta.processing_hints).to.have.property('eth')
-            .and.to.be.a('string')
-          expect(res.body.meta.processing_hints).to.have.property('btc')
-            .and.to.be.a('string')
-          expect(res.body).to.have.property('hashes')
-            .and.to.be.a('array')
-          expect(res.body.hashes.length).to.equal(1)
-          expect(res.body.hashes[0]).to.have.property('hash_id')
-          expect(res.body.hashes[0]).to.have.property('hash')
-            .and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+          expect(res.body).to.have.property('hash_id')
+          expect(res.body).to.have.property('hash').and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+          expect(res.body).to.have.property('nist')
+          expect(res.body).to.have.property('submitted_at')
+          expect(res.body).to.have.property('processing_hints')
+          expect(res.body.processing_hints).to.have.property('cal').and.to.be.a('string')
+          expect(res.body.processing_hints).to.have.property('eth').and.to.be.a('string')
+          expect(res.body.processing_hints).to.have.property('btc').and.to.be.a('string')
           done()
         })
     })
@@ -779,7 +713,6 @@ describe('Config Controller', () => {
           expect(res.body).to.have.property('proof_expire_minutes')
           expect(res.body).to.have.property('get_proofs_max_rest')
           expect(res.body).to.have.property('get_proofs_max_ws')
-          expect(res.body).to.have.property('post_hashes_max')
           expect(res.body).to.have.property('post_verify_proofs_max')
           expect(res.body).to.have.property('get_calendar_blocks_max')
           expect(res.body).to.have.property('time')
@@ -1039,54 +972,16 @@ describe('Nodes Controller', () => {
 })
 
 describe('Functions', () => {
-  describe('calling generatePostHashesResponse with one hash', () => {
+  describe('calling generatePostHashResponse with one hash', () => {
     it('should return proper response object', (done) => {
-      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
-      expect(res).to.have.property('meta')
-      expect(res.meta).to.have.property('submitted_at')
-      expect(res.meta).to.have.property('processing_hints')
-      expect(res.meta.processing_hints).to.have.property('cal')
-        .and.to.be.a('string')
-      expect(res.meta.processing_hints).to.have.property('eth')
-        .and.to.be.a('string')
-      expect(res.meta.processing_hints).to.have.property('btc')
-        .and.to.be.a('string')
-      expect(res).to.have.property('hashes')
-        .and.to.be.a('array')
-      expect(res.hashes.length).to.equal(1)
-      expect(res.hashes[0]).to.have.property('hash_id')
-      expect(res.hashes[0]).to.have.property('hash')
-        .and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
-      done()
-    })
-  })
-
-  describe('calling generatePostHashesResponse with three hashes', () => {
-    it('should return proper response object', (done) => {
-      let res = hashes.generatePostHashesResponse(['ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
-        'aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12',
-        'bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'])
-      expect(res).to.have.property('meta')
-      expect(res.meta).to.have.property('submitted_at')
-      expect(res.meta).to.have.property('processing_hints')
-      expect(res.meta.processing_hints).to.have.property('cal')
-        .and.to.be.a('string')
-      expect(res.meta.processing_hints).to.have.property('eth')
-        .and.to.be.a('string')
-      expect(res.meta.processing_hints).to.have.property('btc')
-        .and.to.be.a('string')
-      expect(res).to.have.property('hashes')
-        .and.to.be.a('array')
-      expect(res.hashes.length).to.equal(3)
-      expect(res.hashes[0]).to.have.property('hash_id')
-      expect(res.hashes[0]).to.have.property('hash')
-        .and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
-      expect(res.hashes[1]).to.have.property('hash_id')
-      expect(res.hashes[1]).to.have.property('hash')
-        .and.to.equal('aa12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
-      expect(res.hashes[2]).to.have.property('hash_id')
-      expect(res.hashes[2]).to.have.property('hash')
-        .and.to.equal('bb12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+      let res = hashes.generatePostHashResponse('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+      expect(res).to.have.property('hash_id')
+      expect(res).to.have.property('hash').and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+      expect(res).to.have.property('submitted_at')
+      expect(res).to.have.property('processing_hints')
+      expect(res.processing_hints).to.have.property('cal').and.to.be.a('string')
+      expect(res.processing_hints).to.have.property('eth').and.to.be.a('string')
+      expect(res.processing_hints).to.have.property('btc').and.to.be.a('string')
       done()
     })
   })

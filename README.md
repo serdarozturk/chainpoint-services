@@ -84,35 +84,6 @@ Running `make` should build and start all services for you.
 
 The following examples use `curl` to submit requests.
 
-### Submit a Hash
-
-Once the environment is running you can start submitting hashes to be anchored.
-
-```
-curl -s -H "Content-Type: application/json" -X POST -d '{"hashes": ["bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"]}' 127.0.0.1/hashes
-```
-
-sample output (prettified with [jq](https://stedolan.github.io/jq/)):
-
-```
-{
-  "meta": {
-    "submitted_at": "2017-06-09T20:39:54Z",
-    "processing_hints": {
-      "cal": "2017-06-09T20:40:54Z",
-      "eth": "2017-06-09T20:50:54Z",
-      "btc": "2017-06-09T21:40:54Z"
-    }
-  },
-  "hashes": [
-    {
-      "hash_id": "cb1980c0-4d53-11e7-88fb-870abcce3652",
-      "hash": "bbf26fec613afd177da0f435042081d6e52dbcfe6ac3b83a53ea3e23926f75b4"
-    }
-  ]
-}
-```
-
 ### Retrieve a Base64 encoded Binary Proof for a Hash ID
 
 Proofs can be retrieved in the supported

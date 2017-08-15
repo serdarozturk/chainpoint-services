@@ -40,22 +40,9 @@ function formatDateISO8601NoMs (date) {
   return date.toISOString().slice(0, 19) + 'Z'
 }
 
-/**
- * Convert strings in an Array of hashes to lower case
- *
- * @param {string[]} hashes - An array of string hashes to convert to lower case
- * @returns {string[]} An array of lowercase hash strings
- */
-function lowerCaseHashes (hashes) {
-  return hashes.map((hash) => {
-    return hash.toLowerCase()
-  })
-}
-
 module.exports = {
   sleep: sleep,
   addMinutes: addMinutes,
   addSeconds: addSeconds,
-  formatDateISO8601NoMs: formatDateISO8601NoMs,
-  lowerCaseHashes: lowerCaseHashes
+  formatDateISO8601NoMs: formatDateISO8601NoMs
 }
