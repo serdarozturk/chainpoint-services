@@ -239,12 +239,12 @@ function consumeBtcTxMessage (msg) {
       (callback) => {
         // queue up message containing updated proof state bound for proof state service
         let stateObj = {}
-        stateObj.anchor_agg_id = btcTxObj.anchor_agg_id
+        stateObj.anchor_btc_agg_id = btcTxObj.anchor_btc_agg_id
         stateObj.btctx_id = btcTxObj.btctx_id
-        let anchorAggRoot = btcTxObj.anchor_agg_root
+        let anchorBTCAggRoot = btcTxObj.anchor_btc_agg_root
         let btctxBody = btcTxObj.btctx_body
-        let prefix = btctxBody.substr(0, btctxBody.indexOf(anchorAggRoot))
-        let suffix = btctxBody.substr(btctxBody.indexOf(anchorAggRoot) + anchorAggRoot.length)
+        let prefix = btctxBody.substr(0, btctxBody.indexOf(anchorBTCAggRoot))
+        let suffix = btctxBody.substr(btctxBody.indexOf(anchorBTCAggRoot) + anchorBTCAggRoot.length)
         stateObj.btctx_state = {}
         stateObj.btctx_state.ops = [
           { l: prefix },
@@ -471,8 +471,8 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
     let treeSize = merkleTools.getLeafCount()
 
     let treeData = {}
-    treeData.anchor_agg_id = uuidv1()
-    treeData.anchor_agg_root = merkleTools.getMerkleRoot().toString('hex')
+    treeData.anchor_btc_agg_id = uuidv1()
+    treeData.anchor_btc_agg_root = merkleTools.getMerkleRoot().toString('hex')
 
     let proofData = []
     for (let x = 0; x < treeSize; x++) {
@@ -493,10 +493,10 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
     if (amqpChannel === null) return
 
     // Create new btc anchor block with resulting tree root
-    await createBtcAnchorBlockAsync(treeData.anchor_agg_root)
+    await createBtcAnchorBlockAsync(treeData.anchor_btc_agg_root)
 
     // For each calendar record block in the tree, add proof state
-    // item containing proof ops from block_hash to anchor_agg_root
+    // item containing proof ops from block_hash to anchor_btc_agg_root
     async.series([
       (seriesCallback) => {
         // for each calendar block hash, queue up message containing updated
@@ -504,19 +504,19 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
         async.each(treeData.proofData, (proofDataItem, eachCallback) => {
           let stateObj = {}
           stateObj.cal_id = proofDataItem.cal_id
-          stateObj.anchor_agg_id = treeData.anchor_agg_id
-          stateObj.anchor_agg_state = {}
-          stateObj.anchor_agg_state.ops = proofDataItem.proof
+          stateObj.anchor_btc_agg_id = treeData.anchor_btc_agg_id
+          stateObj.anchor_btc_agg_state = {}
+          stateObj.anchor_btc_agg_state.ops = proofDataItem.proof
 
-          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_agg' },
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_btc_agg' },
             (err, ok) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message nacked')
+                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message nacked')
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message acked')
+                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -531,10 +531,10 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
         })
       },
       (seriesCallback) => {
-        // Create anchor_agg message data object for anchoring service(s)
+        // Create anchor_btc_agg message data object for anchoring service(s)
         let anchorData = {
-          anchor_agg_id: treeData.anchor_agg_id,
-          anchor_agg_root: treeData.anchor_agg_root
+          anchor_btc_agg_id: treeData.anchor_btc_agg_id,
+          anchor_btc_agg_root: treeData.anchor_btc_agg_root
         }
 
         // Send anchorData to the btc tx service for anchoring

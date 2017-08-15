@@ -44,23 +44,23 @@ let CalStates = sequelize.define('cal_states', {
   timestamps: false
 })
 
-// table for state data connecting calendar block hashes to anchor_agg_root
-let AnchorAggStates = sequelize.define('anchor_agg_states', {
+// table for state data connecting calendar block hashes to anchor_btc_agg_root
+let AnchorBTCAggStates = sequelize.define('anchor_btc_agg_states', {
   cal_id: { type: Sequelize.INTEGER, primaryKey: true },
-  anchor_agg_id: { type: Sequelize.UUID },
-  anchor_agg_state: { type: Sequelize.TEXT }
+  anchor_btc_agg_id: { type: Sequelize.UUID },
+  anchor_btc_agg_state: { type: Sequelize.TEXT }
 }, {
   indexes: [
     {
-      fields: ['anchor_agg_id']
+      fields: ['anchor_btc_agg_id']
     }
   ],
   timestamps: false
 })
 
-// table for state data connecting one anchor_agg_root to one btctx_id
+// table for state data connecting one anchor_btc_agg_root to one btctx_id
 let BtcTxStates = sequelize.define('btctx_states', {
-  anchor_agg_id: { type: Sequelize.UUID, primaryKey: true },
+  anchor_btc_agg_id: { type: Sequelize.UUID, primaryKey: true },
   btctx_id: { type: Sequelize.STRING },
   btctx_state: { type: Sequelize.TEXT }
 }, {
@@ -135,8 +135,8 @@ async function getHashIdsByAggIdAsync (aggId) {
 async function getHashIdsByBtcTxIdAsync (btcTxId) {
   let results = await sequelize.query(`SELECT a.hash_id FROM agg_states a 
     INNER JOIN cal_states c ON c.agg_id = a.agg_id 
-    INNER JOIN anchor_agg_states aa ON aa.cal_id = c.cal_id 
-    INNER JOIN btctx_states tx ON tx.anchor_agg_id = aa.anchor_agg_id 
+    INNER JOIN anchor_btc_agg_states aa ON aa.cal_id = c.cal_id 
+    INNER JOIN btctx_states tx ON tx.anchor_btc_agg_id = aa.anchor_btc_agg_id 
     WHERE tx.btctx_id = '${btcTxId}'`, { type: sequelize.QueryTypes.SELECT })
   return results
 }
@@ -159,8 +159,8 @@ async function getCalStateObjectByAggIdAsync (aggId) {
   return result
 }
 
-async function getAnchorAggStateObjectByCalIdAsync (calId) {
-  let result = await AnchorAggStates.findOne({
+async function getAnchorBTCAggStateObjectByCalIdAsync (calId) {
+  let result = await AnchorBTCAggStates.findOne({
     where: {
       cal_id: calId
     }
@@ -168,10 +168,10 @@ async function getAnchorAggStateObjectByCalIdAsync (calId) {
   return result
 }
 
-async function getBTCTxStateObjectByAnchorAggIdAsync (anchorAggId) {
+async function getBTCTxStateObjectByAnchorBTCAggIdAsync (anchorBTCAggId) {
   let result = await BtcTxStates.findOne({
     where: {
-      anchor_agg_id: anchorAggId
+      anchor_btc_agg_id: anchorBTCAggId
     }
   })
   return result
@@ -204,10 +204,10 @@ async function getCalStateObjectsByCalIdAsync (calId) {
   return results
 }
 
-async function getAnchorAggStateObjectsByAnchorAggIdAsync (anchorAggId) {
-  let results = await AnchorAggStates.findAll({
+async function getAnchorBTCAggStateObjectsByAnchorBTCAggIdAsync (anchorBTCAggId) {
+  let results = await AnchorBTCAggStates.findAll({
     where: {
-      anchor_agg_id: anchorAggId
+      anchor_btc_agg_id: anchorBTCAggId
     }
   })
   return results
@@ -251,23 +251,23 @@ async function writeCalStateObjectAsync (stateObject) {
   return true
 }
 
-async function writeAnchorAggStateObjectAsync (stateObject) {
-  let stateString = JSON.stringify(stateObject.anchor_agg_state)
-  await sequelize.query(`INSERT INTO anchor_agg_states (cal_id, anchor_agg_id, anchor_agg_state)
-    VALUES ('${stateObject.cal_id}', '${stateObject.anchor_agg_id}', '${stateString}')
+async function writeAnchorBTCAggStateObjectAsync (stateObject) {
+  let stateString = JSON.stringify(stateObject.anchor_btc_agg_state)
+  await sequelize.query(`INSERT INTO anchor_btc_agg_states (cal_id, anchor_btc_agg_id, anchor_btc_agg_state)
+    VALUES ('${stateObject.cal_id}', '${stateObject.anchor_btc_agg_id}', '${stateString}')
     ON CONFLICT (cal_id)
-    DO UPDATE SET (anchor_agg_id, anchor_agg_state) = ('${stateObject.anchor_agg_id}', '${stateString}')
-    WHERE anchor_agg_states.cal_id = '${stateObject.cal_id}'`)
+    DO UPDATE SET (anchor_btc_agg_id, anchor_btc_agg_state) = ('${stateObject.anchor_btc_agg_id}', '${stateString}')
+    WHERE anchor_btc_agg_states.cal_id = '${stateObject.cal_id}'`)
   return true
 }
 
 async function writeBTCTxStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.btctx_state)
-  await sequelize.query(`INSERT INTO btctx_states (anchor_agg_id, btctx_id, btctx_state)
-    VALUES ('${stateObject.anchor_agg_id}', '${stateObject.btctx_id}', '${stateString}')
-    ON CONFLICT (anchor_agg_id)
+  await sequelize.query(`INSERT INTO btctx_states (anchor_btc_agg_id, btctx_id, btctx_state)
+    VALUES ('${stateObject.anchor_btc_agg_id}', '${stateObject.btctx_id}', '${stateString}')
+    ON CONFLICT (anchor_btc_agg_id)
     DO UPDATE SET (btctx_id, btctx_state) = ('${stateObject.btctx_id}', '${stateString}')
-    WHERE btctx_states.anchor_agg_id = '${stateObject.anchor_agg_id}'`)
+    WHERE btctx_states.anchor_btc_agg_id = '${stateObject.anchor_btc_agg_id}'`)
   return true
 }
 
@@ -340,20 +340,20 @@ async function deleteCalStatesWithNoRemainingAggStatesAsync () {
   return meta.rowCount
 }
 
-async function deleteAnchorAggStatesWithNoRemainingCalStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM anchor_agg_states WHERE cal_id IN
-    (SELECT a.cal_id FROM anchor_agg_states a
+async function deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM anchor_btc_agg_states WHERE cal_id IN
+    (SELECT a.cal_id FROM anchor_btc_agg_states a
     LEFT JOIN cal_states c ON a.cal_id = c.cal_id
     GROUP BY a.cal_id HAVING COUNT(c.cal_id) = 0)`)
   let meta = results[1]
   return meta.rowCount
 }
 
-async function deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM btctx_states WHERE anchor_agg_id IN
-    (SELECT b.anchor_agg_id FROM btctx_states b
-    LEFT JOIN anchor_agg_states a ON b.anchor_agg_id = a.anchor_agg_id
-    GROUP BY b.anchor_agg_id HAVING COUNT(a.anchor_agg_id) = 0)`)
+async function deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync () {
+  let results = await sequelize.query(`DELETE FROM btctx_states WHERE anchor_btc_agg_id IN
+    (SELECT b.anchor_btc_agg_id FROM btctx_states b
+    LEFT JOIN anchor_btc_agg_states a ON b.anchor_btc_agg_id = a.anchor_btc_agg_id
+    GROUP BY b.anchor_btc_agg_id HAVING COUNT(a.anchor_btc_agg_id) = 0)`)
   let meta = results[1]
   return meta.rowCount
 }
@@ -374,17 +374,17 @@ module.exports = {
   getHashIdsByBtcTxIdAsync: getHashIdsByBtcTxIdAsync,
   getAggStateObjectByHashIdAsync: getAggStateObjectByHashIdAsync,
   getCalStateObjectByAggIdAsync: getCalStateObjectByAggIdAsync,
-  getAnchorAggStateObjectByCalIdAsync: getAnchorAggStateObjectByCalIdAsync,
-  getBTCTxStateObjectByAnchorAggIdAsync: getBTCTxStateObjectByAnchorAggIdAsync,
+  getAnchorBTCAggStateObjectByCalIdAsync: getAnchorBTCAggStateObjectByCalIdAsync,
+  getBTCTxStateObjectByAnchorBTCAggIdAsync: getBTCTxStateObjectByAnchorBTCAggIdAsync,
   getBTCHeadStateObjectByBTCTxIdAsync: getBTCHeadStateObjectByBTCTxIdAsync,
   getAggStateObjectsByAggIdAsync: getAggStateObjectsByAggIdAsync,
   getCalStateObjectsByCalIdAsync: getCalStateObjectsByCalIdAsync,
-  getAnchorAggStateObjectsByAnchorAggIdAsync: getAnchorAggStateObjectsByAnchorAggIdAsync,
+  getAnchorBTCAggStateObjectsByAnchorBTCAggIdAsync: getAnchorBTCAggStateObjectsByAnchorBTCAggIdAsync,
   getBTCTxStateObjectsByBTCTxIdAsync: getBTCTxStateObjectsByBTCTxIdAsync,
   getBTCHeadStateObjectsByBTCHeadIdAsync: getBTCHeadStateObjectsByBTCHeadIdAsync,
   writeAggStateObjectAsync: writeAggStateObjectAsync,
   writeCalStateObjectAsync: writeCalStateObjectAsync,
-  writeAnchorAggStateObjectAsync: writeAnchorAggStateObjectAsync,
+  writeAnchorBTCAggStateObjectAsync: writeAnchorBTCAggStateObjectAsync,
   writeBTCTxStateObjectAsync: writeBTCTxStateObjectAsync,
   writeBTCHeadStateObjectAsync: writeBTCHeadStateObjectAsync,
   logAggregatorEventForHashIdAsync: logAggregatorEventForHashIdAsync,
@@ -394,7 +394,7 @@ module.exports = {
   deleteProcessedHashesFromAggStatesAsync: deleteProcessedHashesFromAggStatesAsync,
   deleteHashTrackerLogEntriesAsync: deleteHashTrackerLogEntriesAsync,
   deleteCalStatesWithNoRemainingAggStatesAsync: deleteCalStatesWithNoRemainingAggStatesAsync,
-  deleteAnchorAggStatesWithNoRemainingCalStatesAsync: deleteAnchorAggStatesWithNoRemainingCalStatesAsync,
-  deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync: deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync,
+  deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync: deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync,
+  deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync: deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync,
   deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync: deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync
 }

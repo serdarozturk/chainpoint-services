@@ -114,15 +114,15 @@ async function ConsumeCalendarMessageAsync (msg) {
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
 */
-async function ConsumeAnchorAggMessageAsync (msg) {
+async function ConsumeAnchorBTCAggMessageAsync (msg) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
   stateObj.cal_id = messageObj.cal_id
-  stateObj.anchor_agg_id = messageObj.anchor_agg_id
-  stateObj.anchor_agg_state = messageObj.anchor_agg_state
+  stateObj.anchor_btc_agg_id = messageObj.anchor_btc_agg_id
+  stateObj.anchor_btc_agg_state = messageObj.anchor_btc_agg_state
 
   try {
-    await storageClient.writeAnchorAggStateObjectAsync(stateObj)
+    await storageClient.writeAnchorBTCAggStateObjectAsync(stateObj)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
     console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
@@ -140,7 +140,7 @@ async function ConsumeAnchorAggMessageAsync (msg) {
 async function ConsumeBtcTxMessageAsync (msg) {
   let messageObj = JSON.parse(msg.content.toString())
   let stateObj = {}
-  stateObj.anchor_agg_id = messageObj.anchor_agg_id
+  stateObj.anchor_btc_agg_id = messageObj.anchor_btc_agg_id
   stateObj.btctx_id = messageObj.btctx_id
   stateObj.btctx_state = messageObj.btctx_state
 
@@ -269,11 +269,11 @@ async function ConsumeProofReadyMessageAsync (msg) {
         // get the cal_state object for the agg_id
         let calStateRow = await storageClient.getCalStateObjectByAggIdAsync(aggStateRow.agg_id)
         if (!calStateRow) throw new Error(new Date().toISOString() + ' no matching cal_state data found')
-        // get the anchorAgg_state object for the cal_id
-        let anchorAggStateRow = await storageClient.getAnchorAggStateObjectByCalIdAsync(calStateRow.cal_id)
-        if (!anchorAggStateRow) throw new Error(new Date().toISOString() + ' no matching anchor_agg_state data found')
-        // get the btctx_state object for the anchor_agg_id
-        let btcTxStateRow = await storageClient.getBTCTxStateObjectByAnchorAggIdAsync(anchorAggStateRow.anchor_agg_id)
+        // get the anchorBTCAgg_state object for the cal_id
+        let anchorBTCAggStateRow = await storageClient.getAnchorBTCAggStateObjectByCalIdAsync(calStateRow.cal_id)
+        if (!anchorBTCAggStateRow) throw new Error(new Date().toISOString() + ' no matching anchor_btc_agg_state data found')
+        // get the btctx_state object for the anchor_btc_agg_id
+        let btcTxStateRow = await storageClient.getBTCTxStateObjectByAnchorBTCAggIdAsync(anchorBTCAggStateRow.anchor_btc_agg_id)
         if (!btcTxStateRow) throw new Error(new Date().toISOString() + ' no matching btctx_state data found')
         // get the btcthead_state object for the btctx_id
         let btcHeadStateRow = await storageClient.getBTCHeadStateObjectByBTCTxIdAsync(btcTxStateRow.btctx_id)
@@ -285,7 +285,7 @@ async function ConsumeProofReadyMessageAsync (msg) {
         dataOutObj.hash = aggStateRow.hash
         dataOutObj.agg_state = JSON.parse(aggStateRow.agg_state)
         dataOutObj.cal_state = JSON.parse(calStateRow.cal_state)
-        dataOutObj.anchor_agg_state = JSON.parse(anchorAggStateRow.anchor_agg_state)
+        dataOutObj.anchor_btc_agg_state = JSON.parse(anchorBTCAggStateRow.anchor_btc_agg_state)
         dataOutObj.btctx_state = JSON.parse(btcTxStateRow.btctx_state)
         dataOutObj.btchead_state = JSON.parse(btcHeadStateRow.btchead_state)
 
@@ -336,11 +336,11 @@ async function PruneStateDataAsync () {
     // remove all rows from cal_states whose agg_states children have all been deleted
     rowCount = await storageClient.deleteCalStatesWithNoRemainingAggStatesAsync()
     console.log(`Pruned cal_states - ${rowCount} row(s) deleted`)
-    // remove all rows from anchor_agg_states whose cal_states children have all been deleted
-    rowCount = await storageClient.deleteAnchorAggStatesWithNoRemainingCalStatesAsync()
-    console.log(`Pruned anchor_agg_states - ${rowCount} row(s) deleted`)
-    // remove all rows from btctx_states whose anchor_agg_states children have all been deleted
-    rowCount = await storageClient.deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync()
+    // remove all rows from anchor_btc_agg_states whose cal_states children have all been deleted
+    rowCount = await storageClient.deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync()
+    console.log(`Pruned anchor_btc_agg_states - ${rowCount} row(s) deleted`)
+    // remove all rows from btctx_states whose anchor_btc_agg_states children have all been deleted
+    rowCount = await storageClient.deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync()
     console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
     // remove all rows from btchead_states whose btctx_states children have all been deleted
     rowCount = await storageClient.deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()
@@ -370,10 +370,10 @@ function processMessage (msg) {
         // Stores state information and publishes proof ready messages bound for the proof state service
         ConsumeCalendarMessageAsync(msg)
         break
-      case 'anchor_agg':
-        // Consumes a anchor aggregation state message from the Calendar service
+      case 'anchor_btc_agg':
+        // Consumes a anchor BTC aggregation state message from the Calendar service
         // Stores state information for anchor agregation events
-        ConsumeAnchorAggMessageAsync(msg)
+        ConsumeAnchorBTCAggMessageAsync(msg)
         break
       case 'btctx':
         // Consumes a btctx state message from the Calendar service

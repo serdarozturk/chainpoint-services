@@ -88,11 +88,11 @@ const sendTxToBTCAsync = async (hash) => {
 *
 * @param {amqp message object} msg - The AMQP message received from the queue
 */
-async function processIncomingAnchorJobAsync (msg) {
+async function processIncomingAnchorBTCJobAsync (msg) {
   if (msg !== null) {
     let messageObj = JSON.parse(msg.content.toString())
     // the value to be anchored, likely a merkle root hex string
-    let anchorData = messageObj.anchor_agg_root
+    let anchorData = messageObj.anchor_btc_agg_root
 
     // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
     if (!amqpChannel) throw new Error('no amqpConnection available')
@@ -168,7 +168,7 @@ async function openRMQConnectionAsync (connectionString) {
       amqpChannel = chan
       // Receive and process messages meant to initiate btc tx generation and publishing
       chan.consume(env.RMQ_WORK_IN_BTCTX_QUEUE, (msg) => {
-        processIncomingAnchorJobAsync(msg)
+        processIncomingAnchorBTCJobAsync(msg)
       })
       // if the channel closes for any reason, attempt to reconnect
       conn.on('close', async () => {

@@ -14,17 +14,17 @@ The following is a description of methods that must be defined in a storage adap
 | getHashIdsByBtcTxIdAsync(btcTxId)     | gets all hash ids associated with a btcTxId | result array containing hash id objects |
 | getAggStateObjectByHashIdAsync(hashId)     | gets the agg state object for a given hash id | an agg state object |
 | getCalStateObjectByAggIdAsync(aggId)     | gets the cal state object for a given agg id | a cal state object |
-| getAnchorAggStateObjectByCalIdAsync(calId)     | gets the anchor agg state object for a given cal id | an anchor agg state object |
-| getBTCTxStateObjectByAnchorAggIdAsync(anchorAggId)     | gets the btctx state object for a given anchor agg id | a btctx state object |
+| getAnchorBTCAggStateObjectByCalIdAsync(calId)     | gets the anchor agg state object for a given cal id | an anchor agg state object |
+| getBTCTxStateObjectByAnchorBTCAggIdAsync(anchorBTCAggId)     | gets the btctx state object for a given anchor agg id | a btctx state object |
 | getBTCHeadStateObjectByBTCTxIdAsync(btcTxId)     | gets the btchead state object for a given btctx id | a btchead state object |
 | getAggStateObjectsByAggIdAsync(aggId)     | gets all agg state data for a given agg id | result array containing agg state objects |
 | getCalStateObjectsByCalIdAsync(calId)     | gets all cal state data for a given cal id | result array containing cal state objects |
-| getAnchorAggStateObjectsByAnchorAggIdAsync(anchorAggId)     | gets all anchor agg state data for a given anchor agg id | result array containing anchor agg state objects |
+| getAnchorBTCAggStateObjectsByAnchorBTCAggIdAsync(anchorBTCAggId)     | gets all anchor agg state data for a given anchor agg id | result array containing anchor agg state objects |
 | getBTCTxStateObjectsByBTCTxIdAsync(btcTxId)     | gets all btctx state data for a given btctx id | result array containing btctx state objects |
 | getBTCHeadStateObjectsByBTCHeadIdAsync(btcHeadId)     | gets all btchead state data for a given btchead id | result array containing btchead state objects |
 | writeAggStateObjectAsync(stateObject)     | write the agg state object to storage | boolean indicating success |
 | writeCalStateObjectAsync(stateObject)     | write the cal state object to storage | boolean indicating success |
-| writeAnchorAggStateObjectAsync(stateObject)     | write the anchor agg state object to storage | boolean indicating success |
+| writeAnchorBTCAggStateObjectAsync(stateObject)     | write the anchor agg state object to storage | boolean indicating success |
 | writeBTCTxStateObjectAsync(stateObject)     | write the btctx state object to storage | boolean indicating success |
 | writeBTCHeadStateObjectAsync(stateObject)     | write the btchead state object to storage | boolean indicating success |
 | logAggregationEventForHashIdAsync(hashId)     | log an aggregation event for the given hash id to the hash tracker | boolean indicating success |
@@ -34,8 +34,8 @@ The following is a description of methods that must be defined in a storage adap
 | deleteProcessedHashesFromAggStatesAsync()     | prune records from agg\_states table | integer |
 | deleteHashTrackerLogEntriesAsync()     | prune records from hash\_tracker\_logs table | integer |
 | deleteCalStatesWithNoRemainingAggStatesAsync()     | prune records from cal\_states table | integer |
-| deleteAnchorAggStatesWithNoRemainingCalStatesAsync()     | prune records from anchor\_agg\_states table | integer |
-| deleteBtcTxStatesWithNoRemainingAnchorAggStatesAsync()     | prune records from btctx\_states table | integer |
+| deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync()     | prune records from anchor\_agg\_states table | integer |
+| deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync()     | prune records from btctx\_states table | integer |
 | deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()     | prune records from btchead\_states table | integer |
 
 

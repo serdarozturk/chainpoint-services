@@ -105,7 +105,7 @@ function generateBTCProof (msg) {
   let proof = {}
   proof = addChainpointHeader(proof, messageObj.hash, messageObj.hash_id)
   proof = addCalendarBranch(proof, messageObj.agg_state, messageObj.cal_state)
-  proof = addBtcBranch(proof, messageObj.anchor_agg_state, messageObj.btctx_state, messageObj.btchead_state)
+  proof = addBtcBranch(proof, messageObj.anchor_btc_agg_state, messageObj.btctx_state, messageObj.btchead_state)
 
   // ensure the proof is valid according to the defined Chainpoint v3 JSON schema
   let isValidSchema = chainpointProofSchema.validate(proof).valid
@@ -217,10 +217,10 @@ function addCalendarBranch (proof, aggState, calState) {
   return proof
 }
 
-function addBtcBranch (proof, anchorAggState, btcTxState, btcHeadState) {
+function addBtcBranch (proof, anchorBTCAggState, btcTxState, btcHeadState) {
   let btcBranch = {}
   btcBranch.label = 'btc_anchor_branch'
-  btcBranch.ops = anchorAggState.ops.concat(btcTxState.ops, btcHeadState.ops)
+  btcBranch.ops = anchorBTCAggState.ops.concat(btcTxState.ops, btcHeadState.ops)
 
   let btcAnchor = {}
   btcAnchor.type = 'btc'

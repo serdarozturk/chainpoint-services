@@ -94,8 +94,8 @@ The following is an example of state data published in an anchor agg message:
 ```json
 {
   "cal_id": "1027",
-  "anchor_agg_id": "af884cde-422b-11e7-a919-92ebcb67fe33",
-  "anchor_agg_state": {
+  "anchor_btc_agg_id": "af884cde-422b-11e7-a919-92ebcb67fe33",
+  "anchor_btc_agg_state": {
     "ops": [
       { "l": "c380779f6175766fdbe90940851fff3995d343c63bbb82f816843c1d5100865e" },
       { "op": "sha-256" },
@@ -117,7 +117,7 @@ When data has been anchored to the Bitcoin blockchain, additional state data is 
 The following is an example of state data published in an anchor agg message: 
 ```json
 {
-  "anchor_agg_id": "af884cde-422b-11e7-a919-92ebcb67fe33",
+  "anchor_btc_agg_id": "af884cde-422b-11e7-a919-92ebcb67fe33",
   "btctx_id": "2265a48bcf9b72c1bc4f0a70ae946e9f438a783947947a309a3b2e458f81c63b",
   "btctx_state": {
     "ops": [
