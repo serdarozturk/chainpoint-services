@@ -25,8 +25,9 @@ let redis = null
 const merkleTools = new MerkleTools()
 
 // pull in variables defined in shared CalendarBlock module
-let sequelize = nodeRegistration.sequelize
+let nodeRegSequelize = nodeRegistration.sequelize
 let NodeRegistration = nodeRegistration.NodeRegistration
+let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 
 // See : https://github.com/ranm8/requestify
@@ -268,7 +269,8 @@ async function openStorageConnectionAsync () {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await sequelize.sync({ logging: false })
+      await nodeRegSequelize.sync({ logging: false })
+      await calBlockSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
