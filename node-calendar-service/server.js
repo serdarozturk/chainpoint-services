@@ -41,12 +41,6 @@ let nistLatest = null
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
 
-// Variables holding the configured interval functions
-// The variables are set when intervals are created
-// The variables are used when deleting a timeout, if requested
-let anchorBtcInterval = null
-let anchorEthInterval = null
-
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
@@ -838,16 +832,6 @@ let setEthInterval = () => {
   }, env.ANCHOR_ETH_INTERVAL_MS)
 }
 
-// Deletes the BTC anchoring interval, disabling BTC anchoring
-let deleteBtcInterval = () => {
-  clearInterval(anchorBtcInterval)
-}
-
-// Deletes the ETH anchoring interval, disabling ETH anchoring
-let deleteEthInterval = () => {
-  clearInterval(anchorEthInterval)
-}
-
 /**
  * Opens a storage connection
  **/
@@ -955,7 +939,7 @@ function startWatchesAndIntervals () {
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
   if (env.ANCHOR_BTC === 'enabled') { // Do this only if BTC anchoring is enabled
-    anchorBtcInterval = setBtcInterval()
+    setBtcInterval()
     console.log('BTC anchoring enabled')
   } else {
     console.log('BTC anchoring disabled')
@@ -963,7 +947,7 @@ function startWatchesAndIntervals () {
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
   if (env.ANCHOR_ETH === 'enabled') { // Do this only if ETH anchoring is enabled
-    anchorEthInterval = setEthInterval()
+    setEthInterval()
     console.log('ETH anchoring enabled')
   } else {
     console.log('ETH anchoring disabled')
