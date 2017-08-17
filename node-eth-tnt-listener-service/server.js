@@ -123,7 +123,7 @@ async function initListener () {
 
   console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDR + ' starting at block ' + JSON.stringify(lastEventInfo))
 
-  // TODO: Possibly watch on a previous incoming address if we need to change for some reason.
+  // TODO: Possibly watch on a previous incoming address (or array of addresses) if we need to change for some reason.
 
   // Start listening for incoming transactions
   ops.watchForTransfers(env.ETH_TNT_LISTEN_ADDR, lastEventInfo.blockNumber, incomingTokenTransferEvent)
