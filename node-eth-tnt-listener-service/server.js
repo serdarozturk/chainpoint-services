@@ -25,13 +25,13 @@ let lastEventInfo = null
  */
 async function getLastKnownEventInfo () {
   // Get the latest incoming transfer from the DB
-  let lastTranser = await EthTokenTxLog.findOne({
+  let lastTransfer = await EthTokenTxLog.findOne({
     where: { toAddress: env.ETH_TNT_LISTEN_ADDR },
     order: [[ 'createdAt', 'DESC' ]]
   })
 
   // Check to make sure one was found or we are in developement mode
-  if (!lastTranser || env.NODE_ENV === 'development') {
+  if (!lastTransfer || env.NODE_ENV === 'development') {
     // Not found, so set to 0s
     return {
       blockNumber: 0,
@@ -41,8 +41,8 @@ async function getLastKnownEventInfo () {
 
   // Return the valid info
   return {
-    blockNumber: lastTranser.blockNumber,
-    transactionIndex: lastTranser.transactionIndex
+    blockNumber: lastTransfer.blockNumber,
+    transactionIndex: lastTransfer.transactionIndex
   }
 }
 
@@ -62,6 +62,8 @@ async function setLastKnownEventInfo (params) {
     amount: params.args._value
   }
 
+  // TODO : Possibly wrap this create with the crediting of balance into a single transaction
+  // for error case of rollback.
   return EthTokenTxLog.create(tx)
 }
 
@@ -76,10 +78,15 @@ async function incrementNodeBalance (nodeAddress, tntAmount) {
   let node = await NodeRegistration.findOne({where: { tntAddr: nodeAddress }})
 
   if (!node) {
+    // TODO - Store unkowns for later processing if node registers after sending in for some reason
+
     // NOTE - If a node sends in TNT before it registers... it will not get counted.
     console.error('Incoming TNT tokens were not mapped to any node: ' + nodeAddress)
     return
   }
+
+  // TODO: Convert TNT to "credits" with an env muliplier of credits
+  //        This will change the SQL type being used in the DB as well.
 
   console.log(`Updating node ${node.tntAddr} credit ${node.tntCredit} with amount ${tntAmount}`)
   node.tntCredit += tntAmount
@@ -115,6 +122,8 @@ async function initListener () {
   lastEventInfo = await getLastKnownEventInfo()
 
   console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDR + ' starting at block ' + JSON.stringify(lastEventInfo))
+
+  // TODO: Possibly watch on a previous incoming address if we need to change for some reason.
 
   // Start listening for incoming transactions
   ops.watchForTransfers(env.ETH_TNT_LISTEN_ADDR, lastEventInfo.blockNumber, incomingTokenTransferEvent)
