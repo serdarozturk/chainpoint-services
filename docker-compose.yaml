@@ -363,40 +363,20 @@ services:
     networks:
       - chainpoint
 
-<<<<<<< HEAD
-testrpc:
-  image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
-  build:
-    context: ./testrpc
-  container_name: testrpc-core
-  restart: unless-stopped
-  ports:
-    - "8545:8545" # RPC
-  networks:
-    - chainpoint
-=======
-  # bcoin:
-  #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
-  #   build:
-  #     context: ./bcoin
-  #   container_name: bcoin-core
-  #   restart: unless-stopped
-  #   ports:
-  #     #-- Mainnet
-  #     # - "8333:8333"
-  #     # - "8332:8332" # RPC
-  #     #-- Testnet
-  #     - "18333:18333"
-  #     - "18332:18332" # RPC
-  #   environment:
-  #     BCOIN_CONFIG: /root/.bcoin/bcoin.conf
-  #     # VIRTUAL_HOST: bcoin.chainpoint.org
-  #     # VIRTUAL_PORT: 8332 # Mainnet
-  #     VIRTUAL_PORT: 18332 # Testnest
-  #   volumes:
-  #     - ./data/bcoin:/root/.bcoin
-  #   networks:
-  #     - chainpoint
+# Testing Ethereum blockchain service
+#
+  testrpc:
+    image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+    build:
+      context: ./testrpc
+    container_name: testrpc-core
+    restart: unless-stopped
+    ports:
+      - "8545:8545" # RPC
+    networks:
+      - chainpoint
+    logging:
+      driver: none
 
   # Ethereum Contracts
   # Builds and deploys the contracts to the testrpc node
@@ -427,6 +407,7 @@ testrpc:
     container_name: btc-tnt-tx-service-core
     depends_on:
       - testrpc
+      - eth-contracts
     networks:
       - chainpoint
     environment:
@@ -450,6 +431,7 @@ testrpc:
     depends_on:
       - testrpc
       - roach1
+      - eth-contracts
     networks:
       - chainpoint
     environment:
@@ -469,4 +451,3 @@ testrpc:
       - "8545:8545" # RPC
     networks:
       - chainpoint
->>>>>>> Split up TNT eth services

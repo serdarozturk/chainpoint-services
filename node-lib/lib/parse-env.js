@@ -156,6 +156,7 @@ module.exports = (service) => {
       envDefinitions.ETH_PROVIDER_URI = envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' })
       envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ default: '0x0', desc: 'The address used to listen for incoming TNT transfers' })
       envDefinitions.LISTEN_TX_PORT = envalid.num({ default: 8085, desc: 'Port of the ETH provider.' })
+      envDefinitions.TNT_TO_CREDIT_RATE = envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' })
       break
   }
   return envalid.cleanEnv(process.env, envDefinitions, {

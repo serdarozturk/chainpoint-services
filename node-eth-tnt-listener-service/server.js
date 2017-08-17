@@ -7,6 +7,7 @@ const utils = require('./lib/utils.js')
 const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
+const BigNumber = require('bignumber.js');
 
 // pull in variables defined in shared EthTokenTrxLog module
 let sequelize = ethTokenTxLog.sequelize
@@ -57,14 +58,23 @@ async function setLastKnownEventInfo (params) {
     txId: params.transactionHash,
     transactionIndex: params.transactionIndex,
     blockNumber: params.blockNumber,
-    fromAddress: params.args._from,
-    toAddress: params.args._to,
-    amount: params.args._value
+    fromAddress: params.args.from,
+    toAddress: params.args.to,
+    amount: params.args.value
   }
 
   // TODO : Possibly wrap this create with the crediting of balance into a single transaction
   // for error case of rollback.
   return EthTokenTxLog.create(tx)
+}
+
+/**
+ * Converts TNT token amount (in grains) to credit value
+ * @param  {number} tntAmount Grains of TNT to convert
+ * @return {number}           Amount of credits
+ */
+function convertTntToCredit(tntAmount) {
+  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(new BigNumber(10).toExponential(8)).toNumber()
 }
 
 /**
@@ -85,11 +95,11 @@ async function incrementNodeBalance (nodeAddress, tntAmount) {
     return
   }
 
-  // TODO: Convert TNT to "credits" with an env muliplier of credits
-  //        This will change the SQL type being used in the DB as well.
+  // Convert the TNT to credits
+  let credits = convertTntToCredit(tntAmount)
 
-  console.log(`Updating node ${node.tntAddr} credit ${node.tntCredit} with amount ${tntAmount}`)
-  node.tntCredit += tntAmount
+  console.log(`Updating node ${node.tntAddr} with current credit ${node.tntCredit} with amount ${credits}`)
+  node.tntCredit += credits
   return node.save()
 }
 
@@ -151,10 +161,10 @@ function incomingTokenTransferEvent (error, params) {
   }
 
   // Log out the transaction
-  console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args._from + ' To: ' + params.args._to + ' AMT: ' + params.args._value)
+  console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args.from + ' To: ' + params.args.to + ' AMT: ' + params.args.value)
 
   // Should take any action required when event is triggered here.
-  incrementNodeBalance(params.args._from, params.args._value)
+  incrementNodeBalance(params.args.from, params.args.value)
 
   // Save off block number here from latest seen event.
   setLastKnownEventInfo(params)

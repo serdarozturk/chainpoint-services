@@ -1,7 +1,7 @@
 var Web3 = require('web3')
 const contract = require('truffle-contract')
 /*
- * This function will load the BCAP token ABI from the build directory and initialize
+ * This function will load the TierionNetworkToken token ABI from the build directory and initialize
  * it so that it can be used to interact with the blockchain. It will use env variable
  * set for the address of the contract on the blockchain.
 */
@@ -14,8 +14,8 @@ module.exports = async (provider, tokenAddr) => {
   web3.eth.defaultAccount = web3.eth.accounts[0]
 
   // Load the token json obj
-  console.log('loding bcap token')
-  let tokenDef = require('../../contracts/BCAPTestToken.json')
+  console.log('loding TierionNetworkToken token')
+  let tokenDef = require('../../contracts/TierionNetworkToken.json')
 
   // If the token addr is specified in the environment var, use that as highest priority
   if (tokenAddr) {
@@ -36,11 +36,12 @@ module.exports = async (provider, tokenAddr) => {
 
   // Didn't find it there either... bail out
   if (!deployedToken) {
-    console.error('BCAP Token ERC20 Contract Address is not found deployed or set as env var (BCAP_TOKEN_ADDR).  Exiting...')
+    console.error('TierionNetworkToken Token ERC20 Contract Address is not found deployed or set as env var (ETH_TNT_TOKEN_ADDR).  Exiting...')
     process.exit(-1)
   }
 
   // Dumb workaround for bug - https://github.com/ethereum/web3.js/issues/925
+  console.log("Using TNT Token contract at ", deployedToken.address)
   let tokenABI = tokenDef.abi
   let tokenDefinition = web3.eth.contract(tokenABI)
   return tokenDefinition.at(deployedToken.address)

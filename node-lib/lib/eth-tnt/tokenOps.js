@@ -1,6 +1,6 @@
 
 /**
- * This class can be used to interact with the BCAP token on the blockchain.
+ * This class can be used to interact with the TierionNetworkToken token on the blockchain.
  */
 class TokenOps {
   /**

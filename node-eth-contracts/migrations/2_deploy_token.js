@@ -1,7 +1,7 @@
 /* global artifacts */
-var BCAPTestToken = artifacts.require('./BCAPTestToken.sol')
+var TierionNetworkToken = artifacts.require('./TierionNetworkToken.sol')
 
-// This deploys the BCAP token using the default account as the owner.
+// This deploys the TierionNetworkToken token using the default account as the owner.
 module.exports = function (deployer, network, accounts) {
-  deployer.deploy(BCAPTestToken, accounts[0])
+  deployer.deploy(TierionNetworkToken, accounts[0])
 }
