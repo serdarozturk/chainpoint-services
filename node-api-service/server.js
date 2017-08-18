@@ -109,7 +109,7 @@ server.use(restify.bodyParser({
 // API RESOURCES
 
 // submit hash(es)
-server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashV1)
+server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashV1Async)
 // get a single proof with a single hash_id
 server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV1)
 // get multiple proofs with 'hashids' header param
@@ -189,7 +189,9 @@ async function openStorageConnectionAsync () {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await cachedCalendarBlock.getSequelize().sync({})
+      await cachedCalendarBlock.getSequelize().sync({ logging: false })
+      await hashes.getSequelize().sync({ logging: false })
+      await nodes.getSequelize().sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
@@ -344,6 +346,7 @@ module.exports = {
     hashes.setAMQPChannel(chan)
   },
   setNistLatest: (val) => { hashes.setNistLatest(val) },
+  setNodeRegistration: (nodeReg) => { hashes.setNodeRegistration(nodeReg) },
   server: server,
   config: config
 }

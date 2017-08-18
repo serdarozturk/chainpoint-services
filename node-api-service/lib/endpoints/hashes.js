@@ -3,6 +3,10 @@ const env = require('../parse-env.js')('api')
 const utils = require('../utils.js')
 const BLAKE2s = require('blake2s-js')
 const _ = require('lodash')
+const crypto = require('crypto')
+const nodeRegistration = require('../models/NodeRegistration.js')
+
+const TNT_CREDIT_COST_POST_HASH = 1
 
 // Generate a v1 UUID (time-based)
 // see: https://github.com/broofa/node-uuid
@@ -16,6 +20,10 @@ let amqpChannel = null
 // This value is updated from consul events as changes are detected
 let nistLatest = null
 let nistLatestEpoch = null
+
+// pull in variables defined in shared NodeRegistration module
+let sequelize = nodeRegistration.sequelize
+let NodeRegistration = nodeRegistration.NodeRegistration
 
 /**
  * Converts an array of hash strings to a object suitable to
@@ -114,26 +122,47 @@ function generatePostHashResponse (hash) {
  * - maximum 128 chars long (e.g. 64 byte SHA512)
  * - an even length string
  */
-function postHashV1 (req, res, next) {
+async function postHashV1Async (req, res, next) {
   // validate content-type sent was 'application/json'
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
 
+  // validate authorization header key exists
+  if (!req.headers || !req.headers.authorization) {
+    return next(new restify.InvalidCredentialsError('authorization denied: missing authorization key'))
+  }
+
+  // validate authorization value is well formatted
+  var authValueSegments = req.headers.authorization.split(' ')
+  if (authValueSegments.length !== 2 || !/^bearer$/i.test(authValueSegments[0])) {
+    return next(new restify.InvalidCredentialsError('authorization denied: bad authorization value'))
+  }
+
+  // validate tnt_address header key exists
+  if (!req.headers.tnt_address) {
+    return next(new restify.InvalidCredentialsError('authorization denied: missing tnt_address key'))
+  }
+
+  // validate tnt_address value
+  if (!/^0x[0-9a-f]{40}$/i.test(req.headers.tnt_address)) {
+    return next(new restify.InvalidCredentialsError('authorization denied: invalid tnt_address value'))
+  }
+
   // validate params has parse a 'hash' key
   if (!req.params.hasOwnProperty('hash')) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, missing hash'))
+    return next(new restify.InvalidArgumentError('invalid JSON body: missing hash'))
   }
 
   // validate 'hash' is a string
   if (!_.isString(req.params.hash)) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, bad hash submitted'))
+    return next(new restify.InvalidArgumentError('invalid JSON body: bad hash submitted'))
   }
-  
+
   // validate hash param is a valid hex string
   let isValidHash = /^([a-fA-F0-9]{2}){20,64}$/.test(req.params.hash)
   if (!isValidHash) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, bad hash submitted'))
+    return next(new restify.InvalidArgumentError('invalid JSON body: bad hash submitted'))
   }
 
   // if NIST value is present, ensure NTP time is >= latest NIST value
@@ -146,6 +175,32 @@ function postHashV1 (req, res, next) {
     }
   }
 
+  // validate amqp channel has been established
+  if (!amqpChannel) {
+    return next(new restify.InternalServerError('Message could not be delivered'))
+  }
+
+  // validate the calculated hmac
+  try {
+    let nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers.tnt_address }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
+    if (!nodeReg) {
+      return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt_address'))
+    }
+    let hash = crypto.createHmac('sha256', nodeReg.hmacKey)
+    let hmac = hash.update(nodeReg.tntAddr).digest('hex')
+    if (authValueSegments[1] !== hmac) {
+      return next(new restify.InvalidCredentialsError('authorization denied: bad hmac value'))
+    }
+    if (nodeReg.tntCredit < TNT_CREDIT_COST_POST_HASH) {
+      return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining : ${nodeReg.tntCredit}`))
+    }
+    // decrement tntCredit by TNT_CREDIT_COST_POST_HASH
+    await nodeReg.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
+  } catch (error) {
+    console.error(error)
+    return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
+  }
+
   let responseObj = generatePostHashResponse(req.params.hash)
 
   let hashObj = {
@@ -154,12 +209,6 @@ function postHashV1 (req, res, next) {
     nist: responseObj.nist
   }
 
-  // AMQP / RabbitMQ
-
-  // validate amqp channel has been established
-  if (!amqpChannel) {
-    return next(new restify.InternalServerError('Message could not be delivered'))
-  }
   amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
     (err) => {
       if (err !== null) {
@@ -190,9 +239,11 @@ function updateNistVars (nistValue) {
 }
 
 module.exports = {
-  postHashV1: postHashV1,
+  getSequelize: () => { return sequelize },
+  postHashV1Async: postHashV1Async,
   generatePostHashResponse: generatePostHashResponse,
   setAMQPChannel: (chan) => { amqpChannel = chan },
   getNistLatest: () => { return nistLatest },
-  setNistLatest: (val) => { updateNistVars(val) }
+  setNistLatest: (val) => { updateNistVars(val) },
+  setNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
 }

@@ -195,9 +195,106 @@ describe('Hashes Controller', () => {
         })
     })
 
+    it('should return proper error with missing authorization key', (done) => {
+      request(server)
+        .post('/hashes')
+        .send({ name: 'Manny' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: missing authorization key')
+          done()
+        })
+    })
+
+    it('should return proper error with bad authorization value, one string', (done) => {
+      request(server)
+        .post('/hashes')
+        .set('Authorization', 'qweqwe')
+        .send({ name: 'Manny' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: bad authorization value')
+          done()
+        })
+    })
+
+    it('should return proper error with bad authorization value, no bearer', (done) => {
+      request(server)
+        .post('/hashes')
+        .set('Authorization', 'qweqwe ababababab')
+        .send({ name: 'Manny' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: bad authorization value')
+          done()
+        })
+    })
+
+    it('should return proper error with bad authorization value, missing tnt_address', (done) => {
+      request(server)
+        .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .send({ name: 'Manny' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: missing tnt_address key')
+          done()
+        })
+    })
+
+    it('should return proper error with bad authorization value, bad tnt_address', (done) => {
+      request(server)
+        .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0xbad')
+        .send({ name: 'Manny' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: invalid tnt_address value')
+          done()
+        })
+    })
+
     it('should return proper error with missing hash', (done) => {
       request(server)
         .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ name: 'Manny' })
         .expect('Content-type', /json/)
         .expect(409)
@@ -208,7 +305,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, missing hash')
+            .and.to.equal('invalid JSON body: missing hash')
           done()
         })
     })
@@ -216,6 +313,8 @@ describe('Hashes Controller', () => {
     it('should return proper error with hash not a string', (done) => {
       request(server)
         .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ hash: ['badhash'] })
         .expect('Content-type', /json/)
         .expect(409)
@@ -226,7 +325,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, bad hash submitted')
+            .and.to.equal('invalid JSON body: bad hash submitted')
           done()
         })
     })
@@ -234,6 +333,8 @@ describe('Hashes Controller', () => {
     it('should return proper error with invalid hash', (done) => {
       request(server)
         .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ hash: 'badhash' })
         .expect('Content-type', /json/)
         .expect(409)
@@ -244,7 +345,7 @@ describe('Hashes Controller', () => {
             .and.to.equal('InvalidArgument')
           expect(res.body).to.have.property('message')
             .and.to.be.a('string')
-            .and.to.equal('invalid JSON body, bad hash submitted')
+            .and.to.equal('invalid JSON body: bad hash submitted')
           done()
         })
     })
@@ -252,6 +353,8 @@ describe('Hashes Controller', () => {
     it('should return proper error with no AMQP connection', (done) => {
       request(server)
         .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(500)
@@ -274,6 +377,8 @@ describe('Hashes Controller', () => {
       app.setNistLatest('3002759084:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
       request(server)
         .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(500)
@@ -289,14 +394,142 @@ describe('Hashes Controller', () => {
         })
     })
 
+    it('should return proper error with unknown tnt_address', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return null
+        }
+      })
+      request(server)
+        .post('/hashes')
+        .set('Authorization', 'bearer ababab121212')
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: unknown tnt_address')
+          done()
+        })
+    })
+
+    it('should return proper error with bad hmac value', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let tntAddr = '0x1234567890123456789012345678901234567890'
+
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+      let hash = crypto.createHmac('sha256', hmacKey)
+      let hmac = hash.update('bad').digest('hex')
+
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return {
+            tntAddr: tntAddr,
+            hmacKey: hmacKey,
+            tntCredit: 10
+          }
+        }
+      })
+      request(server)
+        .post('/hashes')
+        .set('Authorization', `bearer ${hmac}`)
+        .set('tnt_address', tntAddr)
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
+        .expect('Content-type', /json/)
+        .expect(401)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidCredentials')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('authorization denied: bad hmac value')
+          done()
+        })
+    })
+
+    it('should return proper error with zero balance', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let tntAddr = '0x1234567890123456789012345678901234567890'
+
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+      let hash = crypto.createHmac('sha256', hmacKey)
+      let hmac = hash.update(tntAddr).digest('hex')
+
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return {
+            tntAddr: tntAddr,
+            hmacKey: hmacKey,
+            tntCredit: 0
+          }
+        }
+      })
+      request(server)
+        .post('/hashes')
+        .set('Authorization', `bearer ${hmac}`)
+        .set('tnt_address', tntAddr)
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
+        .expect('Content-type', /json/)
+        .expect(403)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('NotAuthorized')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('insufficient tntCredit remaining : 0')
+          done()
+        })
+    })
+
     it('should return a matched set of metadata and UUID embedded timestamps', (done) => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
-      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
 
+      let tntAddr = '0x1234567890123456789012345678901234567890'
+
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+      let hash = crypto.createHmac('sha256', hmacKey)
+      let hmac = hash.update(tntAddr).digest('hex')
+
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return {
+            tntAddr: tntAddr,
+            hmacKey: hmacKey,
+            tntCredit: 10,
+            decrement: (params) => { }
+          }
+        }
+      })
       request(server)
         .post('/hashes')
+        .set('Authorization', `bearer ${hmac}`)
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
         .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(200)
@@ -314,13 +547,29 @@ describe('Hashes Controller', () => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
+
+      let tntAddr = '0x1234567890123456789012345678901234567890'
+
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+      let hash = crypto.createHmac('sha256', hmacKey)
+      let hmac = hash.update(tntAddr).digest('hex')
+
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-
-      let hash = 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12'
-
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return {
+            tntAddr: tntAddr,
+            hmacKey: hmacKey,
+            tntCredit: 10,
+            decrement: (params) => { }
+          }
+        }
+      })
       request(server)
         .post('/hashes')
-        .send({ hash: hash })
+        .set('Authorization', `bearer ${hmac}`)
+        .set('tnt_address', '0x1234567890123456789012345678901234567890')
+        .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
@@ -355,10 +604,28 @@ describe('Hashes Controller', () => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
-      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
 
+      let tntAddr = '0x1234567890123456789012345678901234567890'
+
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+      let hash = crypto.createHmac('sha256', hmacKey)
+      let hmac = hash.update(tntAddr).digest('hex')
+
+      app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
+      app.setNodeRegistration({
+        findOne: (params) => {
+          return {
+            tntAddr: tntAddr,
+            hmacKey: hmacKey,
+            tntCredit: 10,
+            decrement: (params) => { }
+          }
+        }
+      })
       request(server)
         .post('/hashes')
+        .set('Authorization', `bearer ${hmac}`)
+        .set('tnt_address', tntAddr)
         .send({ hash: 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12' })
         .expect('Content-type', /json/)
         .expect(200)
@@ -772,7 +1039,7 @@ describe('Nodes Controller', () => {
     it('should return error with no tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({public_uri: 'http://127.0.0.1'})
+        .send({ public_uri: 'http://127.0.0.1' })
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -790,7 +1057,7 @@ describe('Nodes Controller', () => {
     it('should return error with empty tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '', public_uri: 'http://127.0.0.1'})
+        .send({ tnt_addr: '', public_uri: 'http://127.0.0.1' })
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -808,7 +1075,7 @@ describe('Nodes Controller', () => {
     it('should return error with malformed tnt_addr', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0xabc', public_uri: 'http://127.0.0.1'})
+        .send({ tnt_addr: '0xabc', public_uri: 'http://127.0.0.1' })
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -826,7 +1093,7 @@ describe('Nodes Controller', () => {
     it('should return error with empty public_uri', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: ''})
+        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: '' })
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -844,12 +1111,12 @@ describe('Nodes Controller', () => {
     it('should be OK if a public_uri is registered twice', (done) => {
       request(server)
         .post('/nodes')
-        .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1'})
+        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
         .expect(200)
         .end((err, res) => {
           request(server)
             .post('/nodes')
-            .send({tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1'})
+            .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
             .expect(200)
             .end((err, res) => {
               done()
@@ -902,18 +1169,18 @@ describe('Nodes Controller', () => {
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-          .put('/nodes/' + randTntAddr)
-          .send({ public_uri: publicUri, hmac: calculatedHMAC })
-          .expect('Content-type', /json/)
-          .expect(200)
-          .end((err, res) => {
-            expect(err).to.equal(null)
-            expect(res.body).to.have.property('tnt_addr')
-            .and.to.equal(randTntAddr)
-            expect(res.body).to.have.property('public_uri')
-            .and.to.equal(publicUri)
-            done()
-          })
+            .put('/nodes/' + randTntAddr)
+            .send({ public_uri: publicUri, hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.have.property('public_uri')
+                .and.to.equal(publicUri)
+              done()
+            })
         })
     })
 
@@ -938,18 +1205,18 @@ describe('Nodes Controller', () => {
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-          .put('/nodes/' + randTntAddr)
-          .send({ public_uri: updatedUri, hmac: calculatedHMAC })
-          .expect('Content-type', /json/)
-          .expect(200)
-          .end((err, res) => {
-            expect(err).to.equal(null)
-            expect(res.body).to.have.property('tnt_addr')
-            .and.to.equal(randTntAddr)
-            expect(res.body).to.have.property('public_uri')
-            .and.to.equal(updatedUri)
-            done()
-          })
+            .put('/nodes/' + randTntAddr)
+            .send({ public_uri: updatedUri, hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.have.property('public_uri')
+                .and.to.equal(updatedUri)
+              done()
+            })
         })
     })
 
@@ -973,17 +1240,17 @@ describe('Nodes Controller', () => {
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-          .put('/nodes/' + randTntAddr)
-          .send({ hmac: calculatedHMAC })
-          .expect('Content-type', /json/)
-          .expect(200)
-          .end((err, res) => {
-            expect(err).to.equal(null)
-            expect(res.body).to.have.property('tnt_addr')
-            .and.to.equal(randTntAddr)
-            expect(res.body).to.not.have.property('public_uri')
-            done()
-          })
+            .put('/nodes/' + randTntAddr)
+            .send({ hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.not.have.property('public_uri')
+              done()
+            })
         })
     })
   })

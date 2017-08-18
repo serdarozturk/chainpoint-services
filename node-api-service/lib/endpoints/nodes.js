@@ -3,8 +3,7 @@ const restify = require('restify')
 const _ = require('lodash')
 const moment = require('moment')
 var validUrl = require('valid-url')
-
-const nodeRegistration = require('../../lib/models/NodeRegistration.js')
+const nodeRegistration = require('../models/NodeRegistration.js')
 
 let sequelize = nodeRegistration.sequelize
 let NodeRegistration = nodeRegistration.NodeRegistration
@@ -48,13 +47,6 @@ async function postNodeV1Async (req, res, next) {
   // if an public_uri is provided, it must be valid
   if (req.params.public_uri && !validUrl.isWebUri(req.params.public_uri)) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
-  }
-
-  try {
-    await sequelize.sync({ logging: false })
-  } catch (error) {
-    console.error(`could not sync db : ${error}`)
-    return next(new restify.InternalServerError('server error'))
   }
 
   try {
@@ -130,13 +122,6 @@ async function putNodeV1Async (req, res, next) {
   }
 
   try {
-    await sequelize.sync({ logging: false })
-  } catch (error) {
-    console.error(`could not sync db : ${error}`)
-    return next(new restify.InternalServerError('server error'))
-  }
-
-  try {
     let regNode = await NodeRegistration.find({ where: { tntAddr: req.params.tnt_addr } })
     if (!regNode) {
       return next(new restify.ResourceNotFoundError('not found'))
@@ -174,6 +159,7 @@ async function putNodeV1Async (req, res, next) {
 }
 
 module.exports = {
+  getSequelize: () => { return sequelize },
   nodeRegistration: nodeRegistration,
   postNodeV1Async: postNodeV1Async,
   putNodeV1Async: putNodeV1Async

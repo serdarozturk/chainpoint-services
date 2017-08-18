@@ -42,7 +42,7 @@ var NodeRegistration = sequelize.define(env.COCKROACH_REG_TABLE_NAME,
       comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^(0x)?[0-9a-fA-F]{40}$', 'i']
+        is: ['^0x[0-9a-f]{40}$', 'i']
       },
       field: 'tnt_addr',
       allowNull: false,
@@ -103,6 +103,12 @@ var NodeRegistration = sequelize.define(env.COCKROACH_REG_TABLE_NAME,
       },
       field: 'audited_cal_block_at',
       allowNull: true
+    },
+    tntCredit: {
+      comment: 'The balance of token credit they have against their address.',
+      type: Sequelize.BIGINT,
+      field: 'tnt_credit',
+      defaultValue: 0
     }
   },
   {
