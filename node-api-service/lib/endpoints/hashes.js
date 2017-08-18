@@ -139,14 +139,14 @@ async function postHashV1Async (req, res, next) {
     return next(new restify.InvalidCredentialsError('authorization denied: bad authorization value'))
   }
 
-  // validate tnt_address header key exists
-  if (!req.headers.tnt_address) {
-    return next(new restify.InvalidCredentialsError('authorization denied: missing tnt_address key'))
+  // validate tnt-address header key exists
+  if (!req.headers['tnt-address']) {
+    return next(new restify.InvalidCredentialsError('authorization denied: missing tnt-address key'))
   }
 
-  // validate tnt_address value
-  if (!/^0x[0-9a-f]{40}$/i.test(req.headers.tnt_address)) {
-    return next(new restify.InvalidCredentialsError('authorization denied: invalid tnt_address value'))
+  // validate tnt-address value
+  if (!/^0x[0-9a-f]{40}$/i.test(req.headers['tnt-address'])) {
+    return next(new restify.InvalidCredentialsError('authorization denied: invalid tnt-address value'))
   }
 
   // validate params has parse a 'hash' key
@@ -182,9 +182,9 @@ async function postHashV1Async (req, res, next) {
 
   // validate the calculated hmac
   try {
-    let nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers.tnt_address }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
+    let nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
     if (!nodeReg) {
-      return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt_address'))
+      return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }
     let hash = crypto.createHmac('sha256', nodeReg.hmacKey)
     let hmac = hash.update(nodeReg.tntAddr).digest('hex')
