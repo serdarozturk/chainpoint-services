@@ -72,7 +72,7 @@ let aggregate = () => {
 
     // concatenate and hash the hash ids and hash values into new array
     let leaves = hashesForTree.map((hashObj) => {
-      let hashIdBuffer = Buffer.from(hashObj.hash_id, 'utf8')
+      let hashIdBuffer = Buffer.from(`core_id:${hashObj.hash_id}`, 'utf8')
       let hashBuffer = Buffer.from(hashObj.hash, 'hex')
       let concatAndHashBuffer = crypto.createHash('sha256').update(Buffer.concat([hashIdBuffer, hashBuffer])).digest()
 
@@ -107,7 +107,7 @@ let aggregate = () => {
       let proof = merkleTools.getProof(x)
       // only add the NIST item to the proof path if it was available and used in the tree calculation
       if (hashesForTree[x].nist) proof.unshift({ left: `nist:${hashesForTree[x].nist}` })
-      proof.unshift({ left: hashesForTree[x].hash_id })
+      proof.unshift({ left: `core_id:${hashesForTree[x].hash_id}` })
       proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
       proofData.push(proofDataItem)
     }
