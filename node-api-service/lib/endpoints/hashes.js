@@ -33,7 +33,7 @@ let NodeRegistration = nodeRegistration.NodeRegistration
  * @returns {Object} An Object with 'hash_id', 'hash', 'nist', 'submitted_at' and 'processing_hints' properties
  *
  */
-function generatePostHashResponse (hash) {
+function generatePostHashResponse (hash, nodeReg) {
   hash = hash.toLowerCase()
 
   let hashNIST = nistLatest || ''
@@ -104,6 +104,7 @@ function generatePostHashResponse (hash) {
     eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 41)),
     btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 61))
   }
+  result.tnt_credit_balance = parseInt(nodeReg.tntCredit)
 
   return result
 }
@@ -181,8 +182,9 @@ async function postHashV1Async (req, res, next) {
   }
 
   // validate the calculated hmac
+  let nodeReg = null
   try {
-    let nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
+    nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
     if (!nodeReg) {
       return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }
@@ -201,7 +203,7 @@ async function postHashV1Async (req, res, next) {
     return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
   }
 
-  let responseObj = generatePostHashResponse(req.params.hash)
+  let responseObj = generatePostHashResponse(req.params.hash, nodeReg)
 
   let hashObj = {
     hash_id: responseObj.hash_id,
