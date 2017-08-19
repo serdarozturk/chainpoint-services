@@ -1,4 +1,4 @@
-/* global describe, it, beforeEach */
+/* global describe, it */
 
 process.env.NODE_ENV = 'test'
 
@@ -6,14 +6,12 @@ process.env.NODE_ENV = 'test'
 const expect = require('chai').expect
 const request = require('supertest')
 const crypto = require('crypto')
-const moment = require('moment')
 const uuidTime = require('uuid-time')
 const BLAKE2s = require('blake2s-js')
 
 const app = require('../server')
 const server = app.server
 const hashes = require('../lib/endpoints/hashes')
-const nodes = require('../lib/endpoints/nodes')
 
 describe('Home Controller', () => {
   describe('GET /', () => {
@@ -1014,11 +1012,6 @@ describe('Config Controller', () => {
 
 describe('Nodes Controller', () => {
   describe('POST /nodes', () => {
-    beforeEach(function () {
-      // nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
-      // console.log(nodes)
-    })
-
     it('should return proper error with invalid content type', (done) => {
       request(server)
         .post('/nodes')
@@ -1148,115 +1141,127 @@ describe('Nodes Controller', () => {
   })
 
   describe('PUT /nodes', () => {
-    beforeEach(function () {
-      nodes.nodeRegistration.NodeRegistration.destroy({ truncate: true, cascade: false })
+    it('should return proper error with invalid content type', (done) => {
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+
+      request(server)
+        .put('/nodes/' + randTntAddr)
+        .set('Content-type', 'text/plain')
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid content type')
+          done()
+        })
     })
 
-    it('should return OK for valid PUT no change to tnt or IP', (done) => {
-      app.setAMQPChannel({
-        sendToQueue: function () { }
-      })
+    it('should return error with malformed tnt_addr', (done) => {
+      let randTntAddr = '0xzxczxc'
 
+      request(server)
+        .put('/nodes/' + randTntAddr)
+        .send({ public_uri: 'http://127.0.0.1' })
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, malformed tnt_addr')
+          done()
+        })
+    })
+
+    it('should return error with malformed public_uri', (done) => {
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let publicUri = 'baduri'
+
+      request(server)
+        .put('/nodes/' + randTntAddr)
+        .send({ public_uri: publicUri })
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, invalid public_uri')
+          done()
+        })
+    })
+
+    it('should return error with missing hmac', (done) => {
       let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
       let publicUri = 'http://127.0.0.1'
 
       request(server)
-        .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
-        .expect(200)
+        .put('/nodes/' + randTntAddr)
+        .send({ public_uri: publicUri })
+        .expect('Content-type', /json/)
+        .expect(409)
         .end((err, res) => {
           expect(err).to.equal(null)
-          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
-          let hash = crypto.createHmac('sha256', res.body.hmac_key)
-          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, publicUri, formattedDate].join('')
-          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
-
-          request(server)
-            .put('/nodes/' + randTntAddr)
-            .send({ public_uri: publicUri, hmac: calculatedHMAC })
-            .expect('Content-type', /json/)
-            .expect(200)
-            .end((err, res) => {
-              expect(err).to.equal(null)
-              expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
-              expect(res.body).to.have.property('public_uri')
-                .and.to.equal(publicUri)
-              done()
-            })
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, missing hmac')
+          done()
         })
     })
 
-    it('should return OK for valid PUT no change to tnt and updated IP', (done) => {
-      app.setAMQPChannel({
-        sendToQueue: function () { }
-      })
-
-      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let publicUrl = 'http://127.0.0.1'
-
-      request(server)
-        .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUrl })
-        .expect(200)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          let updatedUri = 'http://127.0.0.2'
-          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
-          let hash = crypto.createHmac('sha256', res.body.hmac_key)
-          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, updatedUri, formattedDate].join('')
-          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
-
-          request(server)
-            .put('/nodes/' + randTntAddr)
-            .send({ public_uri: updatedUri, hmac: calculatedHMAC })
-            .expect('Content-type', /json/)
-            .expect(200)
-            .end((err, res) => {
-              expect(err).to.equal(null)
-              expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
-              expect(res.body).to.have.property('public_uri')
-                .and.to.equal(updatedUri)
-              done()
-            })
-        })
-    })
-
-    it('should return OK for valid PUT no change to tnt and removed IP', (done) => {
-      app.setAMQPChannel({
-        sendToQueue: function () { }
-      })
-
+    it('should return error with empty hmac', (done) => {
       let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
       let publicUri = 'http://127.0.0.1'
 
       request(server)
-        .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
-        .expect(200)
+        .put('/nodes/' + randTntAddr)
+        .send({ public_uri: publicUri, hmac: '' })
+        .expect('Content-type', /json/)
+        .expect(409)
         .end((err, res) => {
           expect(err).to.equal(null)
-          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
-          let hash = crypto.createHmac('sha256', res.body.hmac_key)
-          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, '', formattedDate].join('')
-          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, empty hmac')
+          done()
+        })
+    })
 
-          request(server)
-            .put('/nodes/' + randTntAddr)
-            .send({ hmac: calculatedHMAC })
-            .expect('Content-type', /json/)
-            .expect(200)
-            .end((err, res) => {
-              expect(err).to.equal(null)
-              expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
-              expect(res.body).to.not.have.property('public_uri')
-              done()
-            })
+    it('should return error with invalid hmac', (done) => {
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let publicUri = 'http://127.0.0.1'
+
+      request(server)
+        .put('/nodes/' + randTntAddr)
+        .send({ public_uri: publicUri, hmac: '!badhmac' })
+        .expect('Content-type', /json/)
+        .expect(409)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('InvalidArgument')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('invalid JSON body, invalid hmac')
+          done()
         })
     })
   })
@@ -1265,7 +1270,7 @@ describe('Nodes Controller', () => {
 describe('Functions', () => {
   describe('calling generatePostHashResponse with one hash', () => {
     it('should return proper response object', (done) => {
-      let res = hashes.generatePostHashResponse('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
+      let res = hashes.generatePostHashResponse('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12', { tntCredit: 9999 })
       expect(res).to.have.property('hash_id')
       expect(res).to.have.property('hash').and.to.equal('ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12')
       expect(res).to.have.property('submitted_at')
@@ -1273,6 +1278,7 @@ describe('Functions', () => {
       expect(res.processing_hints).to.have.property('cal').and.to.be.a('string')
       expect(res.processing_hints).to.have.property('eth').and.to.be.a('string')
       expect(res.processing_hints).to.have.property('btc').and.to.be.a('string')
+      expect(res).to.have.property('tnt_credit_balance').and.to.equal(9999)
       done()
     })
   })
