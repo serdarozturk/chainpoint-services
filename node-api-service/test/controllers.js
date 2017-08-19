@@ -6,6 +6,7 @@ process.env.NODE_ENV = 'test'
 const expect = require('chai').expect
 const request = require('supertest')
 const crypto = require('crypto')
+const moment = require('moment')
 const uuidTime = require('uuid-time')
 const BLAKE2s = require('blake2s-js')
 
@@ -1102,6 +1103,7 @@ describe('Nodes Controller', () => {
         })
     })
 
+    /*
     it('should be OK if a public_uri is registered twice', (done) => {
       request(server)
         .post('/nodes')
@@ -1137,7 +1139,7 @@ describe('Nodes Controller', () => {
           expect(res.body.hmac_key.length).to.equal(64)
           done()
         })
-    })
+    }) */
   })
 
   describe('PUT /nodes', () => {
@@ -1264,6 +1266,116 @@ describe('Nodes Controller', () => {
           done()
         })
     })
+
+    /*
+    it('should return OK for valid PUT no change to tnt or IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let publicUri = 'http://127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, publicUri, formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+            .put('/nodes/' + randTntAddr)
+            .send({ public_uri: publicUri, hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.have.property('public_uri')
+                .and.to.equal(publicUri)
+              done()
+            })
+        })
+    })
+
+    it('should return OK for valid PUT no change to tnt and updated IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let publicUrl = 'http://127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, public_uri: publicUrl })
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          let updatedUri = 'http://127.0.0.2'
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, updatedUri, formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+            .put('/nodes/' + randTntAddr)
+            .send({ public_uri: updatedUri, hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.have.property('public_uri')
+                .and.to.equal(updatedUri)
+              done()
+            })
+        })
+    })
+
+    it('should return OK for valid PUT no change to tnt and removed IP', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
+      let publicUri = 'http://127.0.0.1'
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
+          let hash = crypto.createHmac('sha256', res.body.hmac_key)
+          let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+          let hmacTxt = [randTntAddr, '', formattedDate].join('')
+          let calculatedHMAC = hash.update(hmacTxt).digest('hex')
+
+          request(server)
+            .put('/nodes/' + randTntAddr)
+            .send({ hmac: calculatedHMAC })
+            .expect('Content-type', /json/)
+            .expect(200)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('tnt_addr')
+                .and.to.equal(randTntAddr)
+              expect(res.body).to.not.have.property('public_uri')
+              done()
+            })
+        })
+    })
+    */
   })
 })
 
