@@ -346,7 +346,8 @@ module.exports = {
     hashes.setAMQPChannel(chan)
   },
   setNistLatest: (val) => { hashes.setNistLatest(val) },
-  setNodeRegistration: (nodeReg) => { hashes.setNodeRegistration(nodeReg) },
+  setHashesNodeRegistration: (nodeReg) => { hashes.setHashesNodeRegistration(nodeReg) },
+  setNodesNodeRegistration: (nodeReg) => { nodes.setNodesNodeRegistration(nodeReg) },
   server: server,
   config: config
 }

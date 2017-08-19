@@ -61,8 +61,9 @@ async function postNodeV1Async (req, res, next) {
 
   let randHMACKey = crypto.randomBytes(32).toString('hex')
 
+  let newNode
   try {
-    await NodeRegistration.create({
+    newNode = await NodeRegistration.create({
       tntAddr: req.params.tnt_addr,
       publicUri: req.params.public_uri,
       hmacKey: randHMACKey
@@ -73,9 +74,9 @@ async function postNodeV1Async (req, res, next) {
   }
 
   res.send({
-    tnt_addr: req.params.tnt_addr,
-    public_uri: req.params.public_uri,
-    hmac_key: randHMACKey
+    tnt_addr: newNode.tntAddr,
+    public_uri: newNode.publicUri,
+    hmac_key: newNode.hmacKey
   })
   return next()
 }
@@ -160,7 +161,7 @@ async function putNodeV1Async (req, res, next) {
 
 module.exports = {
   getSequelize: () => { return sequelize },
-  nodeRegistration: nodeRegistration,
   postNodeV1Async: postNodeV1Async,
-  putNodeV1Async: putNodeV1Async
+  putNodeV1Async: putNodeV1Async,
+  setNodesNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
 }

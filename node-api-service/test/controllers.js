@@ -398,7 +398,7 @@ describe('Hashes Controller', () => {
       })
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return null
         }
@@ -434,7 +434,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update('bad').digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -474,7 +474,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -514,7 +514,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -554,7 +554,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -612,7 +612,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setNodeRegistration({
+      app.setHashesNodeRegistration({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -1103,17 +1103,87 @@ describe('Nodes Controller', () => {
         })
     })
 
-    /*
-    it('should be OK if a public_uri is registered twice', (done) => {
+    it('should return error if a tnt_addr already exists', (done) => {
+      let publicUri = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+
+      let data = []
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: crypto.randomBytes(32).toString('hex')
+          }
+          data.push(row)
+          return row
+        }
+      })
+
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri })
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
           request(server)
             .post('/nodes')
-            .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
+            .send({ tnt_addr: tntAddr1, public_uri: publicUri })
+            .expect(409)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('code')
+                .and.to.be.a('string')
+                .and.to.equal('ConflictError')
+              expect(res.body).to.have.property('message')
+                .and.to.be.a('string')
+                .and.to.equal('tnt_addr : address already exists')
+              done()
+            })
+        })
+    })
+
+    it('should be OK if a public_uri is registered twice', (done) => {
+      let publicUri = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let tntAddr2 = '0x' + crypto.randomBytes(20).toString('hex')
+
+      let data = []
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: crypto.randomBytes(32).toString('hex')
+          }
+          data.push(row)
+          return row
+        }
+      })
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri })
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          request(server)
+            .post('/nodes')
+            .send({ tnt_addr: tntAddr2, public_uri: publicUri })
             .expect(200)
             .end((err, res) => {
               expect(err).to.equal(null)
@@ -1123,23 +1193,43 @@ describe('Nodes Controller', () => {
     })
 
     it('should return OK for valid request', (done) => {
-      app.setAMQPChannel({
-        sendToQueue: function () { }
+      let publicUri = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        }
       })
+
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: '0x' + crypto.randomBytes(20).toString('hex'), public_uri: 'http://127.0.0.1' })
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri })
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
-          expect(res.body).to.have.property('tnt_addr')
-          expect(res.body).to.have.property('public_uri')
-          expect(res.body).to.have.property('hmac_key')
-          expect(res.body.hmac_key.length).to.equal(64)
+          expect(res.body).to.have.property('tnt_addr').and.to.equal(tntAddr1)
+          expect(res.body).to.have.property('public_uri').and.to.equal(publicUri)
+          expect(res.body).to.have.property('hmac_key').and.to.equal(hmacKey)
           done()
         })
-    }) */
+    })
   })
 
   describe('PUT /nodes', () => {
@@ -1267,36 +1357,175 @@ describe('Nodes Controller', () => {
         })
     })
 
-    /*
+    it('should return error for node registration not found', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let publicUri1 = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+      let nodeReg = null
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        },
+        find: (params) => {
+          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (nodeReg) nodeReg.save = () => { }
+          return nodeReg
+        }
+      })
+
+      request(server)
+        .put('/nodes/' + tntAddr1)
+        .send({ public_uri: publicUri1, hmac: crypto.randomBytes(32).toString('hex') })
+        .expect('Content-type', /json/)
+        .expect(404)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+          expect(res.body).to.have.property('code')
+            .and.to.be.a('string')
+            .and.to.equal('ResourceNotFound')
+          expect(res.body).to.have.property('message')
+            .and.to.be.a('string')
+            .and.to.equal('not found')
+          done()
+        })
+    })
+
+    it('should return error for bad hmac', (done) => {
+      app.setAMQPChannel({
+        sendToQueue: function () { }
+      })
+
+      let publicUri1 = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+      let nodeReg = null
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        },
+        find: (params) => {
+          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (nodeReg) nodeReg.save = () => { }
+          return nodeReg
+        }
+      })
+
+      request(server)
+        .post('/nodes')
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri1 })
+        .expect(200)
+        .end((err, res) => {
+          expect(err).to.equal(null)
+
+          request(server)
+            .put('/nodes/' + tntAddr1)
+            .send({ public_uri: publicUri1, hmac: crypto.randomBytes(32).toString('hex') })
+            .expect('Content-type', /json/)
+            .expect(409)
+            .end((err, res) => {
+              expect(err).to.equal(null)
+              expect(res.body).to.have.property('code')
+                .and.to.be.a('string')
+                .and.to.equal('InvalidArgument')
+              expect(res.body).to.have.property('message')
+                .and.to.be.a('string')
+                .and.to.equal('incorrect hmac')
+              done()
+            })
+        })
+    })
+
     it('should return OK for valid PUT no change to tnt or IP', (done) => {
       app.setAMQPChannel({
         sendToQueue: function () { }
       })
 
-      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
       let publicUri = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+      let nodeReg = null
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        },
+        find: (params) => {
+          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (nodeReg) nodeReg.save = () => { }
+          return nodeReg
+        }
+      })
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri })
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
+
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
           let hash = crypto.createHmac('sha256', res.body.hmac_key)
           let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, publicUri, formattedDate].join('')
+          let hmacTxt = [tntAddr1, publicUri, formattedDate].join('')
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-            .put('/nodes/' + randTntAddr)
+            .put('/nodes/' + tntAddr1)
             .send({ public_uri: publicUri, hmac: calculatedHMAC })
             .expect('Content-type', /json/)
             .expect(200)
             .end((err, res) => {
               expect(err).to.equal(null)
               expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
+                .and.to.equal(tntAddr1)
               expect(res.body).to.have.property('public_uri')
                 .and.to.equal(publicUri)
               done()
@@ -1309,33 +1538,60 @@ describe('Nodes Controller', () => {
         sendToQueue: function () { }
       })
 
-      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let publicUrl = 'http://127.0.0.1'
+      let publicUri1 = 'http://127.0.0.1'
+      let publicUri2 = 'http://127.0.0.2'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+      let nodeReg = null
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        },
+        find: (params) => {
+          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (nodeReg) nodeReg.save = () => { }
+          return nodeReg
+        }
+      })
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUrl })
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri1 })
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
-          let updatedUri = 'http://127.0.0.2'
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
           let hash = crypto.createHmac('sha256', res.body.hmac_key)
           let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, updatedUri, formattedDate].join('')
+          let hmacTxt = [tntAddr1, publicUri2, formattedDate].join('')
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-            .put('/nodes/' + randTntAddr)
-            .send({ public_uri: updatedUri, hmac: calculatedHMAC })
+            .put('/nodes/' + tntAddr1)
+            .send({ public_uri: publicUri2, hmac: calculatedHMAC })
             .expect('Content-type', /json/)
             .expect(200)
             .end((err, res) => {
               expect(err).to.equal(null)
               expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
+                .and.to.equal(tntAddr1)
               expect(res.body).to.have.property('public_uri')
-                .and.to.equal(updatedUri)
+                .and.to.equal(publicUri2)
               done()
             })
         })
@@ -1346,36 +1602,62 @@ describe('Nodes Controller', () => {
         sendToQueue: function () { }
       })
 
-      let randTntAddr = '0x' + crypto.randomBytes(20).toString('hex')
-      let publicUri = 'http://127.0.0.1'
+      let publicUri1 = 'http://127.0.0.1'
+      let tntAddr1 = '0x' + crypto.randomBytes(20).toString('hex')
+      let hmacKey = crypto.randomBytes(32).toString('hex')
+
+      let data = []
+      let nodeReg = null
+
+      app.setNodesNodeRegistration({
+        count: (params) => {
+          let matches = data.filter((row) => {
+            return row.tntAddr === params.where.tntAddr
+          })
+          return matches.length
+        },
+        create: (params) => {
+          let row = {
+            tntAddr: params.tntAddr,
+            publicUri: params.publicUri,
+            hmacKey: hmacKey
+          }
+          data.push(row)
+          return row
+        },
+        find: (params) => {
+          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (nodeReg) nodeReg.save = () => { }
+          return nodeReg
+        }
+      })
 
       request(server)
         .post('/nodes')
-        .send({ tnt_addr: randTntAddr, public_uri: publicUri })
+        .send({ tnt_addr: tntAddr1, public_uri: publicUri1 })
         .expect(200)
         .end((err, res) => {
           expect(err).to.equal(null)
           // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
           let hash = crypto.createHmac('sha256', res.body.hmac_key)
           let formattedDate = moment().utc().format('YYYYMMDDHHmm')
-          let hmacTxt = [randTntAddr, '', formattedDate].join('')
+          let hmacTxt = [tntAddr1, '', formattedDate].join('')
           let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
           request(server)
-            .put('/nodes/' + randTntAddr)
+            .put('/nodes/' + tntAddr1)
             .send({ hmac: calculatedHMAC })
             .expect('Content-type', /json/)
             .expect(200)
             .end((err, res) => {
               expect(err).to.equal(null)
               expect(res.body).to.have.property('tnt_addr')
-                .and.to.equal(randTntAddr)
+                .and.to.equal(tntAddr1)
               expect(res.body).to.not.have.property('public_uri')
               done()
             })
         })
     })
-    */
   })
 })
 

@@ -247,5 +247,5 @@ module.exports = {
   setAMQPChannel: (chan) => { amqpChannel = chan },
   getNistLatest: () => { return nistLatest },
   setNistLatest: (val) => { updateNistVars(val) },
-  setNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
+  setHashesNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
 }
