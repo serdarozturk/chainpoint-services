@@ -111,9 +111,9 @@ server.use(restify.bodyParser({
 // submit hash(es)
 server.post({ path: '/hashes', version: '1.0.0' }, hashes.postHashV1Async)
 // get a single proof with a single hash_id
-server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV1)
+server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV1Async)
 // get multiple proofs with 'hashids' header param
-server.get({ path: '/proofs', version: '1.0.0' }, proofs.getProofsByIDV1)
+server.get({ path: '/proofs', version: '1.0.0' }, proofs.getProofsByIDV1Async)
 // verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, verify.postProofsForVerificationV1)
 // get the block hash for the calendar at the specified hieght
@@ -192,6 +192,7 @@ async function openStorageConnectionAsync () {
       await cachedCalendarBlock.getSequelize().sync({ logging: false })
       await hashes.getSequelize().sync({ logging: false })
       await nodes.getSequelize().sync({ logging: false })
+      await proofs.getSequelize().sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
@@ -348,6 +349,7 @@ module.exports = {
   setNistLatest: (val) => { hashes.setNistLatest(val) },
   setHashesNodeRegistration: (nodeReg) => { hashes.setHashesNodeRegistration(nodeReg) },
   setNodesNodeRegistration: (nodeReg) => { nodes.setNodesNodeRegistration(nodeReg) },
+  setProofsNodeRegistration: (nodeReg) => { proofs.setProofsNodeRegistration(nodeReg) },
   server: server,
   config: config
 }
