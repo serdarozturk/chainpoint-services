@@ -1,0 +1,19 @@
+{
+  "name": "node-eth-tnt-tx-service",
+  "version": "1.0.0",
+  "description": "Responds to requests relating to the TNT service.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "envalid": "^3.1.1",
+    "lodash": "^4.17.4",
+    "restify": "^4.3.0",
+    "restify-cors-middleware": "^0.0.8",
+    "truffle-contract": "^2.0.4",
+    "web3": "0.19.0"
+  }
+}

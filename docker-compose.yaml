@@ -4,6 +4,10 @@ networks:
   chainpoint:
     driver: bridge
 
+# Allows deployed contracts to be shared between eth related services
+volumes:
+  eth-contracts-volume:
+
 services:
 
   # NGINX Proxy
@@ -123,7 +127,7 @@ services:
 
   # NIST Beacon
   # Retrieve and store current NIST Beacon records
-  # 
+  #
   # SCALED: false
   #
   # PORTS : none
@@ -169,7 +173,7 @@ services:
 
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
-  # 
+  #
   btc-tx:
     restart: always
     image: quay.io/chainpoint/node-btc-tx-service:${DOCKER_TAG}
@@ -207,7 +211,7 @@ services:
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
-  # 
+  #
   proof-state:
     restart: always
     image: quay.io/chainpoint/node-proof-state-service:${DOCKER_TAG}
@@ -226,7 +230,7 @@ services:
   # Proof Generation
   # Responsible for constructing, signing, and validating Chainpoint proofs
   # for Calendar, Bitcoin, and Ethereum attestation levels.
-  # 
+  #
   proof-gen:
     restart: always
     image: quay.io/chainpoint/node-proof-gen-service:${DOCKER_TAG}
@@ -356,5 +360,94 @@ services:
     command:
       - start
       - --insecure
+    networks:
+      - chainpoint
+
+# Testing Ethereum blockchain service
+#
+  testrpc:
+    image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+    build:
+      context: ./testrpc
+    container_name: testrpc-core
+    restart: unless-stopped
+    ports:
+      - "8545:8545" # RPC
+    networks:
+      - chainpoint
+    logging:
+      driver: none
+
+  # Ethereum Contracts
+  # Builds and deploys the contracts to the testrpc node
+  #
+  eth-contracts:
+    image: quay.io/chainpoint/node-eth-contracts:${DOCKER_TAG}
+    build:
+      context: ./node-eth-contracts
+    container_name: btc-contracts-core
+    depends_on:
+      - testrpc
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+    command: npm run migrate -- --network testrpc
+    volumes:
+      - eth-contracts-volume:/home/node/app/build/contracts
+
+  # Ethereum TNT Transaction Service
+  # Accepts requests from other services related to the TNT token.
+  #
+  eth-tnt-tx-service:
+    restart: always
+    image: quay.io/chainpoint/node-eth-tnt-tx-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-tx-service
+    container_name: btc-tnt-tx-service-core
+    depends_on:
+      - testrpc
+      - eth-contracts
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      LISTEN_TX_PORT: 8085
+    ports:
+      - "8085:8085" # REST API
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
+
+
+  # Ethereum TNT Listener
+  # Listens for incoming TNT transfers from the nodes
+  #
+  eth-tnt-listener-service:
+    image: quay.io/chainpoint/node-eth-tnt-listener-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-listener-service
+    container_name: eth-tnt-listener-service-core
+    depends_on:
+      - testrpc
+      - roach1
+      - eth-contracts
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      ETH_TNT_LISTEN_ADDR: ${ETH_TNT_LISTEN_ADDR}
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
+
+  testrpc:
+    image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+    build:
+      context: ./testrpc
+    container_name: testrpc-core
+    restart: unless-stopped
+    ports:
+      - "8545:8545" # RPC
     networks:
       - chainpoint
