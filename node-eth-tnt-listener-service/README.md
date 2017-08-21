@@ -69,7 +69,7 @@ curl -H "Content-Type: application/json" -X POST -d '{"tnt_addr":"0xdce8127f92f5
 
 Now that the node is registered, we can send some TNT token to that account.
 
-First grab the constract address that was spit out when the listener node was started:
+First grab the contract address that was spit out when the listener node was started:
 ```
 Using TNT Token contract at  0xceaf0d249fef4acefc37c4b3784bb83c15d90675
 ```
