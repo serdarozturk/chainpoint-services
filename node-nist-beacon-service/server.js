@@ -11,9 +11,8 @@ let getNistLatest = () => {
     if (err) {
       console.error(err)
     } else {
-      // console.log(res)
-
-      if (res && res.timeStamp && res.seedValue) {
+      // Only collect beacon with valid signature!
+      if (res && res.timeStamp && res.seedValue && res.validSignature) {
         let timeAndSeed = `${res.timeStamp.toString()}:${res.seedValue}`.toLowerCase()
 
         // The latest NIST value will always be stored under
@@ -40,7 +39,6 @@ let getNistLatest = () => {
 }
 
 function startIntervals () {
-// run at interval
   setInterval(() => {
     try {
       getNistLatest()
@@ -50,7 +48,6 @@ function startIntervals () {
   }, env.NIST_INTERVAL_MS)
 }
 
-// process all steps need to start the application
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
@@ -68,5 +65,4 @@ async function start () {
   }
 }
 
-// get the whole show started
 start()
