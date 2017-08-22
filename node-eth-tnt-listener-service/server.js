@@ -2,17 +2,17 @@
 const env = require('./lib/parse-env.js')('eth-mon')
 
 const ethTokenTxLog = require('./lib/models/EthTokenTrxLog.js')
-const nodeRegistration = require('./lib/models/NodeRegistration.js')
+const registeredNode = require('./lib/models/RegisteredNode.js')
 const utils = require('./lib/utils.js')
 const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
-const BigNumber = require('bignumber.js');
+const BigNumber = require('bignumber.js')
 
 // pull in variables defined in shared EthTokenTrxLog module
 let sequelize = ethTokenTxLog.sequelize
 let EthTokenTxLog = ethTokenTxLog.EthTokenLog
-let NodeRegistration = nodeRegistration.NodeRegistration
+let RegisteredNode = registeredNode.RegisteredNode
 
 // The provider, token contract, and create the TokenOps class
 let web3Provider = null
@@ -73,7 +73,7 @@ async function setLastKnownEventInfo (params) {
  * @param  {number} tntAmount Grains of TNT to convert
  * @return {number}           Amount of credits
  */
-function convertTntToCredit(tntAmount) {
+function convertTntToCredit (tntAmount) {
   return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(new BigNumber(10).toExponential(8)).toNumber()
 }
 
@@ -85,7 +85,7 @@ function convertTntToCredit(tntAmount) {
  */
 async function incrementNodeBalance (nodeAddress, tntAmount) {
   // Find the node that sent in the balance
-  let node = await NodeRegistration.findOne({where: { tntAddr: nodeAddress }})
+  let node = await RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
 
   if (!node) {
     // TODO - Store unkowns for later processing if node registers after sending in for some reason
@@ -98,7 +98,7 @@ async function incrementNodeBalance (nodeAddress, tntAmount) {
   // Convert the TNT to credits
   let credits = convertTntToCredit(tntAmount)
 
-  console.log(`Updating node ${node.tntAddr} with current credit ${node.tntCredit} with amount ${credits}`)
+  console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
   node.tntCredit += credits
   return node.save()
 }

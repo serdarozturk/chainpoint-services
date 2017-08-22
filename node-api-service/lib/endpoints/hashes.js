@@ -4,7 +4,7 @@ const utils = require('../utils.js')
 const BLAKE2s = require('blake2s-js')
 const _ = require('lodash')
 const crypto = require('crypto')
-const nodeRegistration = require('../models/NodeRegistration.js')
+const registeredNode = require('../models/RegisteredNode.js')
 
 const TNT_CREDIT_COST_POST_HASH = 1
 
@@ -21,9 +21,9 @@ let amqpChannel = null
 let nistLatest = null
 let nistLatestEpoch = null
 
-// pull in variables defined in shared NodeRegistration module
-let sequelize = nodeRegistration.sequelize
-let NodeRegistration = nodeRegistration.NodeRegistration
+// pull in variables defined in shared RegisteredNode module
+let sequelize = registeredNode.sequelize
+let RegisteredNode = registeredNode.RegisteredNode
 
 /**
  * Converts an array of hash strings to a object suitable to
@@ -33,7 +33,7 @@ let NodeRegistration = nodeRegistration.NodeRegistration
  * @returns {Object} An Object with 'hash_id', 'hash', 'nist', 'submitted_at' and 'processing_hints' properties
  *
  */
-function generatePostHashResponse (hash, nodeReg) {
+function generatePostHashResponse (hash, regNode) {
   hash = hash.toLowerCase()
 
   let hashNIST = nistLatest || ''
@@ -104,7 +104,7 @@ function generatePostHashResponse (hash, nodeReg) {
     eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 41)),
     btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 61))
   }
-  result.tnt_credit_balance = parseInt(nodeReg.tntCredit)
+  result.tnt_credit_balance = parseInt(regNode.tntCredit)
 
   return result
 }
@@ -182,28 +182,28 @@ async function postHashV1Async (req, res, next) {
   }
 
   // validate the calculated hmac
-  let nodeReg = null
+  let regNode = null
   try {
-    nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
-    if (!nodeReg) {
+    regNode = await RegisteredNode.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
+    if (!regNode) {
       return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }
-    let hash = crypto.createHmac('sha256', nodeReg.hmacKey)
-    let hmac = hash.update(nodeReg.tntAddr).digest('hex')
+    let hash = crypto.createHmac('sha256', regNode.hmacKey)
+    let hmac = hash.update(regNode.tntAddr).digest('hex')
     if (authValueSegments[1] !== hmac) {
       return next(new restify.InvalidCredentialsError('authorization denied: bad hmac value'))
     }
-    if (nodeReg.tntCredit < TNT_CREDIT_COST_POST_HASH) {
-      return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining : ${nodeReg.tntCredit}`))
+    if (regNode.tntCredit < TNT_CREDIT_COST_POST_HASH) {
+      return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining : ${regNode.tntCredit}`))
     }
     // decrement tntCredit by TNT_CREDIT_COST_POST_HASH
-    await nodeReg.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
+    await regNode.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
   } catch (error) {
     console.error(error)
     return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
   }
 
-  let responseObj = generatePostHashResponse(req.params.hash, nodeReg)
+  let responseObj = generatePostHashResponse(req.params.hash, regNode)
 
   let hashObj = {
     hash_id: responseObj.hash_id,
@@ -247,5 +247,5 @@ module.exports = {
   setAMQPChannel: (chan) => { amqpChannel = chan },
   getNistLatest: () => { return nistLatest },
   setNistLatest: (val) => { updateNistVars(val) },
-  setHashesNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
+  setHashesRegisteredNode: (regNode) => { RegisteredNode = regNode }
 }

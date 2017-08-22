@@ -347,9 +347,9 @@ module.exports = {
     hashes.setAMQPChannel(chan)
   },
   setNistLatest: (val) => { hashes.setNistLatest(val) },
-  setHashesNodeRegistration: (nodeReg) => { hashes.setHashesNodeRegistration(nodeReg) },
-  setNodesNodeRegistration: (nodeReg) => { nodes.setNodesNodeRegistration(nodeReg) },
-  setProofsNodeRegistration: (nodeReg) => { proofs.setProofsNodeRegistration(nodeReg) },
+  setHashesRegisteredNode: (regNode) => { hashes.setHashesRegisteredNode(regNode) },
+  setNodesRegisteredNode: (regNode) => { nodes.setNodesRegisteredNode(regNode) },
+  setProofsRegisteredNode: (regNode) => { proofs.setProofsRegisteredNode(regNode) },
   server: server,
   config: config
 }

@@ -3,10 +3,10 @@ const restify = require('restify')
 const _ = require('lodash')
 const moment = require('moment')
 var validUrl = require('valid-url')
-const nodeRegistration = require('../models/NodeRegistration.js')
+const registeredNode = require('../models/RegisteredNode.js')
 
-let sequelize = nodeRegistration.sequelize
-let NodeRegistration = nodeRegistration.NodeRegistration
+let sequelize = registeredNode.sequelize
+let RegisteredNode = registeredNode.RegisteredNode
 
 // validate eth address is well formed
 let isEthereumAddr = (address) => {
@@ -50,7 +50,7 @@ async function postNodeV1Async (req, res, next) {
   }
 
   try {
-    let count = await NodeRegistration.count({ where: { tntAddr: req.params.tnt_addr } })
+    let count = await RegisteredNode.count({ where: { tntAddr: req.params.tnt_addr } })
     if (count >= 1) {
       return next(new restify.ConflictError('tnt_addr : address already exists'))
     }
@@ -63,13 +63,13 @@ async function postNodeV1Async (req, res, next) {
 
   let newNode
   try {
-    newNode = await NodeRegistration.create({
+    newNode = await RegisteredNode.create({
       tntAddr: req.params.tnt_addr,
       publicUri: req.params.public_uri,
       hmacKey: randHMACKey
     })
   } catch (error) {
-    console.error(`could not create NodeRegistration : ${error}`)
+    console.error(`could not create RegisteredNode : ${error}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -123,7 +123,7 @@ async function putNodeV1Async (req, res, next) {
   }
 
   try {
-    let regNode = await NodeRegistration.find({ where: { tntAddr: req.params.tnt_addr } })
+    let regNode = await RegisteredNode.find({ where: { tntAddr: req.params.tnt_addr } })
     if (!regNode) {
       return next(new restify.ResourceNotFoundError('not found'))
     }
@@ -163,5 +163,5 @@ module.exports = {
   getSequelize: () => { return sequelize },
   postNodeV1Async: postNodeV1Async,
   putNodeV1Async: putNodeV1Async,
-  setNodesNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
+  setNodesRegisteredNode: (regNode) => { RegisteredNode = regNode }
 }

@@ -5,7 +5,7 @@ const uuidValidate = require('uuid-validate')
 const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
 const crypto = require('crypto')
-const nodeRegistration = require('../models/NodeRegistration.js')
+const registeredNode = require('../models/RegisteredNode.js')
 
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
@@ -17,9 +17,9 @@ const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
 // The custom MIME type for JSON proof array results containing Base64 encoded proof data
 const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
 
-// pull in variables defined in shared NodeRegistration module
-let sequelize = nodeRegistration.sequelize
-let NodeRegistration = nodeRegistration.NodeRegistration
+// pull in variables defined in shared RegisteredNode module
+let sequelize = registeredNode.sequelize
+let RegisteredNode = registeredNode.RegisteredNode
 
 /**
  * GET /proofs/:hash_id handler
@@ -77,14 +77,14 @@ async function getProofsByIDV1Async (req, res, next) {
   }
 
   // validate the calculated hmac
-  let nodeReg = null
+  let regNode = null
   try {
-    nodeReg = await NodeRegistration.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey'] })
-    if (!nodeReg) {
+    regNode = await RegisteredNode.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey'] })
+    if (!regNode) {
       return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }
-    let hash = crypto.createHmac('sha256', nodeReg.hmacKey)
-    let hmac = hash.update(nodeReg.tntAddr).digest('hex')
+    let hash = crypto.createHmac('sha256', regNode.hmacKey)
+    let hmac = hash.update(regNode.tntAddr).digest('hex')
     if (authValueSegments[1] !== hmac) {
       return next(new restify.InvalidCredentialsError('authorization denied: bad hmac value'))
     }
@@ -135,5 +135,5 @@ module.exports = {
   getSequelize: () => { return sequelize },
   getProofsByIDV1Async: getProofsByIDV1Async,
   setRedis: (redisClient) => { redis = redisClient },
-  setProofsNodeRegistration: (nodeReg) => { NodeRegistration = nodeReg }
+  setProofsRegisteredNode: (regNode) => { RegisteredNode = regNode }
 }

@@ -172,7 +172,7 @@ describe('Proofs Controller', () => {
       let hash = crypto.createHmac('sha256', hmacKey)
       let hmac = hash.update(tntAddr).digest('hex')
 
-      app.setProofsNodeRegistration({
+      app.setProofsRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -261,7 +261,7 @@ describe('Proofs Controller', () => {
       let hash = crypto.createHmac('sha256', hmacKey)
       let hmac = hash.update('bad').digest('hex')
 
-      app.setProofsNodeRegistration({
+      app.setProofsRegisteredNode({
         findOne: (params) => {
           return null
         }
@@ -298,7 +298,7 @@ describe('Proofs Controller', () => {
       let hash = crypto.createHmac('sha256', hmacKey)
       let hmac = hash.update('bad').digest('hex')
 
-      app.setProofsNodeRegistration({
+      app.setProofsRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -339,7 +339,7 @@ describe('Proofs Controller', () => {
       let hash = crypto.createHmac('sha256', hmacKey)
       let hmac = hash.update(tntAddr).digest('hex')
 
-      app.setProofsNodeRegistration({
+      app.setProofsRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -381,7 +381,7 @@ describe('Proofs Controller', () => {
       let hash = crypto.createHmac('sha256', hmacKey)
       let hmac = hash.update(tntAddr).digest('hex')
 
-      app.setProofsNodeRegistration({
+      app.setProofsRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -641,7 +641,7 @@ describe('Hashes Controller', () => {
       })
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return null
         }
@@ -677,7 +677,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update('bad').digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -717,7 +717,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -757,7 +757,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -797,7 +797,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -855,7 +855,7 @@ describe('Hashes Controller', () => {
       let hmac = hash.update(tntAddr).digest('hex')
 
       app.setNistLatest('1400585240:8E00C0AF2B68E33CC453BF45A1689A6804700C083478FEB34E4694422999B6F745C2F837D7BA983F9D7BA52F7CC62965B8E1B7384CD8177003B5D3A0D099D93C')
-      app.setHashesNodeRegistration({
+      app.setHashesRegisteredNode({
         findOne: (params) => {
           return {
             tntAddr: tntAddr,
@@ -1352,7 +1352,7 @@ describe('Nodes Controller', () => {
 
       let data = []
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1400,7 +1400,7 @@ describe('Nodes Controller', () => {
 
       let data = []
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1442,7 +1442,7 @@ describe('Nodes Controller', () => {
 
       let data = []
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1610,9 +1610,9 @@ describe('Nodes Controller', () => {
       let hmacKey = crypto.randomBytes(32).toString('hex')
 
       let data = []
-      let nodeReg = null
+      let regNode = null
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1629,9 +1629,9 @@ describe('Nodes Controller', () => {
           return row
         },
         find: (params) => {
-          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
-          if (nodeReg) nodeReg.save = () => { }
-          return nodeReg
+          regNode = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (regNode) regNode.save = () => { }
+          return regNode
         }
       })
 
@@ -1662,9 +1662,9 @@ describe('Nodes Controller', () => {
       let hmacKey = crypto.randomBytes(32).toString('hex')
 
       let data = []
-      let nodeReg = null
+      let regNode = null
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1681,9 +1681,9 @@ describe('Nodes Controller', () => {
           return row
         },
         find: (params) => {
-          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
-          if (nodeReg) nodeReg.save = () => { }
-          return nodeReg
+          regNode = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (regNode) regNode.save = () => { }
+          return regNode
         }
       })
 
@@ -1722,9 +1722,9 @@ describe('Nodes Controller', () => {
       let hmacKey = crypto.randomBytes(32).toString('hex')
 
       let data = []
-      let nodeReg = null
+      let regNode = null
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1741,9 +1741,9 @@ describe('Nodes Controller', () => {
           return row
         },
         find: (params) => {
-          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
-          if (nodeReg) nodeReg.save = () => { }
-          return nodeReg
+          regNode = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (regNode) regNode.save = () => { }
+          return regNode
         }
       })
 
@@ -1787,9 +1787,9 @@ describe('Nodes Controller', () => {
       let hmacKey = crypto.randomBytes(32).toString('hex')
 
       let data = []
-      let nodeReg = null
+      let regNode = null
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1806,9 +1806,9 @@ describe('Nodes Controller', () => {
           return row
         },
         find: (params) => {
-          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
-          if (nodeReg) nodeReg.save = () => { }
-          return nodeReg
+          regNode = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (regNode) regNode.save = () => { }
+          return regNode
         }
       })
 
@@ -1850,9 +1850,9 @@ describe('Nodes Controller', () => {
       let hmacKey = crypto.randomBytes(32).toString('hex')
 
       let data = []
-      let nodeReg = null
+      let regNode = null
 
-      app.setNodesNodeRegistration({
+      app.setNodesRegisteredNode({
         count: (params) => {
           let matches = data.filter((row) => {
             return row.tntAddr === params.where.tntAddr
@@ -1869,9 +1869,9 @@ describe('Nodes Controller', () => {
           return row
         },
         find: (params) => {
-          nodeReg = data.find((item) => { return item.tntAddr === params.where.tntAddr })
-          if (nodeReg) nodeReg.save = () => { }
-          return nodeReg
+          regNode = data.find((item) => { return item.tntAddr === params.where.tntAddr })
+          if (regNode) regNode.save = () => { }
+          return regNode
         }
       })
 

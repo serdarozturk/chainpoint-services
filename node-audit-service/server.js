@@ -2,7 +2,8 @@
 const env = require('./lib/parse-env.js')('audit')
 
 const rp = require('request-promise-native')
-const nodeRegistration = require('./lib/models/NodeRegistration.js')
+const registeredNode = require('./lib/models/RegisteredNode.js')
+const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const utils = require('./lib/utils.js')
 const r = require('redis')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
@@ -25,8 +26,10 @@ let redis = null
 const merkleTools = new MerkleTools()
 
 // pull in variables defined in shared CalendarBlock module
-let nodeRegSequelize = nodeRegistration.sequelize
-let NodeRegistration = nodeRegistration.NodeRegistration
+let regNodeSequelize = registeredNode.sequelize
+let RegisteredNode = registeredNode.RegisteredNode
+let nodeAuditSequelize = nodeAuditLog.sequelize
+let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 
@@ -49,24 +52,19 @@ const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 const CHALLENGE_EXPIRE_MINUTES = 75
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
-const ACCEPTABLE_DELTA_MS = 2000 // 2 seconds
+const ACCEPTABLE_DELTA_MS = 1000 // 1 second
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
   let nodesReadyForAudit = []
   try {
     let lastAuditCutoff = Date.now() - AUDIT_NEEDED_AGE_MS
-    nodesReadyForAudit = await NodeRegistration.findAll(
+    nodesReadyForAudit = await RegisteredNode.findAll(
       {
         where: {
-          $and: [
-            { publicUri: { $ne: null } },
-            {
-              $or: [
-                { lastAuditAt: null },
-                { lastAuditAt: { $lte: lastAuditCutoff } }
-              ]
-            }
+          $or: [
+            { lastAuditAt: null },
+            { lastAuditAt: { $lte: lastAuditCutoff } }
           ]
         }
       })
@@ -78,6 +76,25 @@ async function auditNodesAsync () {
 
   // iterate through each Node, requesting an answer to the challenge
   for (let x = 0; x < nodesReadyForAudit.length; x++) {
+    // if there is no public_uri set for this Node, fail all audit tests and continue to the next
+    if (!nodesReadyForAudit[x].publicUri) {
+      let coreAuditTimestamp = Date.now()
+      try {
+        await NodeAuditLog.create({
+          tntAddr: nodesReadyForAudit[x].tntAddr,
+          publicUri: null,
+          auditAt: coreAuditTimestamp,
+          publicIPPass: false,
+          timePass: false,
+          calStatePass: false
+        })
+        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+      } catch (error) {
+        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr} : ${error.message} `)
+      }
+      continue
+    }
+
     let options = {
       headers: [
         {
@@ -98,38 +115,57 @@ async function auditNodesAsync () {
       coreAuditTimestamp = Date.now()
       nodeResponse = await rp(options)
     } catch (error) {
-      if (error.statusCode !== 200) {
-        console.error(`NodeAudit : GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}`)
-      } else {
-        console.error(`NodeAudit : GET failed with error ${error.message} for ${nodesReadyForAudit[x].publicUri}`)
-      }
+      console.error(`NodeAudit : GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri} : ${error.message}`)
       try {
-        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+        await NodeAuditLog.create({
+          tntAddr: nodesReadyForAudit[x].tntAddr,
+          publicUri: nodesReadyForAudit[x].publicUri,
+          auditAt: coreAuditTimestamp,
+          publicIPPass: false,
+          timePass: false,
+          calStatePass: false
+        })
+        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr} : ${error.message} `)
       }
       continue
     }
     if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
       console.error(`NodeAudit : GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
       try {
-        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+        await NodeAuditLog.create({
+          tntAddr: nodesReadyForAudit[x].tntAddr,
+          publicUri: nodesReadyForAudit[x].publicUri,
+          auditAt: coreAuditTimestamp,
+          publicIPPass: false,
+          timePass: false,
+          calStatePass: false
+        })
+        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr} : ${error.message} `)
       }
       continue
     }
     if (!nodeResponse.body.time) {
       console.error(`NodeAudit : GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
       try {
-        await NodeRegistration.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+        await NodeAuditLog.create({
+          tntAddr: nodesReadyForAudit[x].tntAddr,
+          publicUri: nodesReadyForAudit[x].publicUri,
+          auditAt: coreAuditTimestamp,
+          publicIPPass: false,
+          timePass: false,
+          calStatePass: false
+        })
+        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit : Could not update Node registration for ${nodesReadyForAudit[x].publicUri} after error`)
+        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr} : ${error.message} `)
       }
       continue
     }
 
-    let updateValues = {}
     try {
       let nodeAuditResponseData = nodeResponse.body.calendar.audit_response.split(':')
       let nodeAuditResponseCoreChallengeCreateTimestamp = nodeAuditResponseData[0]
@@ -137,18 +173,17 @@ async function auditNodesAsync () {
       let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}`)
       let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
 
-      // update the last audit time
-      updateValues.lastAuditAt = coreAuditTimestamp
-
       // We've gotten this far, so at least auditedPublicIPAt has passed
-      updateValues.auditedPublicIPAt = coreAuditTimestamp
+      let publicIPPass = true
 
       // check if the Node timestamp is withing the acceptable range
+      let timePass = false
       if (Math.abs(nodeAuditTimestamp - coreAuditTimestamp) <= ACCEPTABLE_DELTA_MS) {
-        updateValues.auditedTimeAt = coreAuditTimestamp
+        timePass = true
       }
 
       // check if the Node challenge solution is correct
+      let calStatePass = false
       if (coreAuditChallenge) {
         let coreChallengeSegments = coreAuditChallenge.split(':')
         let coreChallengeSolution = coreChallengeSegments.pop()
@@ -157,22 +192,36 @@ async function auditNodesAsync () {
         coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
 
         if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-          updateValues.auditedCalStateAt = coreAuditTimestamp
+          calStatePass = true
         }
       } else {
         console.error(`NodeAudit : No challenge data found for key 'calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}'`)
       }
 
-      // update the Node audit results in NodeRegistration
+      // update the Node audit results in RegisteredNode
       try {
-        await NodeRegistration.update(updateValues, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+        await NodeAuditLog.create({
+          tntAddr: nodesReadyForAudit[x].tntAddr,
+          publicUri: nodesReadyForAudit[x].publicUri,
+          auditAt: coreAuditTimestamp,
+          publicIPPass: publicIPPass,
+          timePass: timePass,
+          calStatePass: calStatePass
+        })
+        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        throw new Error(`Could not update Node registration`)
+        throw new Error(`Could not update Node Audit results : ${error.message}`)
       }
 
-      console.log(`Audit complete for ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(updateValues)}`)
+      let results = {}
+      results.auditAt = coreAuditTimestamp
+      results.publicIPPass = publicIPPass
+      results.timePass = timePass
+      results.calStatePass = calStatePass
+
+      console.log(`Audit complete for ${nodesReadyForAudit[x].tntAddr} at ${nodesReadyForAudit[x].publicUri} : ${JSON.stringify(results)}`)
     } catch (error) {
-      console.error(`NodeAudit : Could not process audit for ${nodesReadyForAudit[x].publicUri} : ${error.message}`)
+      console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr} : ${error.message} `)
     }
   }
 }
@@ -269,13 +318,15 @@ async function openStorageConnectionAsync () {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await nodeRegSequelize.sync({ logging: false })
+      await regNodeSequelize.sync({ logging: false })
+      await nodeAuditSequelize.sync({ logging: false })
       await calBlockSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
       // catch errors when attempting to establish connection
       console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
+      console.error(error.message)
       await utils.sleep(5000)
     }
   }
