@@ -100,5 +100,5 @@ TierionNetworkToken.at('0xceaf0d249fef4acefc37c4b3784bb83c15d90675').transfer("0
 
 You will see output:
 ```
-Updating node 0xdce8127f92f5a5082ef1ae0de95abfa955be3110 with current credit 0 with amount 500000
+Incrementing node 0xdce8127f92f5a5082ef1ae0de95abfa955be3110 with current credit 0 by amount 500000
 ```
