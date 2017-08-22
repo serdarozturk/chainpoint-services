@@ -451,3 +451,21 @@ services:
       - "8545:8545" # RPC
     networks:
       - chainpoint
+      
+  # TNT Lottery
+  # Responsible for auditing the availability, time, and calendar state
+  # of public Tierion Network Nodes
+  #
+  tnt-lottery:
+    restart: always
+    image: quay.io/chainpoint/node-tnt-lottery-service:${DOCKER_TAG}
+    build:
+      context: ./node-tnt-lottery-service
+    container_name: tnt-lottery-core
+    depends_on:
+      - eth-tnt-tx-service
+      - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development

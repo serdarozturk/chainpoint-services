@@ -135,7 +135,13 @@ let envDefinitions = {
   // ETH TNT Listener / TNT TX services specific variables
   ETH_PROVIDER_URI: envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' }),
   LISTEN_TX_PORT: envalid.num({ default: 8085, desc: 'Port of the ETH provider.' }),
-  TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' })
+  TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' }),
+
+  // TNT Lottery service specific variables
+  TNT_GRAINS_PER_LOTTERY_AWARD: envalid.num({ default: 5000000000, desc: 'The total TNT, in Grains, awarded to the lottery winner' }),
+  LOTTERY_FREQUENCY_SECONDS: envalid.num({ default: 3600, desc: 'The frequency, in seconds, that the lottery is run' }),
+  MIN_CONSECUTIVE_AUDIT_PASSES_FOR_AWARD: envalid.num({ default: 5, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligable for a lottery award' }),
+  MIN_TNT_GRAINS_BALANCE_FOR_AWARD: envalid.num({ default: 300000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligable for a lottery award' })
 }
 
 module.exports = (service) => {
