@@ -404,7 +404,7 @@ services:
     image: quay.io/chainpoint/node-eth-tnt-tx-service:${DOCKER_TAG}
     build:
       context: ./node-eth-tnt-tx-service
-    container_name: eth-tnt-tx-service-core
+    container_name: eth-tnt-tx-core
     depends_on:
       - testrpc
       - eth-contracts
@@ -427,7 +427,7 @@ services:
     image: quay.io/chainpoint/node-eth-tnt-listener-service:${DOCKER_TAG}
     build:
       context: ./node-eth-tnt-listener-service
-    container_name: eth-tnt-listener-service-core
+    container_name: eth-tnt-listener-core
     depends_on:
       - testrpc
       - roach1
