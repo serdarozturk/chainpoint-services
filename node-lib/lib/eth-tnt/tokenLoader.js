@@ -41,7 +41,7 @@ module.exports = async (provider, tokenAddr) => {
   }
 
   // Dumb workaround for bug - https://github.com/ethereum/web3.js/issues/925
-  console.log("Using TNT Token contract at ", deployedToken.address)
+  console.log('Using TNT Token contract at ', deployedToken.address)
   let tokenABI = tokenDef.abi
   let tokenDefinition = web3.eth.contract(tokenABI)
   return tokenDefinition.at(deployedToken.address)
