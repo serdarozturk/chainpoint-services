@@ -1,5 +1,5 @@
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')('eth-mon')
+const env = require('./lib/parse-env.js')('eth-tnt-listener')
 
 const ethTokenTxLog = require('./lib/models/EthTokenTrxLog.js')
 const registeredNode = require('./lib/models/RegisteredNode.js')

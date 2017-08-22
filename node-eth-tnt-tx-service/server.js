@@ -1,5 +1,5 @@
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')('eth-mon')
+const env = require('./lib/parse-env.js')('eth-tnt-tx')
 
 const { promisify } = require('util')
 const restify = require('restify')

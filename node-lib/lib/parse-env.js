@@ -130,8 +130,12 @@ let envDefinitions = {
   // Proof State service specific variables
   RMQ_PREFETCH_COUNT_STATE: envalid.num({ default: 10, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for message consumption originating from the aggregator, calendar, and proof state services' }),
-  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 1, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' })
+  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 1, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' }),
 
+  // ETH TNT Listener / TNT TX services specific variables
+  ETH_PROVIDER_URI: envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' }),
+  LISTEN_TX_PORT: envalid.num({ default: 8085, desc: 'Port of the ETH provider.' }),
+  TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' })
 }
 
 module.exports = (service) => {
@@ -152,11 +156,8 @@ module.exports = (service) => {
       envDefinitions.INSIGHT_API_BASE_URI = envalid.url({ desc: 'The Bitcore Insight-API base URI' })
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
-    case 'eth-mon':
-      envDefinitions.ETH_PROVIDER_URI = envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' })
-      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ default: '0x0', desc: 'The address used to listen for incoming TNT transfers' })
-      envDefinitions.LISTEN_TX_PORT = envalid.num({ default: 8085, desc: 'Port of the ETH provider.' })
-      envDefinitions.TNT_TO_CREDIT_RATE = envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' })
+    case 'eth-tnt-listener':
+      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ desc: 'The address used to listen for incoming TNT transfers' })
       break
   }
   return envalid.cleanEnv(process.env, envDefinitions, {
