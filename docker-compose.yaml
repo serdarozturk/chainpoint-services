@@ -385,7 +385,7 @@ services:
     image: quay.io/chainpoint/node-eth-contracts:${DOCKER_TAG}
     build:
       context: ./node-eth-contracts
-    container_name: btc-contracts-core
+    container_name: eth-contracts-core
     depends_on:
       - testrpc
     networks:
@@ -404,7 +404,7 @@ services:
     image: quay.io/chainpoint/node-eth-tnt-tx-service:${DOCKER_TAG}
     build:
       context: ./node-eth-tnt-tx-service
-    container_name: btc-tnt-tx-service-core
+    container_name: eth-tnt-tx-service-core
     depends_on:
       - testrpc
       - eth-contracts
