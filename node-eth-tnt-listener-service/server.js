@@ -10,8 +10,9 @@ const TokenOps = require('./lib/eth-tnt/tokenOps.js')
 const BigNumber = require('bignumber.js')
 
 // pull in variables defined in shared EthTokenTrxLog module
-let sequelize = ethTokenTxLog.sequelize
+let ethTokenTxSequelize = ethTokenTxLog.sequelize
 let EthTokenTxLog = ethTokenTxLog.EthTokenLog
+let registeredNodeSequelize = ethTokenTxLog.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
 
 // The provider, token contract, and create the TokenOps class
@@ -24,7 +25,7 @@ let lastEventInfo = null
 /**
  * Get the last incoming transfer of TNT tokens we have seen and return block number and trx index
  */
-async function getLastKnownEventInfo () {
+async function getLastKnownEventInfoAsync () {
   // Get the latest incoming transfer from the DB
   let lastTransfer = await EthTokenTxLog.findOne({
     where: { toAddress: env.ETH_TNT_LISTEN_ADDR },
@@ -47,7 +48,7 @@ async function getLastKnownEventInfo () {
   }
 }
 
-async function setLastKnownEventInfo (params) {
+async function setLastKnownEventInfoAsync (params) {
   // Save off the last seen info to the local copy
   lastEventInfo = {
     blockNumber: params.blockNumber,
@@ -65,7 +66,7 @@ async function setLastKnownEventInfo (params) {
 
   // TODO : Possibly wrap this create with the crediting of balance into a single transaction
   // for error case of rollback.
-  return EthTokenTxLog.create(tx)
+  return await EthTokenTxLog.create(tx)
 }
 
 /**
@@ -83,7 +84,7 @@ function convertTntToCredit (tntAmount) {
  * @param {string} nodeAddress
  * @param {bigint} tntAmount
  */
-async function incrementNodeBalance (nodeAddress, tntAmount) {
+async function incrementNodeBalanceAsync (nodeAddress, tntAmount) {
   // Find the node that sent in the balance
   let node = await RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
 
@@ -100,7 +101,7 @@ async function incrementNodeBalance (nodeAddress, tntAmount) {
 
   console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
   node.tntCredit += credits
-  return node.save()
+  return await node.save()
 }
 
 /**
@@ -127,9 +128,9 @@ function isNewEventOlder (latestEventInfo, newEventInfo) {
 /**
  * Initializes the token listener for incoming TNT token transfers.
  */
-async function initListener () {
+async function initListenerAsync () {
   // Get the last known event info and save it to a local var
-  lastEventInfo = await getLastKnownEventInfo()
+  lastEventInfo = await getLastKnownEventInfoAsync()
 
   console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDR + ' starting at block ' + JSON.stringify(lastEventInfo))
 
@@ -164,10 +165,10 @@ function incomingTokenTransferEvent (error, params) {
   console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args.from + ' To: ' + params.args.to + ' AMT: ' + params.args.value)
 
   // Should take any action required when event is triggered here.
-  incrementNodeBalance(params.args.from, params.args.value)
+  incrementNodeBalanceAsync(params.args.from, params.args.value)
 
   // Save off block number here from latest seen event.
-  setLastKnownEventInfo(params)
+  setLastKnownEventInfoAsync(params)
 }
 
 /**
@@ -177,7 +178,8 @@ async function openStorageConnectionAsync (callback) {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await sequelize.sync({ logging: false })
+      await ethTokenTxSequelize.sync({ logging: false })
+      await registeredNodeSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
@@ -203,7 +205,7 @@ async function start () {
     await openStorageConnectionAsync()
 
     // init event listener
-    initListener()
+    await initListenerAsync()
 
     console.log('startup completed successfully')
   } catch (err) {
