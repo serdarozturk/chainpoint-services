@@ -139,8 +139,8 @@ let envDefinitions = {
 
   // TNT Lottery service specific variables
   TNT_GRAINS_PER_LOTTERY_AWARD: envalid.num({ default: 5000000000, desc: 'The total TNT, in Grains, awarded to the lottery winner' }),
-  LOTTERY_FREQUENCY_SECONDS: envalid.num({ default: 3600, desc: 'The frequency, in seconds, that the lottery is run' }),
-  MIN_CONSECUTIVE_AUDIT_PASSES_FOR_AWARD: envalid.num({ default: 5, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligable for a lottery award' }),
+  LOTTERY_FREQUENCY_SECONDS: envalid.num({ default: 1800, desc: 'The frequency, in seconds, that the lottery is run' }),
+  MIN_CONSECUTIVE_AUDIT_PASSES_FOR_AWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligable for a lottery award' }),
   MIN_TNT_GRAINS_BALANCE_FOR_AWARD: envalid.num({ default: 300000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligable for a lottery award' })
 }
 
