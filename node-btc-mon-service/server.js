@@ -48,7 +48,7 @@ let monitorTransactionsAsync = async () => {
   let btcTxIdsToMonitor = BTCTXIDS.splice(0)
   console.log(`Btc Tx montoring process starting for ${btcTxIdsToMonitor.length} transaction(s)`)
 
-  for (let index in btcTxIdsToMonitor) {
+  for (let index = 0; index < btcTxIdsToMonitor.length; index++) {
     let btcTxIdObj = btcTxIdsToMonitor[index]
 
     try {
