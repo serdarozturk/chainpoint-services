@@ -25,7 +25,7 @@ let redis = null
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
 
-// pull in variables defined in shared CalendarBlock module
+// pull in variables defined in shared database models
 let regNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
 let nodeAuditSequelize = nodeAuditLog.sequelize
