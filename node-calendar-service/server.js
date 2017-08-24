@@ -41,8 +41,8 @@ let nistLatest = null
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
 
-// An array of all Lottery messages received and awaiting processing
-let LOTTERY_MESSAGES = []
+// An array of all Reward messages received and awaiting processing
+let REWARD_MESSAGES = []
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
@@ -181,14 +181,14 @@ let createBtcConfirmBlockAsync = async (height, root) => {
   }
 }
 
-let createLotteryBlockAsync = async (dataId, dataVal) => {
+let createRewardBlockAsync = async (dataId, dataVal) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
   try {
     let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      return await writeBlockAsync(newId, 'lottery', dataId.toString(), dataVal.toString(), prevBlock.hash, 'LOTTERY')
+      return await writeBlockAsync(newId, 'reward', dataId.toString(), dataVal.toString(), prevBlock.hash, 'REWARD')
     } else {
       throw new Error('no genesis block found')
     }
@@ -227,8 +227,8 @@ function processMessage (msg) {
           amqpChannel.ack(msg)
         }
         break
-      case 'lottery':
-        consumeLotteryMessage(msg)
+      case 'reward':
+        consumeRewardMessage(msg)
         break
       default:
         // This is an unknown state type
@@ -319,13 +319,13 @@ function consumeBtcMonMessage (msg) {
   }
 }
 
-function consumeLotteryMessage (msg) {
+function consumeRewardMessage (msg) {
   if (msg !== null) {
-    LOTTERY_MESSAGES.push(msg)
+    REWARD_MESSAGES.push(msg)
     try {
-      lotteryLock.acquire()
+      rewardLock.acquire()
     } catch (err) {
-      console.error('lotteryLock.acquire() : caught err : ', err.message)
+      console.error('rewardLock.acquire() : caught err : ', err.message)
     }
   }
 }
@@ -619,7 +619,7 @@ let btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
 let btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
 let ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
 let ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
-let lotteryLock = consul.lock(_.merge({}, lockOpts, { value: 'lottery' }))
+let rewardLock = consul.lock(_.merge({}, lockOpts, { value: 'reward' }))
 
 function registerLockEvents (lock, lockName, acquireFunction) {
   lock.on('acquire', () => {
@@ -838,40 +838,40 @@ registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
   }
 })
 
-// LOCK HANDLERS : lottery
-registerLockEvents(lotteryLock, 'lotteryLock', async () => {
+// LOCK HANDLERS : reward
+registerLockEvents(rewardLock, 'rewardLock', async () => {
   try {
-    let lotteryMessagesToProcess = LOTTERY_MESSAGES.splice(0)
+    let rewardMessagesToProcess = REWARD_MESSAGES.splice(0)
     // if there are no messages left to process, release lock and return
-    if (lotteryMessagesToProcess.length === 0) return
+    if (rewardMessagesToProcess.length === 0) return
 
-    for (let index = 0; index < lotteryMessagesToProcess.length; index++) {
-      let msg = lotteryMessagesToProcess[index]
-      let lotteryObj = JSON.parse(msg.content.toString())
+    for (let index = 0; index < rewardMessagesToProcess.length; index++) {
+      let msg = rewardMessagesToProcess[index]
+      let rewardMsgObj = JSON.parse(msg.content.toString())
 
-      let dataId = lotteryObj.node.eth_tx_id
-      let dataVal = [lotteryObj.node.address, lotteryObj.node.amount].join(':')
-      if (lotteryObj.core) {
-        dataId = [dataId, lotteryObj.core.eth_tx_id].join(':')
-        dataVal = [dataVal, lotteryObj.core.address, lotteryObj.core.amount].join(':')
+      let dataId = rewardMsgObj.node.eth_tx_id
+      let dataVal = [rewardMsgObj.node.address, rewardMsgObj.node.amount].join(':')
+      if (rewardMsgObj.core) {
+        dataId = [dataId, rewardMsgObj.core.eth_tx_id].join(':')
+        dataVal = [dataVal, rewardMsgObj.core.address, rewardMsgObj.core.amount].join(':')
       }
 
       try {
-        await createLotteryBlockAsync(dataId, dataVal)
+        await createRewardBlockAsync(dataId, dataVal)
         // ack consumption of all original hash messages part of this aggregation event
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[lottery] consume message acked')
+        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
       } catch (error) {
         // nack consumption of all original message
         console.error(error)
         amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[lottery] consume message nacked')
+        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
       }
     }
   } catch (error) {
-    console.error('lottery message processing error - ' + error)
+    console.error('reward message processing error - ' + error)
   } finally {
-    lotteryLock.release()
+    rewardLock.release()
   }
 })
 
