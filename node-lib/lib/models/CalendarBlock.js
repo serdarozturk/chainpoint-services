@@ -88,7 +88,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_CAL_TABLE_NAME,
       comment: 'The identifier for the data to be anchored to this block, data identifier meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-fA-F0-9:]{0,255}$', 'i']
+        is: ['^[a-fA-F0-9:x]{0,255}$', 'i']
       },
       field: 'data_id',
       allowNull: false
@@ -97,7 +97,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_CAL_TABLE_NAME,
       comment: 'The data to be anchored to this block, data value meaning is determined by block type.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^[a-fA-F0-9:]{1,255}$', 'i']
+        is: ['^[a-fA-F0-9:x]{1,255}$', 'i']
       },
       field: 'data_val',
       allowNull: false

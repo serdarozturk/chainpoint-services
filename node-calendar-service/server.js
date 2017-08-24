@@ -41,6 +41,9 @@ let nistLatest = null
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
 
+// An array of all Lottery messages received and awaiting processing
+let LOTTERY_MESSAGES = []
+
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
@@ -64,7 +67,7 @@ const signingPubKeyHashHex = calcSigningPubKeyHashHex(signingKeypair.publicKey)
 let calcBlockHashHex = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.stackId.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
-  let dataValBuffer = Buffer.from(block.dataVal, 'hex')
+  let dataValBuffer = utils.isHex(block.dataVal) ? Buffer.from(block.dataVal, 'hex') : Buffer.from(block.dataVal, 'utf8')
   let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
 
   return crypto.createHash('sha256').update(Buffer.concat([
@@ -178,6 +181,22 @@ let createBtcConfirmBlockAsync = async (height, root) => {
   }
 }
 
+let createLotteryBlockAsync = async (dataId, dataVal) => {
+  // Find the last block written so we can incorporate its hash as prevHash
+  // in the new block and increment its block ID by 1.
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
+    if (prevBlock) {
+      let newId = parseInt(prevBlock.id, 10) + 1
+      return await writeBlockAsync(newId, 'lottery', dataId.toString(), dataVal.toString(), prevBlock.hash, 'LOTTERY')
+    } else {
+      throw new Error('no genesis block found')
+    }
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
+}
+
 /**
 * Parses a message and performs the required work for that message
 *
@@ -207,6 +226,9 @@ function processMessage (msg) {
           // BTC anchoring has been disabled, ack message and do nothing
           amqpChannel.ack(msg)
         }
+        break
+      case 'lottery':
+        consumeLotteryMessage(msg)
         break
       default:
         // This is an unknown state type
@@ -293,6 +315,17 @@ function consumeBtcMonMessage (msg) {
       btcConfirmLock.acquire()
     } catch (err) {
       console.error('btcConfirmLock.acquire() : caught err : ', err.message)
+    }
+  }
+}
+
+function consumeLotteryMessage (msg) {
+  if (msg !== null) {
+    LOTTERY_MESSAGES.push(msg)
+    try {
+      lotteryLock.acquire()
+    } catch (err) {
+      console.error('lotteryLock.acquire() : caught err : ', err.message)
     }
   }
 }
@@ -586,6 +619,7 @@ let btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
 let btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
 let ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
 let ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
+let lotteryLock = consul.lock(_.merge({}, lockOpts, { value: 'lottery' }))
 
 function registerLockEvents (lock, lockName, acquireFunction) {
   lock.on('acquire', () => {
@@ -669,7 +703,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
       // if not, release lock and return
-      let lastBtcAnchorMS = lastBtcAnchorBlock.time
+      let lastBtcAnchorMS = lastBtcAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastBtcAnchorMS
       if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
@@ -689,11 +723,11 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
 // LOCK HANDLERS : btc-confirm
 registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
   try {
-    let monMessageToProcess = BTC_MON_MESSAGES.splice(0)
-    // if there are no messaes left to processes, release lock and return
-    if (monMessageToProcess.length === 0) return
+    let monMessagesToProcess = BTC_MON_MESSAGES.splice(0)
+    // if there are no messages left to process, release lock and return
+    if (monMessagesToProcess.length === 0) return
 
-    async.eachSeries(monMessageToProcess, (msg, eachCallback) => {
+    async.eachSeries(monMessagesToProcess, (msg, eachCallback) => {
       let btcMonObj = JSON.parse(msg.content.toString())
       let btctxId = btcMonObj.btctx_id
       let btcheadHeight = btcMonObj.btchead_height
@@ -801,6 +835,43 @@ registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
 
   } finally {
     ethConfirmLock.release()
+  }
+})
+
+// LOCK HANDLERS : lottery
+registerLockEvents(lotteryLock, 'lotteryLock', async () => {
+  try {
+    let lotteryMessagesToProcess = LOTTERY_MESSAGES.splice(0)
+    // if there are no messages left to process, release lock and return
+    if (lotteryMessagesToProcess.length === 0) return
+
+    for (let index = 0; index < lotteryMessagesToProcess.length; index++) {
+      let msg = lotteryMessagesToProcess[index]
+      let lotteryObj = JSON.parse(msg.content.toString())
+
+      let dataId = lotteryObj.node.eth_tx_id
+      let dataVal = [lotteryObj.node.address, lotteryObj.node.amount].join(':')
+      if (lotteryObj.core) {
+        dataId = [dataId, lotteryObj.core.eth_tx_id].join(':')
+        dataVal = [dataVal, lotteryObj.core.address, lotteryObj.core.amount].join(':')
+      }
+
+      try {
+        await createLotteryBlockAsync(dataId, dataVal)
+        // ack consumption of all original hash messages part of this aggregation event
+        amqpChannel.ack(msg)
+        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[lottery] consume message acked')
+      } catch (error) {
+        // nack consumption of all original message
+        console.error(error)
+        amqpChannel.nack(msg)
+        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[lottery] consume message nacked')
+      }
+    }
+  } catch (error) {
+    console.error('lottery message processing error - ' + error)
+  } finally {
+    lotteryLock.release()
   }
 })
 

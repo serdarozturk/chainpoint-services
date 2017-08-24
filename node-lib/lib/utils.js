@@ -40,9 +40,22 @@ function formatDateISO8601NoMs (date) {
   return date.toISOString().slice(0, 19) + 'Z'
 }
 
+/**
+ * Checks if value is a hexadecimal string
+ *
+ * @param {string} value - The value to check
+ * @returns {bool} true if value is a hexadecimal string, otherwise false
+ */
+function isHex (value) {
+  var hexRegex = /^[0-9a-f]{2,}$/i
+  var isHex = hexRegex.test(value) && !(value.length % 2)
+  return isHex
+}
+
 module.exports = {
   sleep: sleep,
   addMinutes: addMinutes,
   addSeconds: addSeconds,
-  formatDateISO8601NoMs: formatDateISO8601NoMs
+  formatDateISO8601NoMs: formatDateISO8601NoMs,
+  isHex: isHex
 }
