@@ -1,5 +1,5 @@
 // load all environment variables into env object
-const env = require('./lib/parse-env.js')('tnt-lottery')
+const env = require('./lib/parse-env.js')('tnt-reward')
 
 const utils = require('./lib/utils')
 const amqp = require('amqplib')
@@ -16,13 +16,13 @@ var amqpChannel = null
 let nodeAuditSequelize = nodeAuditLog.sequelize
 let NodeAuditLog = nodeAuditLog.NodeAuditLog
 
-// Randomly select and deliver tokens to a lottery winner from the list
+// Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and tnt balance
-// eligability requirements for receiving TNT awards
-async function performLotteryAsync () {
-  let minAuditPasses = env.MIN_CONSECUTIVE_AUDIT_PASSES_FOR_AWARD
-  let minGrainsBalanceNeeded = env.MIN_TNT_GRAINS_BALANCE_FOR_AWARD
-  let tntGrainsAward = env.TNT_GRAINS_PER_LOTTERY_AWARD
+// eligability requirements for receiving TNT rewards
+async function performRewardAsync () {
+  let minAuditPasses = env.MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD
+  let minGrainsBalanceNeeded = env.MIN_TNT_GRAINS_BALANCE_FOR_REWARD
+  let tntTotalGrainsReward = env.TNT_GRAINS_PER_REWARD
   let ethTntTxUri = '??' // TODO: Complete
 
   // find all audit qualifying registered Nodes
@@ -39,25 +39,25 @@ async function performLotteryAsync () {
       raw: true
     })
     if (!qualifiedNodes || qualifiedNodes.length < 1) {
-      console.log('No qualifying Nodes were found for lottery selection')
+      console.log('No qualifying Nodes were found for reward')
       return
     } else {
-      console.log(`${qualifiedNodes.length} qualifying Nodes were found for lottery selection`)
+      console.log(`${qualifiedNodes.length} qualifying Nodes were found for reward`)
     }
   } catch (error) {
     console.error(`Audit Log read error : ${error.message}`)
     return
   }
 
-  // randomly select lottery winner from qualifying Nodes
+  // randomly select reward recipient from qualifying Nodes
   let selectionIndex = await csprng(0, qualifiedNodes.length - 1)
   let selectedNodeETHAddr = qualifiedNodes[selectionIndex].tntAddr
 
   // if the selected Node does not have a sufficient minimum TNT balance,
   // remove the Node from the qualifying list and make new random selection
-  let winnerNodeETHAddr = null
+  let qualifiedNodeETHAddr = null
 
-  while (!winnerNodeETHAddr) {
+  while (!qualifiedNodeETHAddr) {
     let options = {
       headers: [
         {
@@ -79,13 +79,13 @@ async function performLotteryAsync () {
         console.log(`${selectedNodeETHAddr} was selected, but was disqualified due to a low TNT balance of ${balanceResponse.balance}, ${minGrainsBalanceNeeded} is required.`)
         qualifiedNodes.splice(selectionIndex, 1)
         if (qualifiedNodes.length === 0) {
-          console.log(`Qualifying Nodes were found for lottery selection, but none had a sufficient TNT balance, ${minGrainsBalanceNeeded} is required.`)
+          console.log(`Qualifying Nodes were found for reward, but none had a sufficient TNT balance, ${minGrainsBalanceNeeded} is required.`)
           return
         }
         selectionIndex = await csprng(0, qualifiedNodes.length - 1)
         selectedNodeETHAddr = qualifiedNodes[selectionIndex].tntAddr
       } else {
-        winnerNodeETHAddr = selectedNodeETHAddr
+        qualifiedNodeETHAddr = selectedNodeETHAddr
       }
     } catch (error) {
       console.error(`TNT balance read error : ${error.message}`)
@@ -93,24 +93,24 @@ async function performLotteryAsync () {
     }
   }
 
-  // calculate award share between Node and Core (if applicable)
-  let nodeAwardShare = tntGrainsAward
-  let coreAwardShare = 0
-  let coreAwardEthAddr = null
+  // calculate reward share between Node and Core (if applicable)
+  let nodeRewardShare = tntTotalGrainsReward
+  let coreRewardShare = 0
+  let coreRewardEthAddr = null
   // TODO: determine Core share when appropriate
   // TODO: Use correct Core target ETH address
   if (false) {
-    nodeAwardShare = bigNumber(tntGrainsAward).times(0.95).toNumber()
-    coreAwardShare = tntGrainsAward - nodeAwardShare
-    coreAwardEthAddr = ''
+    nodeRewardShare = bigNumber(tntTotalGrainsReward).times(0.95).toNumber()
+    coreRewardShare = tntTotalGrainsReward - nodeRewardShare
+    coreRewardEthAddr = ''
   }
-  let nodeAwardTxId = null
-  let coreAwardTxId = null
+  let nodeRewardTxId = null
+  let coreRewardTxId = null
 
-  // award TNT to ETH address for winning Node
+  // reward TNT to ETH address for selected qualifying Node
   let postObject = {
-    to_addr: winnerNodeETHAddr,
-    value: nodeAwardShare
+    to_addr: qualifiedNodeETHAddr,
+    value: nodeRewardShare
   }
 
   let options = {
@@ -129,18 +129,18 @@ async function performLotteryAsync () {
   }
 
   try {
-    let awardResponse = await rp(options)
-    nodeAwardTxId = awardResponse.trx_id
-    console.log(`${nodeAwardShare} TNT grains awarded to Node using ETH address ${winnerNodeETHAddr} in transaction ${nodeAwardTxId}`)
+    let rewardResponse = await rp(options)
+    nodeRewardTxId = rewardResponse.trx_id
+    console.log(`${nodeRewardShare} TNT grains transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
-    console.error(`${nodeAwardShare} TNT grains failed to be awarded to Node using ETH address ${winnerNodeETHAddr} : ${error.message}`)
+    console.error(`${nodeRewardShare} TNT grains failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
   }
 
-  // award TNT to Core operator (if applicable)
-  if (coreAwardShare > 0) {
+  // reward TNT to Core operator (if applicable)
+  if (coreRewardShare > 0) {
     let postObject = {
-      to_addr: coreAwardEthAddr,
-      value: coreAwardShare
+      to_addr: coreRewardEthAddr,
+      value: coreRewardShare
     }
 
     let options = {
@@ -159,32 +159,32 @@ async function performLotteryAsync () {
     }
 
     try {
-      let awardResponse = await rp(options)
-      coreAwardTxId = awardResponse.trx_id
-      console.log(`${coreAwardShare} TNT grains awarded to Core using ETH address ${coreAwardEthAddr} in transaction ${coreAwardTxId}`)
+      let rewardResponse = await rp(options)
+      coreRewardTxId = rewardResponse.trx_id
+      console.log(`${coreRewardShare} TNT grains transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
     } catch (error) {
-      console.error(`${coreAwardShare} TNT grains failed to be awarded to Core using ETH address ${coreAwardEthAddr} : ${error.message}`)
+      console.error(`${coreRewardShare} TNT grains failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
     }
   }
 
-  // send lottery result message to Calendar
+  // send reward result message to Calendar
   let messageObj = {}
   messageObj.node = {}
-  messageObj.node.address = winnerNodeETHAddr
-  messageObj.node.amount = nodeAwardShare
-  messageObj.node.eth_tx_id = nodeAwardTxId
-  if (coreAwardShare > 0) {
+  messageObj.node.address = qualifiedNodeETHAddr
+  messageObj.node.amount = nodeRewardShare
+  messageObj.node.eth_tx_id = nodeRewardTxId
+  if (coreRewardShare > 0) {
     messageObj.core = {}
-    messageObj.core.address = coreAwardEthAddr
-    messageObj.core.amount = coreAwardShare
-    messageObj.core.eth_tx_id = coreAwardTxId
+    messageObj.core.address = coreRewardEthAddr
+    messageObj.core.amount = coreRewardShare
+    messageObj.core.eth_tx_id = coreRewardTxId
   }
 
   try {
-    await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'lottery' })
-    console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[lottery] publish message acked')
+    await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'reward' })
+    console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message acked')
   } catch (error) {
-    console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[lottery] publish message nacked')
+    console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message nacked')
     throw new Error(error.message)
   }
 }
@@ -195,7 +195,7 @@ function startIntervals () {
 
   // PERIODIC TIMERS
 
-  setInterval(() => performLotteryAsync(), env.LOTTERY_FREQUENCY_SECONDS * 1000)
+  setInterval(() => performRewardAsync(), env.REWARD_FREQUENCY_SECONDS * 1000)
 }
 
 /**

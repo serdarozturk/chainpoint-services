@@ -1,4 +1,4 @@
-# chainpoint-node-tnt-lottery-service
+# chainpoint-node-tnt-reward-service
 
-A Node.js service that randomly selects a winner out of the list 
-of registered nodes and distributes tokens to that winner.
+A Node.js service that randomly selects a Node out of the list 
+of qualifying registered Nodes and distributes TNT tokens to that Node.

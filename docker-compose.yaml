@@ -452,16 +452,16 @@ services:
     networks:
       - chainpoint
       
-  # TNT Lottery
-  # Responsible for auditing the availability, time, and calendar state
-  # of public Tierion Network Nodes
+  # TNT Reward
+  # Responsible for rewarding TNT to random Nodes passing
+  # requisite audit checks at regular intervals
   #
-  tnt-lottery:
+  tnt-reward:
     restart: always
-    image: quay.io/chainpoint/node-tnt-lottery-service:${DOCKER_TAG}
+    image: quay.io/chainpoint/node-tnt-reward-service:${DOCKER_TAG}
     build:
-      context: ./node-tnt-lottery-service
-    container_name: tnt-lottery-core
+      context: ./node-tnt-reward-service
+    container_name: tnt-reward-core
     depends_on:
       - eth-tnt-tx-service
       - rabbitmq
