@@ -34,8 +34,8 @@ async function performRewardAsync () {
     qualifiedNodes = await NodeAuditLog.findAll({
       attributes: ['tntAddr'],
       where: { auditAt: { $gte: auditsFromDateEpoch }, publicIPPass: true, timePass: true, calStatePass: true },
-      group: 'tntAddr',
-      having: ['COUNT(?)>=?', 'tntAddr', minAuditPasses],
+      group: 'tnt_addr',
+      having: nodeAuditSequelize.literal(`COUNT(tnt_addr) >= ${minAuditPasses}`),
       raw: true
     })
     if (!qualifiedNodes || qualifiedNodes.length < 1) {
