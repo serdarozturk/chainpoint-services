@@ -5,16 +5,28 @@ const utils = require('./lib/utils')
 const amqp = require('amqplib')
 const rp = require('request-promise-native')
 const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
+const calendarBlock = require('./lib/models/CalendarBlock.js')
 const csprng = require('random-number-csprng')
 const bigNumber = require('bignumber')
+const heartbeats = require('heartbeats')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
 
+// the fuzz factor for anchor interval meant to give each core instance a random chance of being first
+const maxFuzzyMS = 10000
+
+// create a heartbeat for every 200ms
+// 1 second heartbeats had a drift that caused occasional skipping of a whole second
+// decreasing the interval of the heartbeat and checking current time resolves this
+var heart = heartbeats.createHeart(200)
+
 // pull in variables defined in shared database models
 let nodeAuditSequelize = nodeAuditLog.sequelize
 let NodeAuditLog = nodeAuditLog.NodeAuditLog
+let calBlockSequelize = calendarBlock.sequelize
+let CalendarBlock = calendarBlock.CalendarBlock
 
 // Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and tnt balance
@@ -107,6 +119,29 @@ async function performRewardAsync () {
   let nodeRewardTxId = null
   let coreRewardTxId = null
 
+  // check that most recent reward block is older than interval time
+  let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
+  // checks if the last reward block is at least rewardIntervalMinutes - maxFuzzyMS old
+  // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
+  // has performed these tasks for this interval already, so we do nothing.
+  try {
+    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+    if (lastRewardBlock) {
+      // check if the last reward block is at least rewardIntervalMinutes - maxFuzzyMS old
+      // if not, return
+      let lastRewardMS = lastRewardBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastRewardMS
+      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - maxFuzzyMS)) {
+        console.log('Reward distribution skipped, rewardIntervalMinutes not elapsed since last reward block')
+        return
+      }
+    }
+  } catch (error) {
+    console.error(`Calendar query error : ${error.message}`)
+    return
+  }
+
   // reward TNT to ETH address for selected qualifying Node
   let postObject = {
     to_addr: qualifiedNodeETHAddr,
@@ -189,13 +224,40 @@ async function performRewardAsync () {
   }
 }
 
+// Set the BTC anchor interval
+// and return a reference to that configured interval, enabling BTC anchoring
+function setTNTRewardInterval () {
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on REWARDS_PER_HOUR
+  let rewardMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    rewardMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.REWARDS_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (rewardMinutes.includes(currentMinute)) {
+        let randomFuzzyMS = await csprng(0, maxFuzzyMS)
+        setTimeout(performRewardAsync, randomFuzzyMS)
+      }
+    }
+  })
+}
+
 // This initalizes all the JS intervals that fire all aggregator events
 function startIntervals () {
   console.log('starting intervals')
 
   // PERIODIC TIMERS
 
-  setInterval(() => performRewardAsync(), env.REWARD_FREQUENCY_SECONDS * 1000)
+  setTNTRewardInterval()
 }
 
 /**
@@ -241,6 +303,7 @@ async function openStorageConnectionAsync () {
   while (!dbConnected) {
     try {
       await nodeAuditSequelize.sync({ logging: false })
+      await calBlockSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {

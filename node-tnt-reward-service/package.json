@@ -12,6 +12,7 @@
     "amqplib": "^0.5.1",
     "bignumber": "^1.1.0",
     "envalid": "^3.1.1",
+    "heartbeats": "^5.0.1",
     "random-number-csprng": "^1.0.2",
     "request": "^2.81.0",
     "request-promise-native": "^1.0.4",

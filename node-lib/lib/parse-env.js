@@ -143,7 +143,7 @@ let envDefinitions = {
 
   // TNT Reward service specific variables
   TNT_GRAINS_PER_REWARD: envalid.num({ default: 5000000000, desc: 'The total TNT, in Grains, transferred to the reward recipient' }),
-  REWARD_FREQUENCY_SECONDS: envalid.num({ default: 1800, desc: 'The frequency, in seconds, that the reward is distributed' }),
+  REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60' }),
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligable for a reward' }),
   MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 300000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligable for a reward' })
 }
