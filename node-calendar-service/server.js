@@ -725,7 +725,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     let lastBtcAnchorBlockId = lastBtcAnchorBlock ? parseInt(lastBtcAnchorBlock.id, 10) : null
     await aggregateAndAnchorBTCAsync(lastBtcAnchorBlockId)
   } catch (error) {
-    console.error(`Unable to query calendar blocks`)
+    console.error(`Calendar query error : ${error.message}`)
   } finally {
     btcAnchorLock.release()
   }
@@ -833,7 +833,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
       }
     })
   } catch (error) {
-    console.log(`Unable to query calendar blocks`)
+    console.error(`Calendar query error : ${error.message}`)
   } finally {
     ethAnchorLock.release()
   }
