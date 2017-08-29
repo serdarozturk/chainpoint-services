@@ -80,7 +80,7 @@ var CalendarBlock = sequelize.define(env.COCKROACH_CAL_TABLE_NAME,
       comment: 'Block type.',
       type: Sequelize.STRING,
       validate: {
-        isIn: [['gen', 'cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c']]
+        isIn: [['gen', 'cal', 'nist', 'btc-a', 'btc-c', 'eth-a', 'eth-c', 'reward']]
       },
       allowNull: false
     },
