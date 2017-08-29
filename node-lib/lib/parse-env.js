@@ -20,6 +20,10 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
   if (x >= 1 && x <= 16) return x
   else throw new Error('Value must be between 1 and 16, inclusive')
 })
+const validateFactorOfSixty = envalid.makeValidator(x => {
+  if (60 % x === 0) return x
+  else throw new Error('Value must be a factor of 60')
+})
 
 let envDefinitions = {
   // The following variables are exposed by this stack's /config endpoint
@@ -116,8 +120,8 @@ let envDefinitions = {
   RMQ_PREFETCH_COUNT_CAL: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_CAL_QUEUE: envalid.str({ default: 'work.cal', desc: 'The queue name for message consumption originating from the aggregator, btc-tx, and btc-mon services' }),
   CALENDAR_INTERVAL_MS: envalid.num({ default: 10000, desc: 'The frequency to generate new calendar blocks, defaults to 10 seconds' }),
-  ANCHOR_BTC_INTERVAL_MS: envalid.num({ default: 1800000, desc: 'The frequency to generate new btc-a blocks and btc anchoring, defaults to 30 minutes' }),
-  ANCHOR_ETH_INTERVAL_MS: envalid.num({ default: 600000, desc: 'The frequency to generate new eth-a blocks and eth anchoring, defaults to 10 minutes' }),
+  ANCHOR_BTC_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new btc-a blocks and btc anchoring, defaults to 2, must be a factor of 60' }),
+  ANCHOR_ETH_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new eth-a blocks and eth anchoring, defaults to 2, must be a factor of 60' }),
 
   // NIST beacon service specific variables
   NIST_INTERVAL_MS: envalid.num({ default: 60000, desc: 'The frequency to get latest NIST beacon data, in milliseconds' }),

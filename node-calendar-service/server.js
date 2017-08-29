@@ -10,6 +10,8 @@ const crypto = require('crypto')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 const cnsl = require('consul')
 const utils = require('./lib/utils.js')
+const heartbeats = require('heartbeats')
+const rand = require('random-number-csprng')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -22,6 +24,9 @@ const signingSecretKeyBytes = nacl.util.decodeBase64(env.SIGNING_SECRET_KEY)
 const signingKeypair = nacl.sign.keyPair.fromSecretKey(signingSecretKeyBytes)
 
 const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
+
+// the fuzz factor for anchor interval meant to give each core instance a random chance of being first
+const maxFuzzyMS = 10000
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -43,6 +48,11 @@ let BTC_MON_MESSAGES = []
 
 // An array of all Reward messages received and awaiting processing
 let REWARD_MESSAGES = []
+
+// create a heartbeat for every 200ms
+// 1 second heartbeats had a drift that caused occasional skipping of a whole second
+// decreasing the interval of the heartbeat and checking current time resolves this
+var heart = heartbeats.createHeart(200)
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
@@ -696,18 +706,19 @@ registerLockEvents(nistLock, 'nistLock', async () => {
 
 // LOCK HANDLERS : btc-anchor
 registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
-  // checks if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
+  let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
+  // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
     let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (lastBtcAnchorBlock) {
-      // check if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
+      // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
       // if not, release lock and return
       let lastBtcAnchorMS = lastBtcAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastBtcAnchorMS
-      if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
-        console.log('aggregateAndAnchorBTC skipped, ANCHOR_BTC_INTERVAL_MS not elapsed since last btc anchor block')
+      if (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS)) {
+        console.log('aggregateAndAnchorBTC skipped, btcAnchorIntervalMinutes not elapsed since last btc anchor block')
         return
       }
     }
@@ -799,18 +810,19 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
 
 // LOCK HANDLERS : eth-anchor
 registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
-  // checks if the eth last anchor block is at least ANCHOR_ETH_INTERVAL_MS old
+  let ethAnchorIntervalMinutes = 60 / env.ANCHOR_ETH_PER_HOUR
+  // checks if the eth last anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
     let lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (lastEthAnchorBlock) {
-      // check if the last eth anchor block is at least ANCHOR_ETH_INTERVAL_MS old
+      // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
       // if not, release lock and return
       let lastEthAnchorMS = lastEthAnchorBlock.time
       let currentMS = Date.now()
       let ageMS = currentMS - lastEthAnchorMS
-      if (ageMS < env.ANCHOR_ETH_INTERVAL_MS) {
-        console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
+      if (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS)) {
+        console.log('aggregateAndAnchorBTC skipped, ethAnchorIntervalMinutes not elapsed since last eth anchor block')
         return
       }
     }
@@ -875,32 +887,70 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
   }
 })
 
-// Set the BTC anchor interval defined by ANCHOR_BTC_INTERVAL_MS
+// Set the BTC anchor interval
 // and return a reference to that configured interval, enabling BTC anchoring
 let setBtcInterval = () => {
-  return setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      btcAnchorLock.acquire()
-    } catch (err) {
-      console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on ANCHOR_BTC_PER_HOUR
+  let btcAnchorMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    btcAnchorMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.ANCHOR_BTC_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (btcAnchorMinutes.includes(currentMinute)) {
+        try {
+          // if the amqp channel is null (closed), processing should not continue, defer to next interval
+          if (amqpChannel === null) return
+          let randomFuzzyMS = await rand(0, maxFuzzyMS)
+          setTimeout(() => { btcAnchorLock.acquire() }, randomFuzzyMS)
+        } catch (err) {
+          console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+        }
+      }
     }
-  }, env.ANCHOR_BTC_INTERVAL_MS)
+  })
 }
 
-// Set the ETH anchor interval defined by ANCHOR_ETH_INTERVAL_MS
+// Set the ETH anchor interval
 // and return a reference to that configured interval, enabling ETH anchoring
 let setEthInterval = () => {
-  return setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      ethAnchorLock.acquire()
-    } catch (err) {
-      console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on ANCHOR_ETH_PER_HOUR
+  let ethAnchorMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    ethAnchorMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.ANCHOR_ETH_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (ethAnchorMinutes.includes(currentMinute)) {
+        try {
+          // if the amqp channel is null (closed), processing should not continue, defer to next interval
+          if (amqpChannel === null) return
+          let randomFuzzyMS = await rand(0, maxFuzzyMS)
+          setTimeout(() => { ethAnchorLock.acquire() }, randomFuzzyMS)
+        } catch (err) {
+          console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+        }
+      }
     }
-  }, env.ANCHOR_ETH_INTERVAL_MS)
+  })
 }
 
 /**
