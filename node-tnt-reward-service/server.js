@@ -26,14 +26,14 @@ async function performRewardAsync () {
   let ethTntTxUri = '??' // TODO: Complete
 
   // find all audit qualifying registered Nodes
-  let auditCheckRangeSeconds = minAuditPasses * 30 * 60 // minAuditPasses * 30 minute audit interval
-  let auditsFromDateEpoch = Date.now() - auditCheckRangeSeconds
+  let auditCheckRangeMS = minAuditPasses * 30 * 60 * 1000 // minAuditPasses * 30 minute audit interval
+  let auditsFromDateMS = Date.now() - auditCheckRangeMS
   let qualifiedNodes
   try {
-    // SELECT all tnt addresses in the audit log that have minAuditPasses full pass entries since auditsFromDateEpoch
+    // SELECT all tnt addresses in the audit log that have minAuditPasses full pass entries since auditsFromDateMS
     qualifiedNodes = await NodeAuditLog.findAll({
       attributes: ['tntAddr'],
-      where: { auditAt: { $gte: auditsFromDateEpoch }, publicIPPass: true, timePass: true, calStatePass: true },
+      where: { auditAt: { $gte: auditsFromDateMS }, publicIPPass: true, timePass: true, calStatePass: true },
       group: 'tnt_addr',
       having: nodeAuditSequelize.literal(`COUNT(tnt_addr) >= ${minAuditPasses}`),
       raw: true
