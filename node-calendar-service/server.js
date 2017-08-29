@@ -710,7 +710,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
   // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
-    let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
+    let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
     if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
       // if not, release lock and return
@@ -814,11 +814,11 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
   // checks if the eth last anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
   // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
   try {
-    let lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: [['id', 'DESC']] })
+    let lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
     if (lastEthAnchorBlock) {
       // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
       // if not, release lock and return
-      let lastEthAnchorMS = lastEthAnchorBlock.time
+      let lastEthAnchorMS = lastEthAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastEthAnchorMS
       if (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS)) {
