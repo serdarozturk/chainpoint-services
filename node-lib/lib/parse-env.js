@@ -143,7 +143,6 @@ let envDefinitions = {
   ETH_TNT_TX_CONNECT_URI: envalid.url({ default: 'http://eth-tnt-tx-service:8085', desc: 'The eth-tnt-tx-service REST connection URI' }),
 
   // TNT Reward service specific variables
-  TNT_GRAINS_PER_REWARD: envalid.num({ default: 5000000000, desc: 'The total TNT, in Grains, transferred to the reward recipient' }),
   REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60' }),
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligible for a reward' }),
   MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 300000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' })

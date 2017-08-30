@@ -8,7 +8,7 @@ const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 const registeredCore = require('./lib/models/RegisteredCore.js')
 const csprng = require('random-number-csprng')
-const bigNumber = require('bignumber')
+const BigNumber = require('bignumber')
 const heartbeats = require('heartbeats')
 
 // The channel used for all amqp communication
@@ -37,7 +37,6 @@ let RegisteredCore = registeredCore.CalendarBlock
 async function performRewardAsync () {
   let minAuditPasses = env.MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD
   let minGrainsBalanceNeeded = env.MIN_TNT_GRAINS_BALANCE_FOR_REWARD
-  let tntTotalGrainsReward = env.TNT_GRAINS_PER_REWARD
   let ethTntTxUri = env.ETH_TNT_TX_CONNECT_URI
 
   // find all audit qualifying registered Nodes
@@ -109,8 +108,15 @@ async function performRewardAsync () {
   }
 
   // calculate reward share between Node and Core (if applicable)
-  let nodeRewardShare = tntTotalGrainsReward
-  let coreRewardShare = 0
+  let calculatedShares
+  try {
+    calculatedShares = await calculateCurrentRewardShares()
+  } catch (error) {
+    console.error(`Unable to calculate reward shares : ${error.message}`)
+    return
+  }
+  let nodeTNTGrainsRewardShare = calculatedShares.nodeTNTGrainsRewardShare
+  let coreTNTGrainsRewardShare = calculatedShares.coreTNTGrainsRewardShare
   let coreRewardEthAddr = null
   // Determine Core to award, based on that which created the most recent btc-a block
   let selectedCoreStackId = null
@@ -118,7 +124,8 @@ async function performRewardAsync () {
     let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'stackId'], order: [['id', 'DESC']] })
     if (lastBtcAnchorBlock) selectedCoreStackId = lastBtcAnchorBlock.stackId
   } catch (error) {
-    console.error(`Calendar query error : ${error.message}`)
+    console.error(`Unable to query recent btc-a block : ${error.message}`)
+    return
   }
   // Get registered Core data for the Core having selectedCoreStackId
   try {
@@ -127,13 +134,13 @@ async function performRewardAsync () {
       coreRewardEthAddr = selectedCore.tntAddr
     }
   } catch (error) {
-    console.error(`RegisteredCore query error : ${error.message}`)
+    console.error(`Unable to query registered core table : ${error.message}`)
+    return
   }
-
-  if (coreRewardEthAddr) {
-    nodeRewardShare = bigNumber(tntTotalGrainsReward).times(0.95).toNumber()
-    coreRewardShare = tntTotalGrainsReward - nodeRewardShare
-    coreRewardEthAddr = ''
+  // if the Core is not receiving a reward, distribute Core's share to the Node
+  if (!coreRewardEthAddr) {
+    nodeTNTGrainsRewardShare = calculatedShares.totalTNTGrainsReward
+    coreTNTGrainsRewardShare = 0
   }
   let nodeRewardTxId = null
   let coreRewardTxId = null
@@ -157,14 +164,14 @@ async function performRewardAsync () {
       }
     }
   } catch (error) {
-    console.error(`Calendar query error : ${error.message}`)
+    console.error(`Unable to query recent reward block : ${error.message}`)
     return
   }
 
   // reward TNT to ETH address for selected qualifying Node
   let postObject = {
     to_addr: qualifiedNodeETHAddr,
-    value: nodeRewardShare
+    value: nodeTNTGrainsRewardShare
   }
 
   let options = {
@@ -185,16 +192,16 @@ async function performRewardAsync () {
   try {
     let rewardResponse = await rp(options)
     nodeRewardTxId = rewardResponse.trx_id
-    console.log(`${nodeRewardShare} TNT grains transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
+    console.log(`${nodeTNTGrainsRewardShare} TNT grains transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
-    console.error(`${nodeRewardShare} TNT grains failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
+    console.error(`${nodeTNTGrainsRewardShare} TNT grains failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
   }
 
   // reward TNT to Core operator (if applicable)
-  if (coreRewardShare > 0) {
+  if (coreTNTGrainsRewardShare > 0) {
     let postObject = {
       to_addr: coreRewardEthAddr,
-      value: coreRewardShare
+      value: coreTNTGrainsRewardShare
     }
 
     let options = {
@@ -215,9 +222,9 @@ async function performRewardAsync () {
     try {
       let rewardResponse = await rp(options)
       coreRewardTxId = rewardResponse.trx_id
-      console.log(`${coreRewardShare} TNT grains transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
+      console.log(`${coreTNTGrainsRewardShare} TNT grains transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
     } catch (error) {
-      console.error(`${coreRewardShare} TNT grains failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
+      console.error(`${coreTNTGrainsRewardShare} TNT grains failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
     }
   }
 
@@ -225,12 +232,12 @@ async function performRewardAsync () {
   let messageObj = {}
   messageObj.node = {}
   messageObj.node.address = qualifiedNodeETHAddr
-  messageObj.node.amount = nodeRewardShare
+  messageObj.node.amount = nodeTNTGrainsRewardShare
   messageObj.node.eth_tx_id = nodeRewardTxId
-  if (coreRewardShare > 0) {
+  if (coreTNTGrainsRewardShare > 0) {
     messageObj.core = {}
     messageObj.core.address = coreRewardEthAddr
-    messageObj.core.amount = coreRewardShare
+    messageObj.core.amount = coreTNTGrainsRewardShare
     messageObj.core.eth_tx_id = coreRewardTxId
   }
 
@@ -240,6 +247,94 @@ async function performRewardAsync () {
   } catch (error) {
     console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message nacked')
     throw new Error(error.message)
+  }
+}
+
+/**
+ * Calculates the Node and Core reward shares for the current TNT reward Epoch
+ *
+ * @returns an object containing reward share number in TNT grains
+ *
+ * {
+ *  nodeTNTGrainsRewardShare: integer,
+ *  coreTNTGrainsRewardShare: integer,
+ *  totalTNTGrainsReward: integer
+ * }
+ */
+async function calculateCurrentRewardShares () {
+  // get current reward period count
+  let rewardBlockCount
+  try {
+    rewardBlockCount = await CalendarBlock.count({ where: { type: 'reward' } })
+  } catch (error) {
+    throw new Error(`Unable to query reward block count : ${error.message}`)
+  }
+  let nodeTNTRewardShare = 0
+  let coreTNTRewardShare = 0
+  switch (rewardBlockCount) {
+    case (rewardBlockCount < 9600):
+      nodeTNTRewardShare = 6210.30
+      coreTNTRewardShare = 326.86
+      break
+    case (rewardBlockCount < 19200):
+      nodeTNTRewardShare = 4968.28
+      coreTNTRewardShare = 261.49
+      break
+    case (rewardBlockCount < 28800):
+      nodeTNTRewardShare = 3974.66
+      coreTNTRewardShare = 209.19
+      break
+    case (rewardBlockCount < 38400):
+      nodeTNTRewardShare = 3179.76
+      coreTNTRewardShare = 167.36
+      break
+    case (rewardBlockCount < 48000):
+      nodeTNTRewardShare = 2543.85
+      coreTNTRewardShare = 133.89
+      break
+    case (rewardBlockCount < 57600):
+      nodeTNTRewardShare = 2035.11
+      coreTNTRewardShare = 107.11
+      break
+    case (rewardBlockCount < 67200):
+      nodeTNTRewardShare = 1628.13
+      coreTNTRewardShare = 85.69
+      break
+    case (rewardBlockCount < 76800):
+      nodeTNTRewardShare = 1302.54
+      coreTNTRewardShare = 68.55
+      break
+    case (rewardBlockCount < 86400):
+      nodeTNTRewardShare = 1042.07
+      coreTNTRewardShare = 54.85
+      break
+    case (rewardBlockCount < 96000):
+      nodeTNTRewardShare = 833.69
+      coreTNTRewardShare = 43.88
+      break
+    case (rewardBlockCount < 105600):
+      nodeTNTRewardShare = 666.99
+      coreTNTRewardShare = 35.10
+      break
+    case (rewardBlockCount < 115200):
+      nodeTNTRewardShare = 533.63
+      coreTNTRewardShare = 28.09
+      break
+    case (rewardBlockCount < 124800):
+      nodeTNTRewardShare = 426.94
+      coreTNTRewardShare = 22.47
+      break
+    case (rewardBlockCount < 134400):
+      nodeTNTRewardShare = 341.59
+      coreTNTRewardShare = 17.98
+      break
+  }
+  let nodeTNTGrainsRewardShare = new BigNumber(nodeTNTRewardShare).times(new BigNumber(10).toExponential(8)).toNumber()
+  let coreTNTGrainsRewardShare = new BigNumber(coreTNTRewardShare).times(new BigNumber(10).toExponential(8)).toNumber()
+  return {
+    nodeTNTGrainsRewardShare: nodeTNTGrainsRewardShare,
+    coreTNTGrainsRewardShare: coreTNTGrainsRewardShare,
+    totalTNTGrainsReward: nodeTNTGrainsRewardShare + coreTNTGrainsRewardShare
   }
 }
 
