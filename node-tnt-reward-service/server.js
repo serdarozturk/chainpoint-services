@@ -6,6 +6,7 @@ const amqp = require('amqplib')
 const rp = require('request-promise-native')
 const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
+const registeredCore = require('./lib/models/RegisteredCore.js')
 const csprng = require('random-number-csprng')
 const bigNumber = require('bignumber')
 const heartbeats = require('heartbeats')
@@ -27,6 +28,8 @@ let nodeAuditSequelize = nodeAuditLog.sequelize
 let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
+let registeredCoreSequelize = registeredCore.sequelize
+let RegisteredCore = registeredCore.CalendarBlock
 
 // Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and tnt balance
@@ -109,9 +112,25 @@ async function performRewardAsync () {
   let nodeRewardShare = tntTotalGrainsReward
   let coreRewardShare = 0
   let coreRewardEthAddr = null
-  // TODO: determine Core share when appropriate
-  // TODO: Use correct Core target ETH address
-  if (false) {
+  // Determine Core to award, based on that which created the most recent btc-a block
+  let selectedCoreStackId = null
+  try {
+    let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'stackId'], order: [['id', 'DESC']] })
+    if (lastBtcAnchorBlock) selectedCoreStackId = lastBtcAnchorBlock.stackId
+  } catch (error) {
+    console.error(`Calendar query error : ${error.message}`)
+  }
+  // Get registered Core data for the Core having selectedCoreStackId
+  try {
+    let selectedCore = await RegisteredCore.findOne({ where: { stackId: selectedCoreStackId } })
+    if (selectedCore && selectedCore.rewardEligible) {
+      coreRewardEthAddr = selectedCore.tntAddr
+    }
+  } catch (error) {
+    console.error(`RegisteredCore query error : ${error.message}`)
+  }
+
+  if (coreRewardEthAddr) {
     nodeRewardShare = bigNumber(tntTotalGrainsReward).times(0.95).toNumber()
     coreRewardShare = tntTotalGrainsReward - nodeRewardShare
     coreRewardEthAddr = ''
@@ -304,6 +323,7 @@ async function openStorageConnectionAsync () {
     try {
       await nodeAuditSequelize.sync({ logging: false })
       await calBlockSequelize.sync({ logging: false })
+      await registeredCoreSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
