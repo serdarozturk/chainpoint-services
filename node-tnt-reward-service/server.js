@@ -434,7 +434,7 @@ async function openStorageConnectionAsync () {
  * Check to be sure this Core is registered and will
  * register the Core if it is not.
  **/
-async function checkCoreRegistration () {
+async function registerCoreAsync () {
   // Get registered Core data for the Core having stackId = CHAINPOINT_CORE_BASE_URI
   let currentCore
   try {
@@ -469,7 +469,7 @@ async function start () {
     // init DB
     await openStorageConnectionAsync()
     // Check Core registration
-    await checkCoreRegistration()
+    await registerCoreAsync()
     // init interval functions
     startIntervals()
     console.log('startup completed successfully')
