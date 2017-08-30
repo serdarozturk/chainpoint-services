@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_REG_NODE_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_nodes', desc: 'CockroachDB table name' }),
+  COCKROACH_REG_CORE_TABLE_NAME: envalid.str({ default: 'chainpoint_registered_cores', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -36,52 +36,30 @@ if (env.isProduction) {
 
 let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
 
-var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
+var RegisteredCore = sequelize.define(env.COCKROACH_REG_CORE_TABLE_NAME,
   {
+    stackId: {
+      comment: 'The Chainpoint stack identifier. Should be the domain or IP of the API. e.g. a.chainpoint.org',
+      type: Sequelize.STRING,
+      field: 'stack_id',
+      allowNull: false,
+      unique: true,
+      primaryKey: true
+    },
     tntAddr: {
-      comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
+      comment: 'A seemingly valid Ethereum address that the Core may receive Core rewards with.',
       type: Sequelize.STRING,
       validate: {
         is: ['^0x[0-9a-f]{40}$', 'i']
       },
       field: 'tnt_addr',
-      allowNull: false,
-      unique: true,
-      primaryKey: true
-    },
-    publicUri: {
-      comment: 'The public URI address of a Node, when blank represents a non-public Node.',
-      type: Sequelize.STRING,
-      validate: {
-        isUrl: true
-      },
-      field: 'public_uri',
       allowNull: true
     },
-    hmacKey: {
-      comment: 'The HMAC secret for this Node. Needed for Node data updates.',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[a-f0-9]{64}$', 'i']
-      },
-      field: 'hmac_key',
-      allowNull: false,
-      unique: true
-    },
-    lastAuditAt: {
-      comment: 'The last time an audit was performed for this Node, in seconds since EPOCH.',
-      type: Sequelize.INTEGER,
-      validate: {
-        isInt: true
-      },
-      field: 'last_audit_at',
-      allowNull: true
-    },
-    tntCredit: {
-      comment: 'The balance of token credit they have against their address.',
-      type: Sequelize.BIGINT,
-      field: 'tnt_credit',
-      defaultValue: 0
+    rewardEligible: {
+      comment: 'Boolean indicating if the Core is eligible to receive Core rewards.',
+      type: Sequelize.BOOLEAN,
+      field: 'reward_eligible',
+      allowNull: false
     }
   },
   {
@@ -94,5 +72,5 @@ var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
 
 module.exports = {
   sequelize: sequelize,
-  RegisteredNode: RegisteredNode
+  RegisteredCore: RegisteredCore
 }
