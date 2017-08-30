@@ -24,6 +24,10 @@ const validateFactorOfSixty = envalid.makeValidator(x => {
   if (60 % x === 0) return x
   else throw new Error('Value must be a factor of 60')
 })
+const validateETHAddress = envalid.makeValidator(x => {
+  if (/^0x[0-9a-f]{40}$/i.test(x)) return x
+  else throw new Error('Value must be a well formatted Ethereum address')
+})
 
 let envDefinitions = {
   // The following variables are exposed by this stack's /config endpoint
@@ -167,7 +171,12 @@ module.exports = (service) => {
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
     case 'eth-tnt-listener':
-      envDefinitions.ETH_TNT_LISTEN_ADDR = envalid.str({ desc: 'The address used to listen for incoming TNT transfers' })
+      envDefinitions.ETH_TNT_LISTEN_ADDR = validateETHAddress({ desc: 'The address used to listen for incoming TNT transfers' })
+      break
+    case 'tnt-reward':
+      envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
+      envDefinitions.CORE_REWARD_ETH_ADDR = validateETHAddress({ desc: 'A valid Ethereum address that the Core may receive Core rewards with' })
+      envDefinitions.CORE_REWARD_ELIGIBLE = envalid.bool({ desc: 'Boolean indicating if this Core may receive Core TNT rewards' })
       break
   }
   return envalid.cleanEnv(process.env, envDefinitions, {

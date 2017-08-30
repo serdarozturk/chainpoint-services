@@ -469,3 +469,6 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
+      CORE_REWARD_ETH_ADDR: ${CORE_REWARD_ETH_ADDR}
+      CORE_REWARD_ELIGIBLE: ${CORE_REWARD_ELIGIBLE}

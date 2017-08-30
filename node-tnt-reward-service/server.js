@@ -29,7 +29,7 @@ let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let registeredCoreSequelize = registeredCore.sequelize
-let RegisteredCore = registeredCore.CalendarBlock
+let RegisteredCore = registeredCore.RegisteredCore
 
 // Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and tnt balance
@@ -430,6 +430,36 @@ async function openStorageConnectionAsync () {
   }
 }
 
+/**
+ * Check to be sure this Core is registered and will
+ * register the Core if it is not.
+ **/
+async function checkCoreRegistration () {
+  // Get registered Core data for the Core having stackId = CHAINPOINT_CORE_BASE_URI
+  let currentCore
+  try {
+    currentCore = await RegisteredCore.findOne({ where: { stackId: env.CHAINPOINT_CORE_BASE_URI } })
+  } catch (error) {
+    throw new Error(`Unable to query registered core table : ${error.message}`)
+  }
+  if (!currentCore) {
+    // the current Core is not registered, so add it to the registration table
+    let newCore = {
+      stackId: env.CHAINPOINT_CORE_BASE_URI,
+      tntAddr: env.CORE_REWARD_ETH_ADDR,
+      rewardEligible: env.CORE_REWARD_ELIGIBLE
+    }
+    try {
+      let regCore = await RegisteredCore.create(newCore)
+      console.log(`Core ${regCore.stackId} successfully registered`)
+    } catch (error) {
+      throw new Error(`Unable to register core : ${error.message}`)
+    }
+  } else {
+    console.log(`Core ${currentCore.stackId} registration found`)
+  }
+}
+
 // process all steps need to start the application
 async function start () {
   if (env.NODE_ENV === 'test') return
@@ -438,6 +468,8 @@ async function start () {
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
     // init DB
     await openStorageConnectionAsync()
+    // Check Core registration
+    await checkCoreRegistration()
     // init interval functions
     startIntervals()
     console.log('startup completed successfully')
