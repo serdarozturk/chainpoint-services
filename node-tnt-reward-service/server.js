@@ -38,7 +38,7 @@ async function performRewardAsync () {
   let minAuditPasses = env.MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD
   let minGrainsBalanceNeeded = env.MIN_TNT_GRAINS_BALANCE_FOR_REWARD
   let tntTotalGrainsReward = env.TNT_GRAINS_PER_REWARD
-  let ethTntTxUri = '??' // TODO: Complete
+  let ethTntTxUri = env.ETH_TNT_TX_CONNECT_URI
 
   // find all audit qualifying registered Nodes
   let auditCheckRangeMS = minAuditPasses * 30 * 60 * 1000 // minAuditPasses * 30 minute audit interval

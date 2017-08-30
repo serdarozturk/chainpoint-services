@@ -140,6 +140,7 @@ let envDefinitions = {
   ETH_PROVIDER_URI: envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' }),
   LISTEN_TX_PORT: envalid.num({ default: 8085, desc: 'Port of the ETH provider.' }),
   TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' }),
+  ETH_TNT_TX_CONNECT_URI: envalid.url({ default: 'http://eth-tnt-tx-service:8085', desc: 'The eth-tnt-tx-service REST connection URI' }),
 
   // TNT Reward service specific variables
   TNT_GRAINS_PER_REWARD: envalid.num({ default: 5000000000, desc: 'The total TNT, in Grains, transferred to the reward recipient' }),
