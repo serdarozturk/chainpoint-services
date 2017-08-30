@@ -79,7 +79,7 @@ var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
     },
     tntCredit: {
       comment: 'The balance of token credit they have against their address.',
-      type: Sequelize.BIGINT,
+      type: Sequelize.DOUBLE,
       field: 'tnt_credit',
       defaultValue: 0
     }

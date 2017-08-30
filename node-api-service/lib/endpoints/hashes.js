@@ -104,7 +104,7 @@ function generatePostHashResponse (hash, regNode) {
     eth: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 41)),
     btc: utils.formatDateISO8601NoMs(utils.addMinutes(timestampDate, 61))
   }
-  result.tnt_credit_balance = parseInt(regNode.tntCredit)
+  result.tnt_credit_balance = parseFloat(regNode.tntCredit)
 
   return result
 }
