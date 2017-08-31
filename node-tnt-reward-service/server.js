@@ -64,7 +64,7 @@ async function performRewardAsync () {
   }
 
   // randomly select reward recipient from qualifying Nodes
-  let selectionIndex = await csprng(0, qualifiedNodes.length - 1)
+  let selectionIndex = qualifiedNodes.length === 1 ? 0 : await csprng(0, qualifiedNodes.length - 1)
   let selectedNodeETHAddr = qualifiedNodes[selectionIndex].tntAddr
 
   // if the selected Node does not have a sufficient minimum TNT balance,
@@ -96,7 +96,7 @@ async function performRewardAsync () {
           console.log(`Qualifying Nodes were found for reward, but none had a sufficient TNT balance, ${minGrainsBalanceNeeded} is required.`)
           return
         }
-        selectionIndex = await csprng(0, qualifiedNodes.length - 1)
+        selectionIndex = qualifiedNodes.length === 1 ? 0 : await csprng(0, qualifiedNodes.length - 1)
         selectedNodeETHAddr = qualifiedNodes[selectionIndex].tntAddr
       } else {
         qualifiedNodeETHAddr = selectedNodeETHAddr
