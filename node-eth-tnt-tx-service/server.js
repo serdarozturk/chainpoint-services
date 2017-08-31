@@ -8,6 +8,7 @@ const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
 const _ = require('lodash')
+var Web3 = require('web3')
 
 // The provider, token contract, and create the TokenOps class
 let web3Provider = null
@@ -155,8 +156,18 @@ let listenRestifyAsync = promisify(listenRestify)
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
-    // Init the token objects
+    // Init the web3 provider
     web3Provider = loadProvider(env.ETH_PROVIDER_URI)
+    // Set the default account to use for outgoing trxs
+    let web3 = new Web3(web3Provider)
+    web3.eth.getAccounts((error, accounts) => {
+      if (error) {
+        console.error(error)
+      }
+      web3.eth.defaultAccount = accounts[0]
+    })
+
+    // Load the token object
     tokenContract = await loadToken(web3Provider, env.ETH_TNT_TOKEN_ADDR)
     ops = new TokenOps(tokenContract)
 

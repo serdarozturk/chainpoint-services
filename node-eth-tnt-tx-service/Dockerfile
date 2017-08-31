@@ -1,6 +1,6 @@
 FROM quay.io/chainpoint/node-lib
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git make gcc g++ python
 
 COPY package.json yarn.lock /home/node/app/
 RUN yarn

@@ -145,6 +145,8 @@ let envDefinitions = {
   LISTEN_TX_PORT: envalid.num({ default: 8085, desc: 'Port of the ETH provider.' }),
   TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' }),
   ETH_TNT_TX_CONNECT_URI: envalid.url({ default: 'http://eth-tnt-tx-service:8085', desc: 'The eth-tnt-tx-service REST connection URI' }),
+  ETH_WALLET_PATH: envalid.str({ default: '', desc: 'The relative path to the wallet file.  Leave empty to not use a wallet for transactions.' }),
+  ETH_WALLET_PASSWORD: envalid.str({ default: '', desc: 'The password to unlock the wallet file.  Do not specify if no wallet is used.' }),
 
   // TNT Reward service specific variables
   REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60' }),
@@ -171,7 +173,7 @@ module.exports = (service) => {
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
     case 'eth-tnt-listener':
-      envDefinitions.ETH_TNT_LISTEN_ADDR = validateETHAddress({ desc: 'The address used to listen for incoming TNT transfers' })
+      envDefinitions.ETH_TNT_LISTEN_ADDRS = envalid.str({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
       break
     case 'tnt-reward':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })

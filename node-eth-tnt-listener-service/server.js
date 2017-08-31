@@ -12,7 +12,7 @@ const BigNumber = require('bignumber.js')
 // pull in variables defined in shared EthTokenTrxLog module
 let ethTokenTxSequelize = ethTokenTxLog.sequelize
 let EthTokenTxLog = ethTokenTxLog.EthTokenLog
-let registeredNodeSequelize = ethTokenTxLog.sequelize
+let registeredNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
 
 // The provider, token contract, and create the TokenOps class
@@ -26,9 +26,11 @@ let lastEventInfo = null
  * Get the last incoming transfer of TNT tokens we have seen and return block number and trx index
  */
 async function getLastKnownEventInfoAsync () {
+  let addresses = env.ETH_TNT_LISTEN_ADDRS.split(',')
+
   // Get the latest incoming transfer from the DB
   let lastTransfer = await EthTokenTxLog.findOne({
-    where: { toAddress: env.ETH_TNT_LISTEN_ADDR },
+    where: { toAddress: addresses },
     order: [[ 'createdAt', 'DESC' ]]
   })
 
@@ -48,7 +50,7 @@ async function getLastKnownEventInfoAsync () {
   }
 }
 
-async function setLastKnownEventInfoAsync (params) {
+function saveLatestTx (params) {
   // Save off the last seen info to the local copy
   lastEventInfo = {
     blockNumber: params.blockNumber,
@@ -64,9 +66,19 @@ async function setLastKnownEventInfoAsync (params) {
     amount: params.args.value
   }
 
-  // TODO : Possibly wrap this create with the crediting of balance into a single transaction
-  // for error case of rollback.
-  return await EthTokenTxLog.create(tx)
+  // Wrap this in a sequelize transaction.  If anything fails, it will all roll back.
+  return ethTokenTxSequelize.transaction((t) => {
+    // Try to save the tx record
+    return EthTokenTxLog.create(tx, {transaction: t})
+    .then(() => {
+      // Now that the tx was saved, update the balance for the node
+      return incrementNodeBalance(params.args.from, params.args.value, t)
+    })
+    .catch(() => {
+      // Most likely failed due to another node already processing this tx
+      console.warn('Trx update failed.')
+    })
+  })
 }
 
 /**
@@ -84,24 +96,25 @@ function convertTntToCredit (tntAmount) {
  * @param {string} nodeAddress
  * @param {bigint} tntAmount
  */
-async function incrementNodeBalanceAsync (nodeAddress, tntAmount) {
+function incrementNodeBalance (nodeAddress, tntAmount, sequelizeTransaction) {
   // Find the node that sent in the balance
-  let node = await RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
+  return RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
+  .then((node) => {
+    if (!node) {
+      // TODO - Store unkowns for later processing if node registers after sending in for some reason
 
-  if (!node) {
-    // TODO - Store unkowns for later processing if node registers after sending in for some reason
+      // NOTE - If a node sends in TNT before it registers... it will not get counted.
+      console.error('Incoming TNT tokens were not mapped to any node: ' + nodeAddress)
+      return
+    }
 
-    // NOTE - If a node sends in TNT before it registers... it will not get counted.
-    console.error('Incoming TNT tokens were not mapped to any node: ' + nodeAddress)
-    return
-  }
+    // Convert the TNT to credits
+    let credits = convertTntToCredit(tntAmount)
 
-  // Convert the TNT to credits
-  let credits = convertTntToCredit(tntAmount)
-
-  console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
-  node.tntCredit += credits
-  return await node.save()
+    console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
+    node.tntCredit += credits
+    return node.save({transaction: sequelizeTransaction})
+  })
 }
 
 /**
@@ -132,12 +145,12 @@ async function initListenerAsync () {
   // Get the last known event info and save it to a local var
   lastEventInfo = await getLastKnownEventInfoAsync()
 
-  console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDR + ' starting at block ' + JSON.stringify(lastEventInfo))
+  let listenAddresses = env.ETH_TNT_LISTEN_ADDRS.split(',')
 
-  // TODO: Possibly watch on a previous incoming address (or array of addresses) if we need to change for some reason.
+  console.log('Listening for incoming TNT tokens to: ' + listenAddresses + ' starting at block ' + JSON.stringify(lastEventInfo))
 
   // Start listening for incoming transactions
-  ops.watchForTransfers(env.ETH_TNT_LISTEN_ADDR, lastEventInfo.blockNumber, incomingTokenTransferEvent)
+  ops.watchForTransfers(listenAddresses, lastEventInfo.blockNumber, incomingTokenTransferEvent)
 }
 
 /**
@@ -164,11 +177,8 @@ function incomingTokenTransferEvent (error, params) {
   // Log out the transaction
   console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args.from + ' To: ' + params.args.to + ' AMT: ' + params.args.value)
 
-  // Should take any action required when event is triggered here.
-  incrementNodeBalanceAsync(params.args.from, params.args.value)
-
   // Save off block number here from latest seen event.
-  setLastKnownEventInfoAsync(params)
+  saveLatestTx(params)
 }
 
 /**

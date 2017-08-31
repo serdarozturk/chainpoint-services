@@ -4,9 +4,9 @@ This service is responsible for listening to incoming transactions to a specifie
 
 ## Configuration
 
-The service requires two configurations to work.  First the address that the service should listen to should be exposed as an environment variable:
+The service requires two configurations to work.  First the address that the service should listen to should be exposed as an environment variable.  Multiple addresses can be used by a comma separated list:
 ```
-export ETH_TNT_LISTEN_ADDR=0x3b91312d098b2df13e053a971dbb154936963d44
+export ETH_TNT_LISTEN_ADDRS=0x3b91312d098b2df13e053a971dbb154936963d44,0x829BD824B016326A401d083B33D092293333A830
 ```
 
 Second, the built contract JSON files should be exposed in the `/contracts` folder.  In development, this is done through a docker volume but production can be handled differently if needed.
@@ -86,7 +86,7 @@ TierionNetworkToken.at('0xceaf0d249fef4acefc37c4b3784bb83c15d90675').balanceOf(w
 ```
 
 Now that account[2] has tokens, send them to the address that it being listened on.  This is set by an env var:
-`ETH_TNT_LISTEN_ADDR=0x3b91312d098b2df13e053a971dbb154936963d44`
+`ETH_TNT_LISTEN_ADDR=0x3b91312d098b2df13e053a971dbb154936963d44,0x829BD824B016326A401d083B33D092293333A830`
 
 It is also printed out when the service starts up:
 ```
