@@ -8,7 +8,7 @@ const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
 const _ = require('lodash')
-var BigNumber = require('bignumber.js')
+const BigNumber = require('bignumber.js')
 
 // The provider, token contract, and create the TokenOps class
 let web3Provider = null
@@ -120,13 +120,14 @@ server.post({ path: '/transfer/', version: '1.0.0' }, (req, res, next) => {
     return next(new restify.InvalidArgumentError('invalid JSON body, empty \'value\''))
   }
 
-  let val = new BigNumber(req.params.value)
-
-  if (val.isNaN()) {
+  let intValue = parseInt(req.params.value)
+  if (intValue.isNaN()) {
     return next(new restify.InvalidArgumentError('invalid number specified for \'value\''))
   }
 
-  ops.sendTokens(req.params.to_addr, val.valueOf(), (error, result) => {
+  let val = new BigNumber(intValue).toNumber()
+
+  ops.sendTokens(req.params.to_addr, val, (error, result) => {
     // Check for error
     if (error) {
       console.error(error)

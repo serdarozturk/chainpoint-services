@@ -8,7 +8,7 @@ const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 const registeredCore = require('./lib/models/RegisteredCore.js')
 const csprng = require('random-number-csprng')
-const BigNumber = require('bignumber')
+const BigNumber = require('bignumber.js')
 const heartbeats = require('heartbeats')
 
 // The channel used for all amqp communication
@@ -142,8 +142,8 @@ async function performRewardAsync () {
     nodeTNTGrainsRewardShare = calculatedShares.totalTNTGrainsReward
     coreTNTGrainsRewardShare = 0
   }
-  let nodeRewardTxId = null
-  let coreRewardTxId = null
+  let nodeRewardTxId = ''
+  let coreRewardTxId = ''
 
   // check that most recent reward block is older than interval time
   let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
@@ -195,6 +195,7 @@ async function performRewardAsync () {
     console.log(`${nodeTNTGrainsRewardShare} TNT grains transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
     console.error(`${nodeTNTGrainsRewardShare} TNT grains failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
+    return
   }
 
   // reward TNT to Core operator (if applicable)

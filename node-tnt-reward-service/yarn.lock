@@ -64,9 +64,9 @@ bcrypt-pbkdf@^1.0.0:
   dependencies:
     tweetnacl "^0.14.3"
 
-bignumber@^1.1.0:
-  version v1.1.0
-  resolved "https://registry.yarnpkg.com/bignumber/-/bignumber-1.1.0.tgz#e6ab0a743da5f3ea018e5c17597d121f7868c159"
+bignumber.js@^4.0.3:
+  version "4.0.3"
+  resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-4.0.3.tgz#b730be1a6025212b0836fdde0e93fb4f3359b133"
 
 bitsyntax@~0.0.4:
   version "0.0.4"
