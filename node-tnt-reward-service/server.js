@@ -193,7 +193,7 @@ async function performRewardAsync () {
 
   try {
     let rewardResponse = await rp(options)
-    nodeRewardTxId = rewardResponse.trx_id
+    nodeRewardTxId = rewardResponse.body.trx_id
     console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
     console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
@@ -224,7 +224,7 @@ async function performRewardAsync () {
 
     try {
       let rewardResponse = await rp(options)
-      coreRewardTxId = rewardResponse.trx_id
+      coreRewardTxId = rewardResponse.body.trx_id
       console.log(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
     } catch (error) {
       console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
