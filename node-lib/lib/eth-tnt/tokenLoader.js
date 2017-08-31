@@ -10,9 +10,6 @@ module.exports = async (provider, tokenAddr) => {
   console.log('Creating web3')
   let web3 = new Web3(provider)
 
-  // Set the default "from" account to the accounts
-  web3.eth.defaultAccount = web3.eth.accounts[0]
-
   // Load the token json obj
   console.log('loding TierionNetworkToken token')
   let tokenDef = require('../../contracts/TierionNetworkToken.json')

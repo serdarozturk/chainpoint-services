@@ -413,6 +413,8 @@ services:
     environment:
       NODE_ENV: development
       LISTEN_TX_PORT: 8085
+      ETH_WALLET_PATH: ./wallet.json
+      ETH_WALLET_PASSWORD: test-password
     ports:
       - "8085:8085" # REST API
     command: npm run start
@@ -436,7 +438,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}
+      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}      
     command: npm run start
     volumes:
       - eth-contracts-volume:/home/node/app/contracts

@@ -32,8 +32,8 @@ class TokenOps {
    * @param {*} blockStart - block to start listening from
    * @param {*} callback - callback invoked whenever a new transfer is recieved to listenAddr
    */
-  watchForTransfers (listenAddr, blockStart, callback) {
-    this.tokenContract.Transfer({'_to': listenAddr}, {'fromBlock': blockStart}, callback)
+  watchForTransfers (listenAddrs, blockStart, callback) {
+    this.tokenContract.Transfer({'to': listenAddrs}, {'fromBlock': blockStart}, callback)
   }
 
   /**

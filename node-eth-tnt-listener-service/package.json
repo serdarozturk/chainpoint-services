@@ -12,8 +12,10 @@
   "dependencies": {
     "bignumber.js": "^4.0.3",
     "envalid": "^3.1.1",
+    "ethereumjs-wallet": "^0.6.0",
     "sequelize-cockroachdb": "^1.0.2",
     "truffle-contract": "^2.0.4",
-    "web3": "0.19.0"
+    "web3": "^0.19.1",
+    "web3-provider-engine": "^13.2.8"
   }
 }
