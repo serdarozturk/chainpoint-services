@@ -88,6 +88,9 @@ server.get({ path: '/balance/:tnt_addr/', version: '1.0.0' }, (req, res, next) =
     res.send({
       balance: balance
     })
+
+    console.log(`Balance requested for ${req.params.tnt_addr}: ${balance}`)
+
     return next()
   })
 })
@@ -137,6 +140,9 @@ server.post({ path: '/transfer/', version: '1.0.0' }, (req, res, next) => {
     res.send({
       trx_id: result
     })
+
+    console.log(`Transfer TNT to ${req.params.to_addr}: ${val} grains`)
+
     return next()
   })
 })
