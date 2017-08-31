@@ -8,7 +8,6 @@ const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
 const _ = require('lodash')
-const BigNumber = require('bignumber.js')
 
 // The provider, token contract, and create the TokenOps class
 let web3Provider = null
@@ -79,17 +78,17 @@ server.get({ path: '/balance/:tnt_addr/', version: '1.0.0' }, (req, res, next) =
     return next(new restify.InvalidArgumentError('invalid JSON body, malformed tnt_addr'))
   }
 
-  ops.getBalance(req.params.tnt_addr, (error, balance) => {
+  ops.getBalance(req.params.tnt_addr, (error, grains) => {
     if (error) {
       console.error(error)
       return next(new restify.InternalServerError('server error'))
     }
 
     res.send({
-      balance: balance
+      balance: grains
     })
 
-    console.log(`Balance requested for ${req.params.tnt_addr}: ${balance}`)
+    console.log(`Balance requested for ${req.params.tnt_addr}: ${grains} grains`)
 
     return next()
   })
@@ -119,18 +118,12 @@ server.post({ path: '/transfer/', version: '1.0.0' }, (req, res, next) => {
     return next(new restify.InvalidArgumentError('invalid JSON body, missing \'value\''))
   }
 
-  if (_.isEmpty(req.params.value)) {
-    return next(new restify.InvalidArgumentError('invalid JSON body, empty \'value\''))
-  }
-
-  let intValue = parseInt(req.params.value)
-  if (intValue.isNaN()) {
+  let grains = parseInt(req.params.value)
+  if (_.isNaN(grains)) {
     return next(new restify.InvalidArgumentError('invalid number specified for \'value\''))
   }
 
-  let val = new BigNumber(intValue).toNumber()
-
-  ops.sendTokens(req.params.to_addr, val, (error, result) => {
+  ops.sendTokens(req.params.to_addr, grains, (error, result) => {
     // Check for error
     if (error) {
       console.error(error)
@@ -141,7 +134,7 @@ server.post({ path: '/transfer/', version: '1.0.0' }, (req, res, next) => {
       trx_id: result
     })
 
-    console.log(`Transfer TNT to ${req.params.to_addr}: ${val} grains`)
+    console.log(`Transfered TNT to ${req.params.to_addr}: ${grains} grains`)
 
     return next()
   })

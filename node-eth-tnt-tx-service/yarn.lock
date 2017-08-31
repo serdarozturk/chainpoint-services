@@ -32,10 +32,6 @@ balanced-match@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/balanced-match/-/balanced-match-1.0.0.tgz#89b4d199ab2bee49de164ea02b89ce462d71b767"
 
-bignumber.js@^4.0.3:
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/bignumber.js/-/bignumber.js-4.0.3.tgz#b730be1a6025212b0836fdde0e93fb4f3359b133"
-
 "bignumber.js@git+https://github.com/debris/bignumber.js.git#94d7146671b9719e00a09c29b01a691bc85048c2":
   version "2.0.7"
   resolved "git+https://github.com/debris/bignumber.js.git#94d7146671b9719e00a09c29b01a691bc85048c2"
