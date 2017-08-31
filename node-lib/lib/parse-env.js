@@ -171,7 +171,7 @@ module.exports = (service) => {
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
     case 'eth-tnt-listener':
-      envDefinitions.ETH_TNT_LISTEN_ADDR = validateETHAddress({ desc: 'The address used to listen for incoming TNT transfers' })
+      envDefinitions.ETH_TNT_LISTEN_ADDRS = envalid.str({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
       break
     case 'tnt-reward':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })

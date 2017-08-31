@@ -26,9 +26,11 @@ let lastEventInfo = null
  * Get the last incoming transfer of TNT tokens we have seen and return block number and trx index
  */
 async function getLastKnownEventInfoAsync () {
+  let addresses = env.ETH_TNT_LISTEN_ADDRS.split(',')
+
   // Get the latest incoming transfer from the DB
   let lastTransfer = await EthTokenTxLog.findOne({
-    where: { toAddress: env.ETH_TNT_LISTEN_ADDR },
+    where: { toAddress: addresses },
     order: [[ 'createdAt', 'DESC' ]]
   })
 
@@ -66,7 +68,7 @@ async function setLastKnownEventInfoAsync (params) {
 
   // TODO : Possibly wrap this create with the crediting of balance into a single transaction
   // for error case of rollback.
-  return await EthTokenTxLog.create(tx)
+  return EthTokenTxLog.create(tx)
 }
 
 /**
@@ -75,7 +77,7 @@ async function setLastKnownEventInfoAsync (params) {
  * @return {number}           Amount of credits
  */
 function convertTntToCredit (tntAmount) {
-  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(new BigNumber(10).toExponential(8)).toNumber()
+  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(new BigNumber(10).toPower(8)).toNumber()
 }
 
 /**
@@ -132,12 +134,10 @@ async function initListenerAsync () {
   // Get the last known event info and save it to a local var
   lastEventInfo = await getLastKnownEventInfoAsync()
 
-  console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDR + ' starting at block ' + JSON.stringify(lastEventInfo))
-
-  // TODO: Possibly watch on a previous incoming address (or array of addresses) if we need to change for some reason.
+  console.log('Listening for incoming TNT tokens to: ' + env.ETH_TNT_LISTEN_ADDRS + ' starting at block ' + JSON.stringify(lastEventInfo))
 
   // Start listening for incoming transactions
-  ops.watchForTransfers(env.ETH_TNT_LISTEN_ADDR, lastEventInfo.blockNumber, incomingTokenTransferEvent)
+  ops.watchForTransfers(env.ETH_TNT_LISTEN_ADDRS.split(','), lastEventInfo.blockNumber, incomingTokenTransferEvent)
 }
 
 /**

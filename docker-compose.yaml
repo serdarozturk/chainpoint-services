@@ -436,7 +436,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
-      ETH_TNT_LISTEN_ADDR: ${ETH_TNT_LISTEN_ADDR}
+      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}
     command: npm run start
     volumes:
       - eth-contracts-volume:/home/node/app/contracts
