@@ -75,7 +75,7 @@ async function setLastKnownEventInfoAsync (params) {
  * @return {number}           Amount of credits
  */
 function convertTntToCredit (tntAmount) {
-  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(new BigNumber(10).toPower(8)).toNumber()
+  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(10 ** 8).toNumber()
 }
 
 /**

@@ -88,12 +88,13 @@ async function performRewardAsync () {
 
     try {
       let balanceResponse = await rp(options)
-      if (balanceResponse.balance < minGrainsBalanceNeeded) {
+      let balanceTNTGrains = balanceResponse.body.balance
+      if (balanceTNTGrains < minGrainsBalanceNeeded) {
         // disqualified, TNT balance too low, log occurance, remove from qualified list, perform new selection
-        console.log(`${selectedNodeETHAddr} was selected, but was disqualified due to a low TNT balance of ${balanceResponse.balance}, ${minGrainsBalanceNeeded} is required.`)
+        console.log(`${selectedNodeETHAddr} was selected, but was disqualified due to a low TNT balance of ${balanceTNTGrains} grains, ${minGrainsBalanceNeeded} grains (${minGrainsBalanceNeeded / 10 ** 8} TNT) is required.`)
         qualifiedNodes.splice(selectionIndex, 1)
         if (qualifiedNodes.length === 0) {
-          console.log(`Qualifying Nodes were found for reward, but none had a sufficient TNT balance, ${minGrainsBalanceNeeded} is required.`)
+          console.log(`Qualifying Nodes were found for reward, but none had a sufficient TNT balance, ${minGrainsBalanceNeeded} grains (${minGrainsBalanceNeeded / 10 ** 8} TNT) is required.`)
           return
         }
         selectionIndex = qualifiedNodes.length === 1 ? 0 : await csprng(0, qualifiedNodes.length - 1)
@@ -115,6 +116,7 @@ async function performRewardAsync () {
     console.error(`Unable to calculate reward shares : ${error.message}`)
     return
   }
+
   let nodeTNTGrainsRewardShare = calculatedShares.nodeTNTGrainsRewardShare
   let coreTNTGrainsRewardShare = calculatedShares.coreTNTGrainsRewardShare
   let coreRewardEthAddr = null
@@ -192,9 +194,9 @@ async function performRewardAsync () {
   try {
     let rewardResponse = await rp(options)
     nodeRewardTxId = rewardResponse.trx_id
-    console.log(`${nodeTNTGrainsRewardShare} TNT grains transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
+    console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
-    console.error(`${nodeTNTGrainsRewardShare} TNT grains failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
+    console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
     return
   }
 
@@ -223,9 +225,9 @@ async function performRewardAsync () {
     try {
       let rewardResponse = await rp(options)
       coreRewardTxId = rewardResponse.trx_id
-      console.log(`${coreTNTGrainsRewardShare} TNT grains transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
+      console.log(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
     } catch (error) {
-      console.error(`${coreTNTGrainsRewardShare} TNT grains failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
+      console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
     }
   }
 
@@ -272,7 +274,7 @@ async function calculateCurrentRewardShares () {
   }
   let nodeTNTRewardShare = 0
   let coreTNTRewardShare = 0
-  switch (rewardBlockCount) {
+  switch (true) {
     case (rewardBlockCount < 9600):
       nodeTNTRewardShare = 6210.30
       coreTNTRewardShare = 326.86
@@ -330,8 +332,8 @@ async function calculateCurrentRewardShares () {
       coreTNTRewardShare = 17.98
       break
   }
-  let nodeTNTGrainsRewardShare = new BigNumber(nodeTNTRewardShare).times(new BigNumber(10).toExponential(8)).toNumber()
-  let coreTNTGrainsRewardShare = new BigNumber(coreTNTRewardShare).times(new BigNumber(10).toExponential(8)).toNumber()
+  let nodeTNTGrainsRewardShare = new BigNumber(nodeTNTRewardShare).times(10 ** 8).toNumber()
+  let coreTNTGrainsRewardShare = new BigNumber(coreTNTRewardShare).times(10 ** 8).toNumber()
   return {
     nodeTNTGrainsRewardShare: nodeTNTGrainsRewardShare,
     coreTNTGrainsRewardShare: coreTNTGrainsRewardShare,
