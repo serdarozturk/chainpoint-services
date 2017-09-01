@@ -7,7 +7,7 @@
 # see: https://github.com/nodejs/LTS
 # see: https://hub.docker.com/_/node/
 # see: https://alpinelinux.org/
-FROM node:8.1.2-alpine
+FROM node:8.1.4-alpine
 
 LABEL MAINTAINER="Glenn Rempe <glenn@tierion.com>"
 
