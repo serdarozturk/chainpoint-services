@@ -69,8 +69,8 @@ var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
       unique: true
     },
     lastAuditAt: {
-      comment: 'The last time an audit was performed for this Node, in seconds since EPOCH.',
-      type: Sequelize.INTEGER,
+      comment: 'The last time an audit was performed for this Node, in MS since EPOCH.',
+      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
       validate: {
         isInt: true
       },

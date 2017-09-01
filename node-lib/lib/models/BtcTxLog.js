@@ -52,7 +52,7 @@ var BtcTxLog = sequelize.define(env.COCKROACH_BTC_TX_LOG_TABLE_NAME,
     },
     publishDate: {
       comment: 'Transaction publish time in milliseconds since unix epoch',
-      type: Sequelize.INTEGER,
+      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
       validate: {
         isInt: true
       },

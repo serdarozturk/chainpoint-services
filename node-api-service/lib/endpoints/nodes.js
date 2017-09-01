@@ -4,9 +4,12 @@ const _ = require('lodash')
 const moment = require('moment')
 var validUrl = require('valid-url')
 const registeredNode = require('../models/RegisteredNode.js')
+const nodeAuditLog = require('../models/NodeAuditLog.js')
 
-let sequelize = registeredNode.sequelize
+let registeredNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
+let nodeAuditLogSequelize = nodeAuditLog.sequelize
+let NodeAuditLog = nodeAuditLog.NodeAuditLog
 
 // validate eth address is well formed
 let isEthereumAddr = (address) => {
@@ -15,6 +18,56 @@ let isEthereumAddr = (address) => {
 
 let isHMAC = (hmac) => {
   return /^[0-9a-fA-F]{64}$/i.test(hmac)
+}
+
+/**
+ * GET /nodes retreive handler
+ *
+ * Retrieve a list of registered Nodes
+ */
+async function getNodesV1Async (req, res, next) {
+  // healthyOnly will limit results to Nodes who have
+  // passed all health checks of their most recent audit
+  let healthyOnly = false
+  if (parseInt(req.query.healthy) === 1) healthyOnly = true
+
+  // get the full list of Nodes
+  let regNodes = await RegisteredNode.findAll({attributes: ['tntAddr', 'publicUri', 'lastAuditAt']})
+  // if healthyOnly, check NodeAuditLog and limit regNodes to healthy nodes only
+  if (healthyOnly) {
+    // get all fully passing Node audit checks from the last 30 minutes
+    let thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
+    let nodeAuditLogs = await NodeAuditLog.findAll({
+      where: {
+        auditAt: { $gte: thirtyMinutesAgo },
+        publicIPPass: true,
+        timePass: true,
+        calStatePass: true
+      },
+      attributes: ['tntAddr']
+    })
+    // map nodeAuditLogs to an array of passing tntAddr
+    let healthyTNTAddrs = nodeAuditLogs.map((nodeAuditLog) => {
+      return nodeAuditLog.tntAddr
+    })
+    // filter out non-healthy nodes
+    regNodes = regNodes.filter((regNode) => {
+      return healthyTNTAddrs.includes(regNode.tntAddr)
+    })
+  }
+
+  // build well formatted result array
+  regNodes = regNodes.map((regNode) => {
+    return {
+      tntAddr: regNode.tntAddr,
+      publicUri: regNode.publicUri,
+      lastAuditAt: parseInt(regNode.lastAuditAt)
+    }
+  })
+
+  // randomize results order and send
+  res.send(_.shuffle(regNodes))
+  return next()
 }
 
 /**
@@ -160,8 +213,11 @@ async function putNodeV1Async (req, res, next) {
 }
 
 module.exports = {
-  getSequelize: () => { return sequelize },
+  getRegisteredNodeSequelize: () => { return registeredNodeSequelize },
+  getNodeAuditLogSequelize: () => { return nodeAuditLogSequelize },
+  getNodesV1Async: getNodesV1Async,
   postNodeV1Async: postNodeV1Async,
   putNodeV1Async: putNodeV1Async,
-  setNodesRegisteredNode: (regNode) => { RegisteredNode = regNode }
+  setNodesRegisteredNode: (regNode) => { RegisteredNode = regNode },
+  setNodesNodeAuditLog: (nodeAuditLog) => { NodeAuditLog = nodeAuditLog }
 }

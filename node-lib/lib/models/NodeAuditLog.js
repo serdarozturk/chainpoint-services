@@ -57,8 +57,8 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       allowNull: true
     },
     auditAt: {
-      comment: 'The time the audit was performed, in seconds since EPOCH.',
-      type: Sequelize.INTEGER,
+      comment: 'The time the audit was performed, in MS since EPOCH.',
+      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
       validate: {
         isInt: true
       },
@@ -90,7 +90,14 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
     // Disable the modification of table names; By default, sequelize will automatically
     // transform all passed model names (first parameter of define) into plural.
     // if you don't want that, set the following
-    freezeTableName: true
+    freezeTableName: true,
+    indexes: [
+      // Create a unique index on audit_at
+      {
+        unique: false,
+        fields: ['audit_at']
+      }
+    ]
   }
 )
 

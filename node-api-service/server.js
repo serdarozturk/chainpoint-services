@@ -124,6 +124,8 @@ server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCal
 server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1)
 // get the block objects for the calendar in the specified range, incusive
 server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1)
+// get nodes list
+server.get({ path: '/nodes', version: '1.0.0' }, nodes.getNodesV1Async)
 // register a new node
 server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node
@@ -191,7 +193,8 @@ async function openStorageConnectionAsync () {
     try {
       await cachedCalendarBlock.getSequelize().sync({ logging: false })
       await hashes.getSequelize().sync({ logging: false })
-      await nodes.getSequelize().sync({ logging: false })
+      await nodes.getRegisteredNodeSequelize().sync({ logging: false })
+      await nodes.getNodeAuditLogSequelize().sync({ logging: false })
       await proofs.getSequelize().sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
@@ -349,6 +352,7 @@ module.exports = {
   setNistLatest: (val) => { hashes.setNistLatest(val) },
   setHashesRegisteredNode: (regNode) => { hashes.setHashesRegisteredNode(regNode) },
   setNodesRegisteredNode: (regNode) => { nodes.setNodesRegisteredNode(regNode) },
+  setNodesNodeAuditLog: (nodeAuditLog) => { nodes.setNodesNodeAuditLog(nodeAuditLog) },
   setProofsRegisteredNode: (regNode) => { proofs.setProofsRegisteredNode(regNode) },
   server: server,
   config: config
