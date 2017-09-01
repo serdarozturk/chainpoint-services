@@ -1,5 +1,4 @@
-# Ubuntu + Node.js
-FROM node:8.1.2
+FROM quay.io/chainpoint/node-base
 
 # Create the db dir
 RUN mkdir -p /root/testrpc/db
