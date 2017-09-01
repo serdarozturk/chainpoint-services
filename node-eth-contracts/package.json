@@ -1,27 +1,27 @@
 {
   "name": "chainpoint-eth",
   "version": "1.0.0",
-  "description": "This is proof of concept project to show how to interact with the Ethereum network via the web3 library.",
+  "description": "Interact with the Ethereum network via the web3 library.",
   "main": "truffle.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "test": "truffle test; ./node_modules/mocha/bin/mocha **/*.spec.js",
+    "test": "./node_modules/.bin/truffle test",
     "transferTokens": "node ./scripts/transferTokens.js",
     "getBalance": "node ./scripts/getBalance.js",
     "watchTransfers": "node ./scripts/watchTransfers.js",
-    "build": "truffle compile",
-    "migrate": "truffle migrate",
     "start": "node server.js",
-    "console": "truffle console"
+    "build": "./node_modules/.bin/truffle compile",
+    "migrate": "./node_modules/.bin/truffle migrate",
+    "console": "./node_modules/.bin/truffle console"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^4.0.0",
     "envalid": "^3.1.1",
-    "truffle": "3.4.6",
+    "truffle": "^3.4.9",
     "truffle-contract": "^2.0.4",
     "web3": "0.19.0"
   },
