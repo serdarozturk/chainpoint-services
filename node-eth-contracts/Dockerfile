@@ -1,6 +1,6 @@
 FROM quay.io/chainpoint/node-lib
 
-# needed for  npm package to build
+# needed for npm package to build
 # native extensions
 RUN apk add --no-cache git
 
