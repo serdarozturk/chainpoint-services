@@ -147,6 +147,7 @@ let envDefinitions = {
   ETH_TNT_TX_CONNECT_URI: envalid.url({ default: 'http://eth-tnt-tx-service:8085', desc: 'The eth-tnt-tx-service REST connection URI' }),
   ETH_WALLET_PATH: envalid.str({ default: '', desc: 'The relative path to the wallet file.  Leave empty to not use a wallet for transactions.' }),
   ETH_WALLET_PASSWORD: envalid.str({ default: '', desc: 'The password to unlock the wallet file.  Do not specify if no wallet is used.' }),
+  ETH_TNT_TOKEN_ADDR: envalid.str({ default: '', desc: 'The address where the contract is on the blockchain.' }),
 
   // TNT Reward service specific variables
   REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60' }),

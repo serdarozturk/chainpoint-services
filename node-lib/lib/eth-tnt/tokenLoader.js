@@ -11,11 +11,11 @@ module.exports = async (provider, tokenAddr) => {
   let web3 = new Web3(provider)
 
   // Load the token json obj
-  console.log('loding TierionNetworkToken token')
+  console.log('loading TierionNetworkToken token')
   let tokenDef = require('../../contracts/TierionNetworkToken.json')
 
   // If the token addr is specified in the environment var, use that as highest priority
-  if (tokenAddr) {
+  if (tokenAddr && tokenAddr !== '') {
     console.log('Using token addr: ' + tokenAddr)
 
     // Load the ABI for the contract and initialize a contract interface
