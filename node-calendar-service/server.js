@@ -907,14 +907,16 @@ let setBtcInterval = () => {
     if (now.getUTCMinutes() !== currentMinute) {
       currentMinute = now.getUTCMinutes()
       if (btcAnchorMinutes.includes(currentMinute)) {
-        try {
-          // if the amqp channel is null (closed), processing should not continue, defer to next interval
-          if (amqpChannel === null) return
-          let randomFuzzyMS = await rand(0, maxFuzzyMS)
-          setTimeout(() => { btcAnchorLock.acquire() }, randomFuzzyMS)
-        } catch (err) {
-          console.error('btcAnchorLock.acquire() : caught err : ', err.message)
-        }
+        // if the amqp channel is null (closed), processing should not continue, defer to next interval
+        if (amqpChannel === null) return
+        let randomFuzzyMS = await rand(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            btcAnchorLock.acquire()
+          } catch (err) {
+            console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+          }
+        }, randomFuzzyMS)
       }
     }
   })
@@ -940,14 +942,16 @@ let setEthInterval = () => {
     if (now.getUTCMinutes() !== currentMinute) {
       currentMinute = now.getUTCMinutes()
       if (ethAnchorMinutes.includes(currentMinute)) {
-        try {
-          // if the amqp channel is null (closed), processing should not continue, defer to next interval
-          if (amqpChannel === null) return
-          let randomFuzzyMS = await rand(0, maxFuzzyMS)
-          setTimeout(() => { ethAnchorLock.acquire() }, randomFuzzyMS)
-        } catch (err) {
-          console.error('ethAnchorLock.acquire() : caught err : ', err.message)
-        }
+        // if the amqp channel is null (closed), processing should not continue, defer to next interval
+        if (amqpChannel === null) return
+        let randomFuzzyMS = await rand(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            ethAnchorLock.acquire()
+          } catch (err) {
+            console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+          }
+        }, randomFuzzyMS)
       }
     }
   })
