@@ -65,6 +65,8 @@ let monitorTransactionsAsync = async () => {
         blockStats.txIds[x] = blockStats.txIds[x].match(/.{2}/g).reverse().join('')
       }
 
+      if (blockStats.txIds.length === 0) throw new Error(`No transactions found in block ${txStats.blockHeight}`)
+
       // build BTC merkle tree with txIds
       merkleTools.resetTree()
       merkleTools.addLeaves(blockStats.txIds)

@@ -270,6 +270,8 @@ async function generateAuditChallengeAsync () {
 async function calculateChallengeAnswerAsync (min, max, nonce) {
   let blocks = await CalendarBlock.findAll({ where: { id: { $between: [min, max] } }, order: [['id', 'ASC']] })
 
+  if (blocks.length === 0) throw new Error('No blocks returned to create challenge tree')
+
   merkleTools.resetTree()
 
   // retrieve all block hashes from blocks array

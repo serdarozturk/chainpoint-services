@@ -492,6 +492,8 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
     if (!lastBtcAnchorBlockId) lastBtcAnchorBlockId = -1
     let blocks = await CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: [['id', 'ASC']] })
 
+    if (blocks.length === 0) throw new Error('No blocks returned to create btc anchor tree')
+
     // Build merkle tree with block hashes
     let leaves = blocks.map((blockObj) => {
       return blockObj.hash
@@ -591,7 +593,7 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
       console.log('aggregateAndAnchorBTCAsync process complete.')
     })
   } catch (error) {
-    throw new Error('aggregateAndAnchorBTCAsync error - ' + error)
+    throw new Error(`aggregateAndAnchorBTCAsync error: ${error.message}`)
   }
 }
 
