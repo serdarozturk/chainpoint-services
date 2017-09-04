@@ -392,6 +392,7 @@ services:
       - chainpoint
     environment:
       NODE_ENV: development
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
     command: npm run migrate -- --network testrpc
     volumes:
       - eth-contracts-volume:/home/node/app/build/contracts
@@ -413,6 +414,7 @@ services:
     environment:
       NODE_ENV: development
       LISTEN_TX_PORT: 8085
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
       # ETH_WALLET_PATH: ./wallet.json
       # ETH_WALLET_PASSWORD: test-password
     ports:
@@ -439,6 +441,7 @@ services:
     environment:
       NODE_ENV: development
       ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}      
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
     command: npm run start
     volumes:
       - eth-contracts-volume:/home/node/app/contracts
