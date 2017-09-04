@@ -8,7 +8,7 @@ const env = envalid.cleanEnv(process.env, {
   COCKROACH_DB_NAME: envalid.str({ default: 'chainpoint', desc: 'CockroachDB name' }),
   COCKROACH_DB_USER: envalid.str({ default: 'chainpoint', desc: 'CockroachDB user' }),
   COCKROACH_DB_PASS: envalid.str({ default: '', desc: 'CockroachDB password' }),
-  COCKROACH_TABLE_NAME: envalid.str({ default: 'chainpoint_btc_tx_log', desc: 'CockroachDB table name' }),
+  COCKROACH_BTC_TX_LOG_TABLE_NAME: envalid.str({ default: 'chainpoint_btc_tx_log', desc: 'CockroachDB table name' }),
   COCKROACH_TLS_CA_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS CA Cert' }),
   COCKROACH_TLS_CLIENT_KEY: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Key' }),
   COCKROACH_TLS_CLIENT_CRT: envalid.str({ devDefault: '', desc: 'CockroachDB TLS Client Cert' })
@@ -37,7 +37,7 @@ if (env.isProduction) {
 let sequelize = new Sequelize(env.COCKROACH_DB_NAME, env.COCKROACH_DB_USER, env.COCKROACH_DB_PASS, sequelizeOptions)
 
 // Define the model and the table it will be stored in.
-var BtcTxLog = sequelize.define(env.COCKROACH_TABLE_NAME,
+var BtcTxLog = sequelize.define(env.COCKROACH_BTC_TX_LOG_TABLE_NAME,
   {
     txId: {
       comment: 'The bitcoin transaction id hash.',
@@ -52,7 +52,7 @@ var BtcTxLog = sequelize.define(env.COCKROACH_TABLE_NAME,
     },
     publishDate: {
       comment: 'Transaction publish time in milliseconds since unix epoch',
-      type: Sequelize.INTEGER,
+      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
       validate: {
         isInt: true
       },
@@ -60,58 +60,31 @@ var BtcTxLog = sequelize.define(env.COCKROACH_TABLE_NAME,
       allowNull: false,
       unique: true
     },
-    txSizeBytes: {
-      comment: 'Size of the transaction in bytes',
+    rawTx: {
+      comment: 'The raw transaction body hex',
+      type: Sequelize.TEXT,
+      validate: {
+        is: ['^([a-f0-9]{2})+$', 'i']
+      },
+      field: 'raw_tx',
+      allowNull: false
+    },
+    feeSatoshiPerByte: {
+      comment: 'The fee expressed in Satoshi per byte',
       type: Sequelize.INTEGER,
       validate: {
         isInt: true
       },
-      field: 'tx_size_bytes',
+      field: 'fee_satoshi_per_byte',
       allowNull: false
     },
-    feeBtcPerKb: {
-      comment: 'The fee expressed in BTC per kilobyte',
-      type: Sequelize.FLOAT,
+    feePaidSatoshi: {
+      comment: 'The final fee paid for this transaction expressed in Satoshi',
+      type: Sequelize.INTEGER,
       validate: {
-        isFloat: true
+        isInt: true
       },
-      field: 'fee_btc_per_kb',
-      allowNull: false
-    },
-    feePaidBtc: {
-      comment: 'The fee paid for this transaction expressed in BTC',
-      type: Sequelize.FLOAT,
-      validate: {
-        isFloat: true
-      },
-      field: 'fee_paid_btc',
-      allowNull: false
-    },
-    inputAddress: {
-      comment: 'The bitcoin input address',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
-      },
-      field: 'input_address',
-      allowNull: false
-    },
-    outputAddress: {
-      comment: 'The bitcoin output address',
-      type: Sequelize.STRING,
-      validate: {
-        is: ['^[123mn][1-9A-HJ-NP-Za-km-z]{26,35}$', 'i']
-      },
-      field: 'output_address',
-      allowNull: false
-    },
-    balanceBtc: {
-      comment: 'The remaining balance for the stack\'s bitcoin wallet expressed in BTC',
-      type: Sequelize.FLOAT,
-      validate: {
-        isFloat: true
-      },
-      field: 'balance_btc',
+      field: 'fee_paid_satoshi',
       allowNull: false
     },
     stackId: {

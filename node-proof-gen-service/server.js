@@ -1,11 +1,12 @@
-const amqp = require('amqplib/callback_api')
+// load all environment variables into env object
+const env = require('./lib/parse-env.js')('gen')
+
+const amqp = require('amqplib')
 const chainpointProofSchema = require('chainpoint-proof-json-schema')
 const async = require('async')
 const uuidTime = require('uuid-time')
 const chpBinary = require('chainpoint-binary')
-
-// load all environment variables into env object
-const env = require('./lib/parse-env.js')('gen')
+const utils = require('./lib/utils.js')
 
 const r = require('redis')
 
@@ -16,35 +17,6 @@ let amqpChannel = null
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
 let redis = null
-
-/**
- * Opens a Redis connection
- *
- * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
- */
-function openRedisConnection (redisURI) {
-  redis = r.createClient(redisURI)
-  redis.on('error', () => {
-    redis.quit()
-    redis = null
-    console.error('Cannot connect to Redis. Attempting in 5 seconds...')
-    setTimeout(openRedisConnection.bind(null, redisURI), 5 * 1000)
-  })
-  redis.on('ready', () => {
-    console.log('Redis connected')
-  })
-}
-
-/**
- * Convert Date to ISO8601 string, stripping milliseconds
- * '2017-03-19T23:24:32Z'
- *
- * @param {Date} date - The date to convert
- * @returns {string} An ISO8601 formatted time string
- */
-function formatDateISO8601NoMs (date) {
-  return date.toISOString().slice(0, 19) + 'Z'
-}
 
 function generateCALProof (msg) {
   let messageObj = JSON.parse(msg.content.toString())
@@ -133,7 +105,7 @@ function generateBTCProof (msg) {
   let proof = {}
   proof = addChainpointHeader(proof, messageObj.hash, messageObj.hash_id)
   proof = addCalendarBranch(proof, messageObj.agg_state, messageObj.cal_state)
-  proof = addBtcBranch(proof, messageObj.anchor_agg_state, messageObj.btctx_state, messageObj.btchead_state)
+  proof = addBtcBranch(proof, messageObj.anchor_btc_agg_state, messageObj.btctx_state, messageObj.btchead_state)
 
   // ensure the proof is valid according to the defined Chainpoint v3 JSON schema
   let isValidSchema = chainpointProofSchema.validate(proof).valid
@@ -217,8 +189,15 @@ function addChainpointHeader (proof, hash, hashId) {
   proof['@context'] = 'https://w3id.org/chainpoint/v3'
   proof.type = 'Chainpoint'
   proof.hash = hash
-  proof.hash_id = hashId
-  proof.hash_submitted_at = formatDateISO8601NoMs(new Date(uuidTime.v1(hashId)))
+
+  // the following two values are added as placeholders
+  // the spec does not allow for missing or empty values here
+  // these values will be replaced with proper ones by the Node instance
+  proof.hash_id_node = hashId
+  proof.hash_submitted_node_at = utils.formatDateISO8601NoMs(new Date(uuidTime.v1(hashId)))
+
+  proof.hash_id_core = hashId
+  proof.hash_submitted_core_at = proof.hash_submitted_node_at
   return proof
 }
 
@@ -238,10 +217,10 @@ function addCalendarBranch (proof, aggState, calState) {
   return proof
 }
 
-function addBtcBranch (proof, anchorAggState, btcTxState, btcHeadState) {
+function addBtcBranch (proof, anchorBTCAggState, btcTxState, btcHeadState) {
   let btcBranch = {}
   btcBranch.label = 'btc_anchor_branch'
-  btcBranch.ops = anchorAggState.ops.concat(btcTxState.ops, btcHeadState.ops)
+  btcBranch.ops = anchorBTCAggState.ops.concat(btcTxState.ops, btcHeadState.ops)
 
   let btcAnchor = {}
   btcAnchor.type = 'btc'
@@ -283,55 +262,78 @@ function processMessage (msg) {
 }
 
 /**
+ * Opens a Redis connection
+ *
+ * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
+ */
+function openRedisConnection (redisURI) {
+  redis = r.createClient(redisURI)
+  redis.on('ready', () => {
+    console.log('Redis connection established')
+  })
+  redis.on('error', async () => {
+    redis.quit()
+    redis = null
+    console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
+    await utils.sleep(5000)
+    openRedisConnection(redisURI)
+  })
+}
+
+/**
  * Opens an AMPQ connection and channel
  * Retry logic is included to handle losses of connection
  *
  * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
  */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
       // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_IN_GEN_QUEUE, { durable: true })
+      chan.assertExchange(env.RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
+      chan.prefetch(env.RMQ_PREFETCH_COUNT_GEN)
+      amqpChannel = chan
+        // Continuously load the HASHES from RMQ with hash objects to process
+      chan.consume(env.RMQ_WORK_IN_GEN_QUEUE, (msg) => {
+        processMessage(msg)
       })
-    },
-    (conn, callback) => {
       // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
+      conn.on('close', async () => {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
         amqpChannel = null
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
       })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_GEN_QUEUE, { durable: true })
-        chan.assertExchange(env.RMQ_OUTGOING_EXCHANGE, 'headers', { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT_GEN)
-        amqpChannel = chan
-        // Continuously load the HASHES from RMQ with hash objects to process
-        chan.consume(env.RMQ_WORK_IN_GEN_QUEUE, (msg) => {
-          processMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
       // catch errors when attempting to establish connection
       console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
+      await utils.sleep(5000)
     }
-  })
+  }
 }
 
-// Open amqp connection
-amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
+// process all steps need to start the application
+async function start () {
+  if (env.NODE_ENV === 'test') return
+  try {
+    // init Redis
+    openRedisConnection(env.REDIS_CONNECT_URI)
+    // init RabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    console.log('startup completed successfully')
+  } catch (err) {
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
+  }
+}
 
-// REDIS initialization
-openRedisConnection(env.REDIS_CONNECT_URI)
+// get the whole show started
+start()

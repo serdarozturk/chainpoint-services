@@ -1,15 +1,17 @@
-const async = require('async')
-const _ = require('lodash')
-const MerkleTools = require('merkle-tools')
-const amqp = require('amqplib/callback_api')
-const uuidv1 = require('uuid/v1')
-const crypto = require('crypto')
-const calendarBlock = require('./lib/models/CalendarBlock.js')
-
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('cal')
 
-const consul = require('consul')({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+const async = require('async')
+const _ = require('lodash')
+const MerkleTools = require('merkle-tools')
+const amqp = require('amqplib')
+const uuidv1 = require('uuid/v1')
+const crypto = require('crypto')
+const calendarBlock = require('./lib/models/CalendarBlock.js')
+const cnsl = require('consul')
+const utils = require('./lib/utils.js')
+const heartbeats = require('heartbeats')
+const rand = require('random-number-csprng')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -22,6 +24,9 @@ const signingSecretKeyBytes = nacl.util.decodeBase64(env.SIGNING_SECRET_KEY)
 const signingKeypair = nacl.sign.keyPair.fromSecretKey(signingSecretKeyBytes)
 
 const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
+
+// the fuzz factor for anchor interval meant to give each core instance a random chance of being first
+const maxFuzzyMS = 10000
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -41,15 +46,20 @@ let nistLatest = null
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
 
-// Variables holding the configured interval functions
-// The variables are set when intervals are created
-// The variables are used when deleting a timeout, if requested
-let anchorBtcInterval = null
-let anchorEthInterval = null
+// An array of all Reward messages received and awaiting processing
+let REWARD_MESSAGES = []
+
+// create a heartbeat for every 200ms
+// 1 second heartbeats had a drift that caused occasional skipping of a whole second
+// decreasing the interval of the heartbeat and checking current time resolves this
+var heart = heartbeats.createHeart(200)
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
+
+let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+console.log('Consul connection established')
 
 // Calculate the hash of the signing public key bytes
 // to allow lookup of which pubkey was used to sign
@@ -58,117 +68,143 @@ let CalendarBlock = calendarBlock.CalendarBlock
 // When a Base64 pubKey is published publicly it should also
 // be accompanied by this hash of its bytes to serve
 // as a fingerprint.
-let calcSigningPubKeyHash = (pubKey) => {
+let calcSigningPubKeyHashHex = (pubKey) => {
   return crypto.createHash('sha256').update(pubKey).digest('hex')
 }
-const signingPubKeyHash = calcSigningPubKeyHash(signingKeypair.publicKey)
+const signingPubKeyHashHex = calcSigningPubKeyHashHex(signingKeypair.publicKey)
 
 // Calculate a deterministic block hash and return a Buffer hash value
-let calcBlockHash = (block) => {
+let calcBlockHashHex = (block) => {
   let prefixString = `${block.id.toString()}:${block.time.toString()}:${block.version.toString()}:${block.stackId.toString()}:${block.type.toString()}:${block.dataId.toString()}`
   let prefixBuffer = Buffer.from(prefixString, 'utf8')
-  let dataValBuffer = Buffer.from(block.dataVal, 'hex')
+  let dataValBuffer = utils.isHex(block.dataVal) ? Buffer.from(block.dataVal, 'hex') : Buffer.from(block.dataVal, 'utf8')
   let prevHashBuffer = Buffer.from(block.prevHash, 'hex')
 
   return crypto.createHash('sha256').update(Buffer.concat([
     prefixBuffer,
     dataValBuffer,
     prevHashBuffer
-  ])).digest()
+  ])).digest('hex')
 }
 
 // Calculate a base64 encoded signature over the block hash
-let calcBlockHashSig = (bh) => {
-  return nacl.util.encodeBase64(nacl.sign(bh, signingKeypair.secretKey))
+let calcBlockHashSigB64 = (blockHashHex) => {
+  return nacl.util.encodeBase64(nacl.sign.detached(nacl.util.decodeUTF8(blockHashHex), signingKeypair.secretKey))
 }
 
 // The write function used by all block creation functions to write to calendar blockchain
-let writeBlock = (height, type, dataId, dataVal, prevHash, friendlyName, callback) => {
+let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyName) => {
   let b = {}
   b.id = height
   b.time = Math.trunc(Date.now() / 1000)
   b.version = 1
-  b.stackId = env.CHAINPOINT_STACK_ID
+  b.stackId = env.CHAINPOINT_CORE_BASE_URI
   b.type = type
   b.dataId = dataId
   b.dataVal = dataVal
   b.prevHash = prevHash
 
-  let bh = calcBlockHash(b)
-  b.hash = bh.toString('hex')
+  let blockHashHex = calcBlockHashHex(b)
+  b.hash = blockHashHex
 
   // pre-pend Base64 signature with truncated chars of SHA256 hash of the
   // pubkey bytes, joined with ':', to allow for lookup of signing pubkey.
-  b.sig = [signingPubKeyHash.slice(0, 12), calcBlockHashSig(bh)].join(':')
+  b.sig = [signingPubKeyHashHex.slice(0, 12), calcBlockHashSigB64(blockHashHex)].join(':')
 
-  CalendarBlock.create(b).nodeify((err, block) => {
-    if (err) return callback(`${friendlyName} BLOCK create error: ${err.message} : ${err.stack}`)
+  try {
+    let block = await CalendarBlock.create(b)
     console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
-    return callback(null, block.get({ plain: true }))
-  })
+    return block.get({ plain: true })
+  } catch (error) {
+    throw new Error(`${friendlyName} BLOCK create error: ${error.message} : ${error.stack}`)
+  }
 }
 
-let createGenesisBlock = (callback) => {
-  return writeBlock(0, 'gen', '0', zeroStr, zeroStr, 'GENESIS', callback)
+let createGenesisBlockAsync = async () => {
+  return await writeBlockAsync(0, 'gen', '0', zeroStr, zeroStr, 'GENESIS')
 }
 
-let createCalendarBlock = (root, callback) => {
+let createCalendarBlockAsync = async (root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
-    if (err) return callback('could not write block')
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      return writeBlock(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL', callback)
+      return await writeBlockAsync(newId, 'cal', newId.toString(), root.toString(), prevBlock.hash, 'CAL')
     } else {
-      return callback('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
-  })
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
 }
 
-let createNistBlock = (nistDataObj, callback) => {
+let createNistBlockAsync = async (nistDataObj) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
-    if (err) return callback('could not write block')
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       let dataId = nistDataObj.split(':')[0].toString() // the epoch timestamp for this NIST entry
       let dataVal = nistDataObj.split(':')[1].toString()  // the hex value for this NIST entry
-      return writeBlock(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST', callback)
+      return await writeBlockAsync(newId, 'nist', dataId, dataVal, prevBlock.hash, 'NIST')
     } else {
-      return callback('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
-  })
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
 }
 
-let createBtcAnchorBlock = (root, callback) => {
+let createBtcAnchorBlockAsync = async (root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
-    if (err) return callback('could not write block')
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
       console.log(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
-      return writeBlock(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR', callback)
+      return await writeBlockAsync(newId, 'btc-a', '', root.toString(), prevBlock.hash, 'BTC-ANCHOR')
     } else {
-      return callback('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
-  })
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
 }
 
-let createBtcConfirmBlock = (height, root, callback) => {
+let createBtcConfirmBlockAsync = async (height, root) => {
   // Find the last block written so we can incorporate its hash as prevHash
   // in the new block and increment its block ID by 1.
-  CalendarBlock.findOne({ attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, prevBlock) => {
-    if (err) return callback('could not write block')
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
     if (prevBlock) {
       let newId = parseInt(prevBlock.id, 10) + 1
-      return writeBlock(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM', callback)
+      return await writeBlockAsync(newId, 'btc-c', height.toString(), root.toString(), prevBlock.hash, 'BTC-CONFIRM')
     } else {
-      return callback('could not write block, no genesis block found')
+      throw new Error('no genesis block found')
     }
-  })
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
+}
+
+let createRewardBlockAsync = async (dataId, dataVal) => {
+  // Find the last block written so we can incorporate its hash as prevHash
+  // in the new block and increment its block ID by 1.
+  try {
+    let prevBlock = await CalendarBlock.findOne({ attributes: ['id', 'hash'], order: [['id', 'DESC']] })
+    if (prevBlock) {
+      let newId = parseInt(prevBlock.id, 10) + 1
+      return await writeBlockAsync(newId, 'reward', dataId.toString(), dataVal.toString(), prevBlock.hash, 'REWARD')
+    } else {
+      throw new Error('no genesis block found')
+    }
+  } catch (error) {
+    throw new Error(`could not write block : ${error}`)
+  }
 }
 
 /**
@@ -201,6 +237,9 @@ function processMessage (msg) {
           amqpChannel.ack(msg)
         }
         break
+      case 'reward':
+        consumeRewardMessage(msg)
+        break
       default:
         // This is an unknown state type
         console.error('Unknown state type', msg.properties.type)
@@ -226,12 +265,12 @@ function consumeBtcTxMessage (msg) {
       (callback) => {
         // queue up message containing updated proof state bound for proof state service
         let stateObj = {}
-        stateObj.anchor_agg_id = btcTxObj.anchor_agg_id
+        stateObj.anchor_btc_agg_id = btcTxObj.anchor_btc_agg_id
         stateObj.btctx_id = btcTxObj.btctx_id
-        let anchorAggRoot = btcTxObj.anchor_agg_root
+        let anchorBTCAggRoot = btcTxObj.anchor_btc_agg_root
         let btctxBody = btcTxObj.btctx_body
-        let prefix = btctxBody.substr(0, btctxBody.indexOf(anchorAggRoot))
-        let suffix = btctxBody.substr(btctxBody.indexOf(anchorAggRoot) + anchorAggRoot.length)
+        let prefix = btctxBody.substr(0, btctxBody.indexOf(anchorBTCAggRoot))
+        let suffix = btctxBody.substr(btctxBody.indexOf(anchorBTCAggRoot) + anchorBTCAggRoot.length)
         stateObj.btctx_state = {}
         stateObj.btctx_state.ops = [
           { l: prefix },
@@ -282,7 +321,22 @@ function consumeBtcTxMessage (msg) {
 function consumeBtcMonMessage (msg) {
   if (msg !== null) {
     BTC_MON_MESSAGES.push(msg)
-    btcConfirmLock.acquire()
+    try {
+      btcConfirmLock.acquire()
+    } catch (err) {
+      console.error('btcConfirmLock.acquire() : caught err : ', err.message)
+    }
+  }
+}
+
+function consumeRewardMessage (msg) {
+  if (msg !== null) {
+    REWARD_MESSAGES.push(msg)
+    try {
+      rewardLock.acquire()
+    } catch (err) {
+      console.error('rewardLock.acquire() : caught err : ', err.message)
+    }
   }
 }
 
@@ -353,15 +407,11 @@ let generateCalendarTree = () => {
 }
 
 // Write tree to calendar block DB and also to proof state service via RMQ
-let persistCalendarTree = (treeDataObj, persistCallback) => {
+let persistCalendarTreeAsync = async (treeDataObj) => {
+  // Store Merkle root of calendar in DB and chain to previous calendar entries
+  let block = await createCalendarBlockAsync(treeDataObj.cal_root.toString('hex'))
   async.waterfall([
-    // Store Merkle root of calendar in DB and chain to previous calendar entries
-    (callback) => {
-      createCalendarBlock(treeDataObj.cal_root.toString('hex'), (err, block) => {
-        if (err) return persistCallback(err)
-        return callback(null, block)
-      })
-    },
+    async.constant(block),
     // queue proof state messages for each aggregation root in the tree
     (block, callback) => {
       // for each aggregation root, queue up message containing
@@ -379,8 +429,8 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
         stateObj.cal_state.ops.push({ r: block.prevHash })
         stateObj.cal_state.ops.push({ op: 'sha-256' })
 
-        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
-        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
+        // Build the anchors uris using the locations configured in CHAINPOINT_CORE_BASE_URI
+        let BASE_URIS = [env.CHAINPOINT_CORE_BASE_URI]
         let uris = []
         for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/hash`)
         stateObj.cal_state.anchor = {
@@ -421,7 +471,7 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
           console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message nacked')
         }
       })
-      return persistCallback(err)
+      throw new Error(err)
     } else {
       _.forEach(messages, (message) => {
         if (message !== null) {
@@ -430,139 +480,124 @@ let persistCalendarTree = (treeDataObj, persistCallback) => {
           console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
         }
       })
-      return persistCallback(null)
     }
   })
 }
 
 // Aggregate all block hashes on chain since last BTC anchor block, add new
 // BTC anchor block to calendar, add new proof state entries, anchor root
-let aggregateAndAnchorBTC = (lastBtcAnchorBlockId, anchorCallback) => {
-  async.waterfall([
-    (wfCallback) => {
-      // Retrieve calendar blocks since last anchor block
-      if (!lastBtcAnchorBlockId) lastBtcAnchorBlockId = -1
-      CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: 'id ASC' }).nodeify((err, blocks) => {
-        if (err) return wfCallback(err)
-        return wfCallback(null, blocks)
-      })
-    },
-    (blocks, wfCallback) => {
-      // Build merkle tree with block hashes
-      let leaves = blocks.map((blockObj) => {
-        return blockObj.hash
-      })
+let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
+  try {
+    // Retrieve calendar blocks since last anchor block
+    if (!lastBtcAnchorBlockId) lastBtcAnchorBlockId = -1
+    let blocks = await CalendarBlock.findAll({ where: { id: { $gt: lastBtcAnchorBlockId } }, attributes: ['id', 'type', 'hash'], order: [['id', 'ASC']] })
 
-      // clear the merkleTools instance to prepare for a new tree
-      merkleTools.resetTree()
+    if (blocks.length === 0) throw new Error('No blocks returned to create btc anchor tree')
 
-      // Add every blockHash in blocks to new Merkle tree
-      merkleTools.addLeaves(leaves)
-      merkleTools.makeTree()
+    // Build merkle tree with block hashes
+    let leaves = blocks.map((blockObj) => {
+      return blockObj.hash
+    })
 
-      // get the total count of leaves in this aggregation
-      let treeSize = merkleTools.getLeafCount()
+    // clear the merkleTools instance to prepare for a new tree
+    merkleTools.resetTree()
 
-      let treeData = {}
-      treeData.anchor_agg_id = uuidv1()
-      treeData.anchor_agg_root = merkleTools.getMerkleRoot().toString('hex')
+    // Add every blockHash in blocks to new Merkle tree
+    merkleTools.addLeaves(leaves)
+    merkleTools.makeTree()
 
-      let proofData = []
-      for (let x = 0; x < treeSize; x++) {
-        // for calendar type blocks only, push the cal_id and corresponding proof onto the array
-        if (blocks[x].type === 'cal') {
-          let proofDataItem = {}
-          proofDataItem.cal_id = blocks[x].id
-          let proof = merkleTools.getProof(x)
-          proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
-          proofData.push(proofDataItem)
-        }
+    // get the total count of leaves in this aggregation
+    let treeSize = merkleTools.getLeafCount()
+
+    let treeData = {}
+    treeData.anchor_btc_agg_id = uuidv1()
+    treeData.anchor_btc_agg_root = merkleTools.getMerkleRoot().toString('hex')
+
+    let proofData = []
+    for (let x = 0; x < treeSize; x++) {
+      // for calendar type blocks only, push the cal_id and corresponding proof onto the array
+      if (blocks[x].type === 'cal') {
+        let proofDataItem = {}
+        proofDataItem.cal_id = blocks[x].id
+        let proof = merkleTools.getProof(x)
+        proofDataItem.proof = formatAsChainpointV3Ops(proof, 'sha-256')
+        proofData.push(proofDataItem)
       }
-      treeData.proofData = proofData
+    }
+    treeData.proofData = proofData
 
-      console.log('blocks length : %s', blocks.length)
+    console.log('blocks length : %s', blocks.length)
 
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
+    // if the amqp channel is null (closed), processing should not continue, defer to next interval
+    if (amqpChannel === null) return
 
-      // Create new btc anchor block with resulting tree root
-      createBtcAnchorBlock(treeData.anchor_agg_root, (err, block) => {
-        if (err) {
-          return wfCallback('createBtcAnchorBlock error - ' + err)
-        } else {
-          // console.log('createBtcAnchorBlock succeeded')
-          return wfCallback(null, treeData, block)
+    // Create new btc anchor block with resulting tree root
+    await createBtcAnchorBlockAsync(treeData.anchor_btc_agg_root)
+
+    // For each calendar record block in the tree, add proof state
+    // item containing proof ops from block_hash to anchor_btc_agg_root
+    async.series([
+      (seriesCallback) => {
+        // for each calendar block hash, queue up message containing updated
+        // proof state bound for proof state service
+        async.each(treeData.proofData, (proofDataItem, eachCallback) => {
+          let stateObj = {}
+          stateObj.cal_id = proofDataItem.cal_id
+          stateObj.anchor_btc_agg_id = treeData.anchor_btc_agg_id
+          stateObj.anchor_btc_agg_state = {}
+          stateObj.anchor_btc_agg_state.ops = proofDataItem.proof
+
+          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_btc_agg' },
+            (err, ok) => {
+              if (err !== null) {
+                // An error as occurred publishing a message
+                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message nacked')
+                return eachCallback(err)
+              } else {
+                // New message has been published
+                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message acked')
+                return eachCallback(null)
+              }
+            })
+        }, (err) => {
+          if (err) {
+            console.error('Anchor aggregation had errors.')
+            return seriesCallback(err)
+          } else {
+            console.log('Anchor aggregation complete')
+            return seriesCallback(null)
+          }
+        })
+      },
+      (seriesCallback) => {
+        // Create anchor_btc_agg message data object for anchoring service(s)
+        let anchorData = {
+          anchor_btc_agg_id: treeData.anchor_btc_agg_id,
+          anchor_btc_agg_root: treeData.anchor_btc_agg_root
         }
-      })
-    },
-    (treeData, newBlock, wfCallback) => {
-      // For each calendar record block in the tree, add proof state
-      // item containing proof ops from block_hash to anchor_agg_root
-      async.series([
-        (seriesCallback) => {
-          // for each calendar block hash, queue up message containing updated
-          // proof state bound for proof state service
-          async.each(treeData.proofData, (proofDataItem, eachCallback) => {
-            let stateObj = {}
-            stateObj.cal_id = proofDataItem.cal_id
-            stateObj.anchor_agg_id = treeData.anchor_agg_id
-            stateObj.anchor_agg_state = {}
-            stateObj.anchor_agg_state.ops = proofDataItem.proof
 
-            amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'anchor_agg' },
-              (err, ok) => {
-                if (err !== null) {
-                  // An error as occurred publishing a message
-                  console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message nacked')
-                  return eachCallback(err)
-                } else {
-                  // New message has been published
-                  console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_agg] publish message acked')
-                  return eachCallback(null)
-                }
-              })
-          }, (err) => {
-            if (err) {
-              console.error('Anchor aggregation had errors.')
+        // Send anchorData to the btc tx service for anchoring
+        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
+          (err, ok) => {
+            if (err !== null) {
+              console.error(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
               return seriesCallback(err)
             } else {
-              console.log('Anchor aggregation complete')
+              console.log(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
               return seriesCallback(null)
             }
           })
-        },
-        (seriesCallback) => {
-          // Create anchor_agg message data object for anchoring service(s)
-          let anchorData = {
-            anchor_agg_id: treeData.anchor_agg_id,
-            anchor_agg_root: treeData.anchor_agg_root
-          }
-
-          // Send anchorData to the btc tx service for anchoring
-          amqpChannel.sendToQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, Buffer.from(JSON.stringify(anchorData)), { persistent: true },
-            (err, ok) => {
-              if (err !== null) {
-                console.error(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
-                return seriesCallback(err)
-              } else {
-                console.log(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
-                return seriesCallback(null)
-              }
-            })
-        }
-      ], (err) => {
-        if (err) return wfCallback(err)
-        console.log('aggregateAndAnchorBTC process complete.')
-        return wfCallback(null)
-      })
-    }
-  ], (err) => {
-    if (err) return anchorCallback(err)
-    return anchorCallback(null)
-  })
+      }
+    ], (err) => {
+      if (err) throw new Error(err)
+      console.log('aggregateAndAnchorBTCAsync process complete.')
+    })
+  } catch (error) {
+    throw new Error(`aggregateAndAnchorBTCAsync error: ${error.message}`)
+  }
 }
 
-let aggregateAndAnchorETH = (lastEthAnchorBlockId, anchorCallback) => {
+let aggregateAndAnchorETHAsync = async (lastEthAnchorBlockId, anchorCallback) => {
   console.log('TODO aggregateAndAnchorETH()')
   return anchorCallback(null)
 }
@@ -589,13 +624,14 @@ var lockOpts = {
   }
 }
 
-var genesisLock = consul.lock(_.merge({}, lockOpts, { value: 'genesis' }))
-var calendarLock = consul.lock(_.merge({}, lockOpts, { value: 'calendar' }))
-var nistLock = consul.lock(_.merge({}, lockOpts, { value: 'nist' }))
-var btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
-var btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
-var ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
-var ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
+let genesisLock = consul.lock(_.merge({}, lockOpts, { value: 'genesis' }))
+let calendarLock = consul.lock(_.merge({}, lockOpts, { value: 'calendar' }))
+let nistLock = consul.lock(_.merge({}, lockOpts, { value: 'nist' }))
+let btcAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-anchor' }))
+let btcConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'btc-confirm' }))
+let ethAnchorLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-anchor' }))
+let ethConfirmLock = consul.lock(_.merge({}, lockOpts, { value: 'eth-confirm' }))
+let rewardLock = consul.lock(_.merge({}, lockOpts, { value: 'reward' }))
 
 function registerLockEvents (lock, lockName, acquireFunction) {
   lock.on('acquire', () => {
@@ -610,270 +646,401 @@ function registerLockEvents (lock, lockName, acquireFunction) {
   lock.on('release', () => {
     console.log(`${lockName} release`)
   })
-
-  // lock.on('end', () => {
-  //   console.log(`${lockName} end`)
-  // })
 }
 
 // LOCK HANDLERS : genesis
-registerLockEvents(genesisLock, 'genesisLock', () => {
-  // The value of the lock determines what function it triggers
-  // Is a genesis block needed? If not release lock and move on.
-  CalendarBlock.count().nodeify((err, c) => {
-    if (err) {
-      genesisLock.release()
-      console.log(`Unable to count calendar blocks`)
-    } else {
-      if (c === 0) {
-        createGenesisBlock((err, block) => {
-          if (err) {
-            console.error('createGenesisBlock error - ' + err)
-          } else {
-            console.log('createGenesisBlock succeeded')
-          }
-          genesisLock.release()
-        })
-      } else {
-        genesisLock.release()
-        console.log(`No genesis block needed : ${c} block(s) found.`)
-      }
+registerLockEvents(genesisLock, 'genesisLock', async () => {
+  try {
+    // The value of the lock determines what function it triggers
+    // Is a genesis block needed? If not release lock and move on.
+    let blockCount
+    try {
+      blockCount = await CalendarBlock.count()
+    } catch (error) {
+      throw new Error(`Unable to count calendar blocks: ${error.message}`)
     }
-  })
+    if (blockCount === 0) {
+      try {
+        await createGenesisBlockAsync()
+      } catch (error) {
+        throw new Error(`Unable to create genesis block: ${error.message}`)
+      }
+    } else {
+      console.log(`No genesis block needed: ${blockCount} block(s) found`)
+    }
+  } catch (error) {
+    console.error(error.message)
+  } finally {
+    // always release lock
+    genesisLock.release()
+  }
 })
 
 // LOCK HANDLERS : calendar
-registerLockEvents(calendarLock, 'calendarLock', () => {
-  let treeDataObj = generateCalendarTree()
-  if (treeDataObj) { // there is some data to process, continue and persist
-    persistCalendarTree(treeDataObj, (err) => {
-      if (err) {
-        console.error('persistCalendarTree error - ' + err)
-      } else {
-        console.log('persistCalendarTree succeeded')
-      }
-      calendarLock.release()
-    })
-  } else { // there is nothing to process in this calendar interval, write nothing, release lock
-    console.log('no data for this calendar interval')
+registerLockEvents(calendarLock, 'calendarLock', async () => {
+  try {
+    let treeDataObj = generateCalendarTree()
+    // if there is some data to process, continue and persist
+    if (treeDataObj) {
+      await persistCalendarTreeAsync(treeDataObj)
+    } else {
+      // there is nothing to process in this calendar interval, write nothing, release lock
+      console.log('no hashes for this calendar interval')
+    }
+  } catch (error) {
+    console.error(`Unable to create calendar block: ${error.message}`)
+  } finally {
+    // always release lock
     calendarLock.release()
   }
 })
 
 // LOCK HANDLERS : nist
-registerLockEvents(nistLock, 'nistLock', () => {
-  if (nistLatest) {
-    console.log(nistLatest)
-    createNistBlock(nistLatest, (err, block) => {
-      if (err) {
-        console.error('createNistBlock error - ' + err)
-      } else {
-        // console.log('createNistBlock succeeded')
-      }
-      nistLock.release()
-    })
-  } else {
-    console.error('nistLatest is null or missing Value property')
+registerLockEvents(nistLock, 'nistLock', async () => {
+  try {
+    if (!nistLatest) throw new Error(`No value for nistLatest has been assigned`)
+    await createNistBlockAsync(nistLatest)
+  } catch (error) {
+    console.error(`Unable to create NIST block: ${error.message}`)
+  } finally {
+    // always release lock
     nistLock.release()
   }
 })
 
 // LOCK HANDLERS : btc-anchor
-registerLockEvents(btcAnchorLock, 'btcAnchorLock', () => {
-  // checks if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
-  // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
-  let lastBtcAnchorBlockId = null
-  CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, lastBtcAnchorBlock) => {
-    if (err) {
-      btcAnchorLock.release()
-      console.log(`Unable to query calendar blocks`)
-    } else {
-      if (lastBtcAnchorBlock) {
-      // check if the last btc anchor block is at least ANCHOR_BTC_INTERVAL_MS old
-      // if not, release lock and return
-        let lastBtcAnchorMS = lastBtcAnchorBlock.time
-        let currentMS = Date.now()
-        let ageMS = currentMS - lastBtcAnchorMS
-        if (ageMS < env.ANCHOR_BTC_INTERVAL_MS) {
-          console.log('aggregateAndAnchorBTC skipped, ANCHOR_BTC_INTERVAL_MS not elapsed since last btc anchor block')
-          btcAnchorLock.release()
-          return
-        }
-        lastBtcAnchorBlockId = parseInt(lastBtcAnchorBlock.id, 10)
-      }
-      aggregateAndAnchorBTC(lastBtcAnchorBlockId, (err) => {
-        if (err) {
-          console.error('aggregateAndAnchorBTC error - ' + err)
-        } else {
-          // console.log('aggregateAndAnchorBTC succeeded')
-        }
-        btcAnchorLock.release()
-      })
+registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
+  try {
+    let btcAnchorIntervalMinutes = 60 / (env.ANCHOR_BTC_PER_HOUR || 2) // default to 2, avoid possible divide by 0
+    // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
+    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+    let lastBtcAnchorBlock
+    try {
+      lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+    } catch (error) {
+      throw new Error(`Unable to retreive most recent btc anchor block: ${error.message}`)
     }
-  })
+    if (lastBtcAnchorBlock) {
+      // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
+      // if not, release lock and return
+      let lastBtcAnchorMS = lastBtcAnchorBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastBtcAnchorMS
+      let lastAnchorTooRecent = (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      if (lastAnchorTooRecent) {
+        console.log('aggregateAndAnchorBTCAsync skipped, btcAnchorIntervalMinutes not elapsed since last btc anchor block')
+      } else {
+        try {
+          let lastBtcAnchorBlockId = lastBtcAnchorBlock ? parseInt(lastBtcAnchorBlock.id, 10) : null
+          await aggregateAndAnchorBTCAsync(lastBtcAnchorBlockId)
+        } catch (error) {
+          throw new Error(`Unable to aggregate and create btc anchor block: ${error.message}`)
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error.message)
+  } finally {
+    // always release lock
+    btcAnchorLock.release()
+  }
 })
 
 // LOCK HANDLERS : btc-confirm
-registerLockEvents(btcConfirmLock, 'btcConfirmLock', () => {
-  let monMessageToProcess = BTC_MON_MESSAGES.splice(0)
-  // if there are no messaes left to processes, release lock and return
-  if (monMessageToProcess.length === 0) {
-    btcConfirmLock.release()
-    return
-  }
-  async.eachSeries(monMessageToProcess, (msg, eachCallback) => {
-    let btcMonObj = JSON.parse(msg.content.toString())
-    let btctxId = btcMonObj.btctx_id
-    let btcheadHeight = btcMonObj.btchead_height
-    let btcheadRoot = btcMonObj.btchead_root
-    let proofPath = btcMonObj.path
+registerLockEvents(btcConfirmLock, 'btcConfirmLock', async () => {
+  try {
+    let monMessagesToProcess = BTC_MON_MESSAGES.splice(0)
+    // if there are no messages left to process, release lock and return
+    if (monMessagesToProcess.length === 0) return
 
-    async.waterfall([
+    for (let x = 0; x < monMessagesToProcess.length; x++) {
+      let msg = monMessagesToProcess[x]
+
+      let btcMonObj = JSON.parse(msg.content.toString())
+      let btctxId = btcMonObj.btctx_id
+      let btcheadHeight = btcMonObj.btchead_height
+      let btcheadRoot = btcMonObj.btchead_root
+      let proofPath = btcMonObj.path
+
       // Store Merkle root of BTC block in chain
-      (wfCallback) => {
-        createBtcConfirmBlock(btcheadHeight, btcheadRoot, (err, block) => {
-          if (err) return wfCallback(err)
-          return wfCallback(null, block)
-        })
-      },
-      // queue up message containing updated proof state bound for proof state service
-      (block, wfCallback) => {
-        let stateObj = {}
-        stateObj.btctx_id = btctxId
-        stateObj.btchead_height = btcheadHeight
-        stateObj.btchead_state = {}
-        stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
-
-        // Build the anchors uris using the locations configured in CHAINPOINT_BASE_URI
-        let BASE_URIS = [env.CHAINPOINT_BASE_URI]
-        let uris = []
-        for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/data`)
-        stateObj.btchead_state.anchor = {
-          anchor_id: btcheadHeight.toString(),
-          uris: uris
-        }
-
-        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' },
-          (err, ok) => {
-            if (err !== null) {
-              // An error as occurred publishing a message
-              console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
-              return wfCallback(err)
-            } else {
-              // New message has been published
-              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
-              return wfCallback(null)
-            }
-          })
+      let block
+      try {
+        block = await createBtcConfirmBlockAsync(btcheadHeight, btcheadRoot)
+      } catch (error) {
+        throw new Error(`Unable to create btc confirm block: ${error.message}`)
       }
-    ], (err) => {
-      if (err) {
-        // nack consumption of all original message
-        console.error(err)
+
+      // queue up message containing updated proof state bound for proof state service
+      let stateObj = {}
+      stateObj.btctx_id = btctxId
+      stateObj.btchead_height = btcheadHeight
+      stateObj.btchead_state = {}
+      stateObj.btchead_state.ops = formatAsChainpointV3Ops(proofPath, 'sha-256-x2')
+
+      // Build the anchors uris using the locations configured in CHAINPOINT_CORE_BASE_URI
+      let BASE_URIS = [env.CHAINPOINT_CORE_BASE_URI]
+      let uris = []
+      for (let x = 0; x < BASE_URIS.length; x++) uris.push(`${BASE_URIS[x]}/calendar/${block.id}/data`)
+      stateObj.btchead_state.anchor = {
+        anchor_id: btcheadHeight.toString(),
+        uris: uris
+      }
+
+      try {
+        await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' })
+        // New message has been published
+        console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+      } catch (error) {
+        // An error as occurred publishing a message
+        console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
         amqpChannel.nack(msg)
         console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message nacked')
-      } else {
-        // ack consumption of all original hash messages part of this aggregation event
-        amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message acked')
+        throw new Error(`Unable to publish state message: ${error.message}`)
       }
-      return eachCallback(null)
-    })
-  },
-    (err) => {
-      btcConfirmLock.release()
-      if (err) {
-        console.error('monitoring message processing error - ' + err)
-      }
-    })
+
+      // ack consumption of all original hash messages part of this aggregation event
+      amqpChannel.ack(msg)
+      console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message acked')
+    }
+  } catch (error) {
+    console.error(error.message)
+  } finally {
+    // always release lock
+    btcConfirmLock.release()
+  }
 })
 
 // LOCK HANDLERS : eth-anchor
-registerLockEvents(ethAnchorLock, 'ethAnchorLock', () => {
-  // checks if the eth last anchor block is at least ANCHOR_ETH_INTERVAL_MS old
-  // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
-  let lastEthAnchorBlockId = null
-  CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash'], order: 'id DESC' }).nodeify((err, lastEthAnchorBlock) => {
-    if (err) {
-      ethAnchorLock.release()
-      console.log(`Unable to query calendar blocks`)
-    } else {
-      if (lastEthAnchorBlock) {
-      // check if the last eth anchor block is at least ANCHOR_ETH_INTERVAL_MS old
-      // if not, release lock and return
-        let lastEthAnchorMS = lastEthAnchorBlock.time
-        let currentMS = Date.now()
-        let ageMS = currentMS - lastEthAnchorMS
-        if (ageMS < env.ANCHOR_ETH_INTERVAL_MS) {
-          console.log('aggregateAndAnchorBTC skipped, ANCHOR_ETH_INTERVAL_MS not elapsed since last eth anchor block')
-          ethAnchorLock.release()
-          return
-        }
-        lastEthAnchorBlockId = parseInt(lastEthAnchorBlock.id, 10)
-      }
-      aggregateAndAnchorETH(lastEthAnchorBlockId, (err) => {
-        if (err) {
-          console.error('aggregateAndAnchorETH error - ' + err)
-        } else {
-          // console.log('aggregateAndAnchorETH succeeded')
-        }
-        ethAnchorLock.release()
-      })
+registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
+  try {
+    let ethAnchorIntervalMinutes = 60 / (env.ANCHOR_ETH_PER_HOUR || 2) // default to 2, avoid possible divide by 0
+    // checks if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
+    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+    let lastEthAnchorBlock
+    try {
+      lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+    } catch (error) {
+      throw new Error(`Unable to retreive most recent eth anchor block: ${error.message}`)
     }
-  })
+    if (lastEthAnchorBlock) {
+      // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
+      // if not, release lock and return
+      let lastEthAnchorMS = lastEthAnchorBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastEthAnchorMS
+      let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      if (lastAnchorTooRecent) {
+        console.log('aggregateAndAnchorETHAsync skipped, ethAnchorIntervalMinutes not elapsed since last eth anchor block')
+      } else {
+        try {
+          let lastBtcAnchorBlockId = lastEthAnchorBlock ? parseInt(lastEthAnchorBlock.id, 10) : null
+          await aggregateAndAnchorETHAsync(lastBtcAnchorBlockId)
+        } catch (error) {
+          throw new Error(`Unable to aggregate and create eth anchor block: ${error.message}`)
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error.message)
+  } finally {
+    // always release lock
+    ethAnchorLock.release()
+  }
 })
 
 // LOCK HANDLERS : eth-confirm
 registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
-  ethConfirmLock.release()
+  try {
+
+  } catch (error) {
+
+  } finally {
+    // always release lock
+    ethConfirmLock.release()
+  }
 })
 
-// Set the BTC anchor interval defined by ANCHOR_BTC_INTERVAL_MS
+// LOCK HANDLERS : reward
+registerLockEvents(rewardLock, 'rewardLock', async () => {
+  try {
+    let rewardMessagesToProcess = REWARD_MESSAGES.splice(0)
+    // if there are no messages left to process, release lock and return
+    if (rewardMessagesToProcess.length === 0) return
+
+    for (let index = 0; index < rewardMessagesToProcess.length; index++) {
+      let msg = rewardMessagesToProcess[index]
+      let rewardMsgObj = JSON.parse(msg.content.toString())
+
+      let dataId = rewardMsgObj.node.eth_tx_id
+      let dataVal = [rewardMsgObj.node.address, rewardMsgObj.node.amount].join(':')
+      if (rewardMsgObj.core) {
+        dataId = [dataId, rewardMsgObj.core.eth_tx_id].join(':')
+        dataVal = [dataVal, rewardMsgObj.core.address, rewardMsgObj.core.amount].join(':')
+      }
+
+      try {
+        await createRewardBlockAsync(dataId, dataVal)
+        // ack consumption of all original hash messages part of this aggregation event
+        amqpChannel.ack(msg)
+        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
+      } catch (error) {
+        // nack consumption of all original message
+        console.error(error)
+        amqpChannel.nack(msg)
+        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
+        throw new Error(`Unable to create reward block: ${error.message}`)
+      }
+    }
+  } catch (error) {
+    console.error(error.message)
+  } finally {
+    // always release lock
+    rewardLock.release()
+  }
+})
+
+// Set the BTC anchor interval
 // and return a reference to that configured interval, enabling BTC anchoring
 let setBtcInterval = () => {
-  return setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      btcAnchorLock.acquire()
-    } catch (err) {
-      console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on ANCHOR_BTC_PER_HOUR
+  let btcAnchorMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    btcAnchorMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.ANCHOR_BTC_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (btcAnchorMinutes.includes(currentMinute)) {
+        // if the amqp channel is null (closed), processing should not continue, defer to next interval
+        if (amqpChannel === null) return
+        let randomFuzzyMS = await rand(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            btcAnchorLock.acquire()
+          } catch (err) {
+            console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+          }
+        }, randomFuzzyMS)
+      }
     }
-  }, env.ANCHOR_BTC_INTERVAL_MS)
+  })
 }
 
-// Set the ETH anchor interval defined by ANCHOR_ETH_INTERVAL_MS
+// Set the ETH anchor interval
 // and return a reference to that configured interval, enabling ETH anchoring
 let setEthInterval = () => {
-  return setInterval(() => {
-    try {
-      // if the amqp channel is null (closed), processing should not continue, defer to next interval
-      if (amqpChannel === null) return
-      ethAnchorLock.acquire()
-    } catch (err) {
-      console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on ANCHOR_ETH_PER_HOUR
+  let ethAnchorMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    ethAnchorMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.ANCHOR_ETH_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (ethAnchorMinutes.includes(currentMinute)) {
+        // if the amqp channel is null (closed), processing should not continue, defer to next interval
+        if (amqpChannel === null) return
+        let randomFuzzyMS = await rand(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            ethAnchorLock.acquire()
+          } catch (err) {
+            console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+          }
+        }, randomFuzzyMS)
+      }
     }
-  }, env.ANCHOR_ETH_INTERVAL_MS)
+  })
 }
 
-// Deletes the BTC anchoring interval, disabling BTC anchoring
-let deleteBtcInterval = () => {
-  clearInterval(anchorBtcInterval)
+/**
+ * Opens a storage connection
+ **/
+async function openStorageConnectionAsync () {
+  let dbConnected = false
+  while (!dbConnected) {
+    try {
+      await sequelize.sync({ logging: false })
+      console.log('Sequelize connection established')
+      dbConnected = true
+    } catch (error) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
+      await utils.sleep(5000)
+    }
+  }
+  // trigger creation of the genesis block
+  genesisLock.acquire()
 }
 
-// Deletes the ETH anchoring interval, disabling ETH anchoring
-let deleteEthInterval = () => {
-  clearInterval(anchorEthInterval)
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
+      // connect to rabbitmq server
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_IN_CAL_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
+      chan.assertQueue(env.RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
+      chan.prefetch(env.RMQ_PREFETCH_COUNT)
+      // set 'amqpChannel' so that publishers have access to the channel
+      amqpChannel = chan
+      chan.consume(env.RMQ_WORK_IN_CAL_QUEUE, (msg) => {
+        processMessage(msg)
+      })
+      // if the channel closes for any reason, attempt to reconnect
+      conn.on('close', async () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        // un-acked messaged will be requeued, so clear all work in progress
+        AGGREGATION_ROOTS = []
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
+      })
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
+      await utils.sleep(5000)
+    }
+  }
 }
 
 // This initalizes all the consul watches and JS intervals that fire all calendar events
-function startListening () {
+function startWatchesAndIntervals () {
   // console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
 
-  // Store the updated fee object on change
+  // Store the updated nist object on change
   nistWatch.on('change', function (data, res) {
     // process only if a value has been returned and it is different than what is already stored
     if (data && data.Value && nistLatest !== data.Value) {
@@ -909,7 +1076,7 @@ function startListening () {
 
   // Add all block hashes back to the previous BTC anchor to a Merkle tree and send to BTC TX
   if (env.ANCHOR_BTC === 'enabled') { // Do this only if BTC anchoring is enabled
-    anchorBtcInterval = setBtcInterval()
+    setBtcInterval()
     console.log('BTC anchoring enabled')
   } else {
     console.log('BTC anchoring disabled')
@@ -917,97 +1084,29 @@ function startListening () {
 
   // Add all block hashes back to the previous ETH anchor to a Merkle tree and send to ETH TX
   if (env.ANCHOR_ETH === 'enabled') { // Do this only if ETH anchoring is enabled
-    anchorEthInterval = setEthInterval()
+    setEthInterval()
     console.log('ETH anchoring enabled')
   } else {
     console.log('ETH anchoring disabled')
   }
 }
 
-/**
- * Opens an AMPQ connection and channel
- * Retry logic is included to handle losses of connection
- *
- * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
- */
-function amqpOpenConnection (connectionString) {
-  async.waterfall([
-    (callback) => {
-      // connect to rabbitmq server
-      amqp.connect(connectionString, (err, conn) => {
-        if (err) return callback(err)
-        return callback(null, conn)
-      })
-    },
-    (conn, callback) => {
-      // if the channel closes for any reason, attempt to reconnect
-      conn.on('close', () => {
-        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
-        amqpChannel = null
-        // un-acked messaged will be requeued, so clear all work in progress
-        AGGREGATION_ROOTS = []
-        setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-      })
-      // create communication channel
-      conn.createConfirmChannel((err, chan) => {
-        if (err) return callback(err)
-        // the connection and channel have been established
-        // set 'amqpChannel' so that publishers have access to the channel
-        console.log('RabbitMQ connection established')
-        chan.assertQueue(env.RMQ_WORK_IN_CAL_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_BTCTX_QUEUE, { durable: true })
-        chan.assertQueue(env.RMQ_WORK_OUT_BTCMON_QUEUE, { durable: true })
-        chan.prefetch(env.RMQ_PREFETCH_COUNT)
-        amqpChannel = chan
-
-        chan.consume(env.RMQ_WORK_IN_CAL_QUEUE, (msg) => {
-          processMessage(msg)
-        })
-        return callback(null)
-      })
-    }
-  ], (err) => {
-    if (err) {
-      // catch errors when attempting to establish connection
-      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
-      setTimeout(amqpOpenConnection.bind(null, connectionString), 5 * 1000)
-    }
-  })
+// process all steps need to start the application
+async function start () {
+  if (env.NODE_ENV === 'test') return
+  try {
+    // init DB
+    await openStorageConnectionAsync()
+    // init RabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
+    // Init intervals and watches
+    startWatchesAndIntervals()
+    console.log('startup completed successfully')
+  } catch (err) {
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
+  }
 }
 
-/**
- * Opens a storage connection
- **/
-function openStorageConnection (callback) {
-  // Sync models to DB tables and trigger check
-  // if a new genesis block is needed.
-  sequelize.sync({ logging: false }).nodeify((err) => {
-    if (err) {
-      console.error('sequelize.sync() error: ' + err.stack)
-      setTimeout(openStorageConnection.bind(null, callback), 5 * 1000)
-    } else {
-      console.log('CalendarBlock sequelize database synchronized')
-    // trigger creation of the genesis block
-      genesisLock.acquire()
-      return callback(null, true)
-    }
-  })
-}
-
-function initConnectionsAndStart () {
-  // Open storage connection and then amqp connection
-  openStorageConnection((err, result) => {
-    if (err) {
-      console.error(err)
-    } else {
-      amqpOpenConnection(env.RABBITMQ_CONNECT_URI)
-      // Init intervals and watches
-      startListening()
-    }
-  })
-}
-
-// start the whole show here
-// first open the required connections, then allow locks for db writing
-initConnectionsAndStart()
+// get the whole show started
+start()

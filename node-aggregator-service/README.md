@@ -8,7 +8,7 @@ The following are the descriptions of the configuration parameters:
 | Name           | Description  |
 | :------------- |:-------------|
 | RMQ\_PREFETCH\_COUNT | the maximum number of messages sent over the channel that can be awaiting acknowledgement |
-| RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the splitter service |
+| RMQ\_WORK\_IN\_QUEUE     | the queue name for message consumption originating from the api service |
 | RMQ\_WORK\_OUT\_CAL\_QUEUE       | the queue name for outgoing message to the calendar service |
 | RMQ\_WORK\_OUT\_STATE\_QUEUE       | the queue name for outgoing message to the proof state service |
 | AGGREGATION_INTERVAL       | how often the aggregation process should run, in milliseconds | 

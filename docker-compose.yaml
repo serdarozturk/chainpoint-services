@@ -4,6 +4,10 @@ networks:
   chainpoint:
     driver: bridge
 
+# Allows deployed contracts to be shared between eth related services
+volumes:
+  eth-contracts-volume:
+
 services:
 
   # NGINX Proxy
@@ -22,7 +26,7 @@ services:
   nginx-proxy:
     restart: always
     image: jwilder/nginx-proxy
-    container_name: nginx-proxy
+    container_name: nginx-proxy-core
     ports:
       - "80:80"
     volumes:
@@ -58,37 +62,35 @@ services:
       context: ./node-api-service
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - redis
       - rabbitmq
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       VIRTUAL_HOST: api.local
 
-  # Splitter
-  #
-  # SCALED: true
-  # 
-  # PORTS : none
-  #
-  splitter:
-    restart: always
-    image: quay.io/chainpoint/node-splitter-service:${DOCKER_TAG}
+  api-test:
+    image: quay.io/chainpoint/node-api-service-test:${DOCKER_TAG}
+    container_name: node-api-service-test
     build:
-      context: ./node-splitter-service
+      context: ./node-api-service
+      dockerfile: Dockerfile.test
     depends_on:
+      - roach1
+      - redis
       - rabbitmq
     networks:
       - chainpoint
     environment:
-      NODE_ENV: development
+      NODE_ENV: test
+      CHAINPOINT_CORE_BASE_URI: http://test.chainpoint.org
+      ANCHOR_BTC: ${ANCHOR_BTC}
+      ANCHOR_ETH: ${ANCHOR_ETH}
+      VIRTUAL_HOST: api.local
 
   # Aggregator
   #
@@ -109,9 +111,23 @@ services:
     environment:
       NODE_ENV: development
 
+  aggregator-test:
+    image: quay.io/chainpoint/node-aggregator-service-test:${DOCKER_TAG}
+    container_name: node-aggregator-service-test
+    build:
+      context: ./node-aggregator-service
+      dockerfile: Dockerfile.test
+    depends_on:
+      - rabbitmq
+      - nist-beacon
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: test
+
   # NIST Beacon
   # Retrieve and store current NIST Beacon records
-  # 
+  #
   # SCALED: false
   #
   # PORTS : none
@@ -121,7 +137,7 @@ services:
     image: quay.io/chainpoint/node-nist-beacon-service:${DOCKER_TAG}
     build:
       context: ./node-nist-beacon-service
-    container_name: nist-beacon
+    container_name: nist-beacon-core
     depends_on:
       - redis
     networks:
@@ -142,68 +158,39 @@ services:
     image: quay.io/chainpoint/node-calendar-service:${DOCKER_TAG}
     build:
       context: ./node-calendar-service
-    container_name: calendar
+    container_name: calendar-core
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - rabbitmq
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      CHAINPOINT_BASE_URI: ${CHAINPOINT_BASE_URI}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
       SIGNING_SECRET_KEY: ${SIGNING_SECRET_KEY}
 
-  # Bitcoin Fees
-  # Retrieve and store recommended transaction fees for Bitcoin
-  # 
-  # SCALED: false
-  #
-  # PORTS : none
-  #
-  btc-fee:
-    restart: always
-    image: quay.io/chainpoint/node-btc-fee-service:${DOCKER_TAG}
-    build:
-      context: ./node-btc-fee-service
-    container_name: btc-fee
-    depends_on:
-      - consul
-      - rabbitmq
-    networks:
-      - chainpoint
-    environment:
-      NODE_ENV: development
-
   # Bitcoin Transmit
   # Send Calendar Block Merkle roots to be embedded in a BTC transaction.
-  # 
+  #
   btc-tx:
     restart: always
     image: quay.io/chainpoint/node-btc-tx-service:${DOCKER_TAG}
     build:
       context: ./node-btc-tx-service
-    container_name: btc-tx
+    container_name: btc-tx-core
     depends_on:
       - roach1
-      - roach2
-      - roach3
       - consul
       - rabbitmq
-      - btc-fee
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
-      CHAINPOINT_STACK_ID: ${CHAINPOINT_STACK_ID}
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
+      INSIGHT_API_BASE_URI: ${INSIGHT_API_BASE_URI}
+      BITCOIN_WIF: ${BITCOIN_WIF}
 
   # Bitcoin Transmit Monitor
   # Monitor and report on the state of BTC transactions this app has submitted.
@@ -213,21 +200,18 @@ services:
     image: quay.io/chainpoint/node-btc-mon-service:${DOCKER_TAG}
     build:
       context: ./node-btc-mon-service
-    container_name: btc-mon
+    container_name: btc-mon-core
     depends_on:
       - rabbitmq
     networks:
       - chainpoint
     environment:
       NODE_ENV: development
-      BCOIN_API_BASE_URI: ${BCOIN_API_BASE_URI}
-      BCOIN_API_WALLET_ID: ${BCOIN_API_WALLET_ID}
-      BCOIN_API_USERNAME: ${BCOIN_API_USERNAME}
-      BCOIN_API_PASS: ${BCOIN_API_PASS}
+      INSIGHT_API_BASE_URI: ${INSIGHT_API_BASE_URI}
 
   # Proof State
   # Encapsulates all persistent data storage for partial proof data.
-  # 
+  #
   proof-state:
     restart: always
     image: quay.io/chainpoint/node-proof-state-service:${DOCKER_TAG}
@@ -246,7 +230,7 @@ services:
   # Proof Generation
   # Responsible for constructing, signing, and validating Chainpoint proofs
   # for Calendar, Bitcoin, and Ethereum attestation levels.
-  # 
+  #
   proof-gen:
     restart: always
     image: quay.io/chainpoint/node-proof-gen-service:${DOCKER_TAG}
@@ -254,6 +238,22 @@ services:
       context: ./node-proof-gen-service
     depends_on:
       - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+
+  # Node Auditing
+  # Responsible for auditing the availability, time, and calendar state
+  # of public Tierion Network Nodes
+  #
+  audit:
+    restart: always
+    image: quay.io/chainpoint/node-audit-service:${DOCKER_TAG}
+    build:
+      context: ./node-audit-service
+    depends_on:
+      - roach1
     networks:
       - chainpoint
     environment:
@@ -273,7 +273,7 @@ services:
   postgres:
     restart: always
     image: postgres:9.6.2-alpine
-    container_name: postgres
+    container_name: postgres-core
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
     environment:
@@ -296,7 +296,7 @@ services:
   rabbitmq:
     restart: always
     image: rabbitmq:3.6.9-management-alpine
-    container_name: rabbitmq
+    container_name: rabbitmq-core
     hostname: rabbitmq
     ports:
     - 5673:5672
@@ -314,8 +314,8 @@ services:
   #
   redis:
     restart: always
-    image: redis:3.2.9-alpine
-    container_name: redis
+    image: redis:4.0.1-alpine
+    container_name: redis-core
     ports:
       - "6380:6379"
     volumes:
@@ -334,7 +334,7 @@ services:
   consul:
     restart: always
     image: consul:0.8.5
-    container_name: consul
+    container_name: consul-core
     ports:
       - "8300:8300"
       - "8400:8400"
@@ -350,8 +350,8 @@ services:
   #
   roach1:
     restart: always
-    image: cockroachdb/cockroach:v1.0.3
-    container_name: roach1
+    image: cockroachdb/cockroach:v1.0.5
+    container_name: roach1-core
     ports:
       - "26257:26257"
       - "8080:8080"
@@ -363,62 +363,117 @@ services:
     networks:
       - chainpoint
 
-  roach2:
-    restart: always
-    image: cockroachdb/cockroach:v1.0.3
-    container_name: roach2
-    depends_on:
-      - roach1
+# Testing Ethereum blockchain service
+#
+  testrpc:
+    image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+    build:
+      context: ./testrpc
+    container_name: testrpc-core
+    restart: unless-stopped
     ports:
-      - 26257
-    volumes:
-      - ./data/roach2:/cockroach/cockroach-data
-    command:
-      - start
-      - --insecure
-      - --join
-      - roach1
+      - "8545:8545" # RPC
     networks:
       - chainpoint
+    logging:
+      driver: none
 
-  roach3:
-    restart: always
-    image: cockroachdb/cockroach:v1.0.3
-    container_name: roach3
+  # Ethereum Contracts
+  # Builds and deploys the contracts to the testrpc node
+  #
+  eth-contracts:
+    image: quay.io/chainpoint/node-eth-contracts:${DOCKER_TAG}
+    build:
+      context: ./node-eth-contracts
+    container_name: eth-contracts-core
     depends_on:
-      - roach1
-      - roach2
-    ports:
-      - 26257
-    volumes:
-      - ./data/roach3:/cockroach/cockroach-data
-    command:
-      - start
-      - --insecure
-      - --join
-      - roach1
+      - testrpc
     networks:
       - chainpoint
+    environment:
+      NODE_ENV: development
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
+    command: npm run migrate -- --network testrpc
+    volumes:
+      - eth-contracts-volume:/home/node/app/build/contracts
 
-  # bcoin:
-  #   image: quay.io/chainpoint/bcoin:${DOCKER_TAG}
-  #   build:
-  #     context: ./bcoin
-  #   container_name: bcoin
-  #   restart: unless-stopped
-  #   ports:
-  #     #-- Mainnet
-  #     # - "8333:8333"
-  #     # - "8332:8332" # RPC
-  #     #-- Testnet
-  #     - "18333:18333"
-  #     - "18332:18332" # RPC
-  #   environment:
-  #     BCOIN_CONFIG: /root/.bcoin/bcoin.conf
-  #     # VIRTUAL_HOST: bcoin.chainpoint.org
-  #     # VIRTUAL_PORT: 8332 # Mainnet
-  #     VIRTUAL_PORT: 18332 # Testnest
-  #   volumes:
-  #     - ./data/bcoin:/root/.bcoin
-  #   networks:
-  #     - chainpoint
+  # Ethereum TNT Transaction Service
+  # Accepts requests from other services related to the TNT token.
+  #
+  eth-tnt-tx-service:
+    restart: always
+    image: quay.io/chainpoint/node-eth-tnt-tx-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-tx-service
+    container_name: eth-tnt-tx-core
+    depends_on:
+      - testrpc
+      - eth-contracts
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      LISTEN_TX_PORT: 8085
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
+      # ETH_WALLET_PATH: ./wallet.json
+      # ETH_WALLET_PASSWORD: test-password
+    ports:
+      - "8085:8085" # REST API
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
+
+
+  # Ethereum TNT Listener
+  # Listens for incoming TNT transfers from the nodes
+  #
+  eth-tnt-listener-service:
+    image: quay.io/chainpoint/node-eth-tnt-listener-service:${DOCKER_TAG}
+    build:
+      context: ./node-eth-tnt-listener-service
+    container_name: eth-tnt-listener-core
+    depends_on:
+      - testrpc
+      - roach1
+      - eth-contracts
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}      
+      ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
+    command: npm run start
+    volumes:
+      - eth-contracts-volume:/home/node/app/contracts
+
+  testrpc:
+    image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
+    build:
+      context: ./testrpc
+    container_name: testrpc-core
+    restart: unless-stopped
+    ports:
+      - "8545:8545" # RPC
+    networks:
+      - chainpoint
+      
+  # TNT Reward
+  # Responsible for rewarding TNT to random Nodes passing
+  # requisite audit checks at regular intervals
+  #
+  tnt-reward:
+    restart: always
+    image: quay.io/chainpoint/node-tnt-reward-service:${DOCKER_TAG}
+    build:
+      context: ./node-tnt-reward-service
+    container_name: tnt-reward-core
+    depends_on:
+      - eth-tnt-tx-service
+      - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+      CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
+      CORE_REWARD_ETH_ADDR: ${CORE_REWARD_ETH_ADDR}
+      CORE_REWARD_ELIGIBLE: ${CORE_REWARD_ELIGIBLE}

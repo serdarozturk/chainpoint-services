@@ -24,27 +24,27 @@ done
 
 if [ "$DELETE" == 'true' ]
 then
-docker-compose stop roach3
-docker-compose stop roach2
 docker-compose stop roach1
 rm -rf $SCRIPT_FULL_PATH/../data/roach*
 fi
 
-echo "starting cockroachdb cluster..."
-docker-compose up -d --build roach3
+echo "starting cockroachdb..."
+docker-compose up -d --build roach1
 
-# See : https://stackoverflow.com/questions/21183088/how-can-i-wait-for-a-docker-container-to-be-up-and-running
-attempt=0
-while [ $attempt -le 59 ]; do
-    attempt=$(( $attempt + 1 ))
-    echo "Waiting for server to be up (attempt: $attempt)..."
-    result=$(docker logs roach1)
-    if grep -q 'CockroachDB node starting' <<< $result ; then
-      echo "CockroachDB cluster is up!"
-      break
-    fi
-    sleep 2
-done
+# # See : https://stackoverflow.com/questions/21183088/how-can-i-wait-for-a-docker-container-to-be-up-and-running
+# attempt=0
+# while [ $attempt -le 59 ]; do
+#     attempt=$(( $attempt + 1 ))
+#     echo "Waiting for server to be up (attempt: $attempt)..."
+#     result=$(docker logs roach1)
+#     if grep -q 'CockroachDB node starting' <<< $result ; then
+#       echo "CockroachDB cluster is up!"
+#       break
+#     fi
+#     sleep 2
+# done
+
+sleep 10
 
 echo "adding user..."
 $SCRIPT_FULL_PATH/cockroach user set chainpoint --insecure

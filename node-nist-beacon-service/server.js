@@ -2,18 +2,18 @@
 const env = require('./lib/parse-env.js')('nist')
 
 const BEACON = require('nist-randomness-beacon')
+const cnsl = require('consul')
 
-const consul = require('consul')({host: env.CONSUL_HOST, port: env.CONSUL_PORT})
+let consul = null
 
 let getNistLatest = () => {
   BEACON.last((err, res) => {
     if (err) {
       console.error(err)
     } else {
-      // console.log(res)
-
-      if (res && res.timeStamp && res.seedValue) {
-        let timeAndSeed = res.timeStamp.toString() + ':' + res.seedValue
+      // Only collect beacon with valid signature!
+      if (res && res.timeStamp && res.seedValue && res.validSignature) {
+        let timeAndSeed = `${res.timeStamp.toString()}:${res.seedValue}`.toLowerCase()
 
         // The latest NIST value will always be stored under
         // a known key which can always be used if present.
@@ -38,14 +38,31 @@ let getNistLatest = () => {
   })
 }
 
-// run at service start
-getNistLatest()
+function startIntervals () {
+  setInterval(() => {
+    try {
+      getNistLatest()
+    } catch (err) {
+      console.error('getNistLatest : caught err : ', err.message)
+    }
+  }, env.NIST_INTERVAL_MS)
+}
 
-// run at interval
-setInterval(() => {
+async function start () {
+  if (env.NODE_ENV === 'test') return
   try {
+    // init consul
+    consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+    console.log('Consul connection established')
+    // get initial value for service start
     getNistLatest()
+    // init interval functions
+    startIntervals()
+    console.log('startup completed successfully')
   } catch (err) {
-    console.error('getNistLatest : caught err : ', err.message)
+    console.error(`An error has occurred on startup: ${err}`)
+    process.exit(1)
   }
-}, env.NIST_INTERVAL_MS)
+}
+
+start()
