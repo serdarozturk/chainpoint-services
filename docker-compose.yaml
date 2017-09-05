@@ -4,10 +4,6 @@ networks:
   chainpoint:
     driver: bridge
 
-# Allows deployed contracts to be shared between eth related services
-volumes:
-  eth-contracts-volume:
-
 services:
 
   # NGINX Proxy
@@ -380,6 +376,10 @@ services:
 
   # Ethereum Contracts
   # Builds and deploys the contracts to the testrpc node
+  # The built contracts are stored in a mounted local dir
+  # which is also mounted RO in the other Ethereum services.
+  # This allows them to be able to discover the address of the
+  # migrated TNT contract in testrpc.
   #
   eth-contracts:
     image: quay.io/chainpoint/node-eth-contracts:${DOCKER_TAG}
@@ -393,9 +393,9 @@ services:
     environment:
       NODE_ENV: development
       ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
-    command: npm run migrate -- --network testrpc
     volumes:
-      - eth-contracts-volume:/home/node/app/build/contracts
+      - ./data/contracts:/home/node/app/build/contracts
+    command: yarn migrate -- --network testrpc
 
   # Ethereum TNT Transaction Service
   # Accepts requests from other services related to the TNT token.
@@ -415,14 +415,14 @@ services:
       NODE_ENV: development
       LISTEN_TX_PORT: 8085
       ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
-      # ETH_WALLET_PATH: ./wallet.json
-      # ETH_WALLET_PASSWORD: test-password
+      # Standard Ethereum Keystore encrypted private key file
+      # ETH_WALLET: '{"version":3,"id":"899fdc72-7afe-4d04-83c7-89d46b201c7f","address":"5467972599d1c388b875dd9a54b9ea80b2a5b108","crypto":{"ciphertext":"1e05c56af4766441493e71788cbd63baccc9ba90ee069bc80e5cdde2c45857bc","cipherparams":{"iv":"f25baeb791bec69a19b1eb35d84e4a82"},"cipher":"aes-128-ctr","kdf":"scrypt","kdfparams":{"dklen":32,"salt":"af22507b690ff0e1212a4e5df87005216d2ca6da1c71f5cf7840dc081d2ea73d","n":262144,"r":8,"p":1},"mac":"d2d868d31654fb17938d74a14648b7798d7651058fce7e4f3c92bee19a2412c4"}}'
+      # ETH_WALLET_PASSWORD: 'test-password'
     ports:
       - "8085:8085" # REST API
-    command: npm run start
+    command: yarn start
     volumes:
-      - eth-contracts-volume:/home/node/app/contracts
-
+      - ./data/contracts:/home/node/app/contracts:ro
 
   # Ethereum TNT Listener
   # Listens for incoming TNT transfers from the nodes
@@ -442,9 +442,9 @@ services:
       NODE_ENV: development
       ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}      
       ETH_TNT_TOKEN_ADDR: ${ETH_TNT_TOKEN_ADDR}
-    command: npm run start
+    command: yarn start
     volumes:
-      - eth-contracts-volume:/home/node/app/contracts
+      - ./data/contracts:/home/node/app/contracts:ro
 
   testrpc:
     image: quay.io/chainpoint/testrpc:${DOCKER_TAG}
