@@ -3,7 +3,6 @@ const env = require('./lib/parse-env.js')('eth-tnt-tx')
 
 const { promisify } = require('util')
 const restify = require('restify')
-const corsMiddleware = require('restify-cors-middleware')
 const loadProvider = require('./lib/eth-tnt/providerLoader.js')
 const loadToken = require('./lib/eth-tnt/tokenLoader.js')
 const TokenOps = require('./lib/eth-tnt/tokenOps.js')
@@ -29,27 +28,6 @@ server.pre(restify.pre.sanitizePath())
 // Connection header to "close" and removes the "Content-Length" header
 // See : http://restify.com/#server-api
 server.pre(restify.pre.userAgentConnection())
-
-// CORS
-// See : https://github.com/TabDigital/restify-cors-middleware
-// See : https://github.com/restify/node-restify/issues/1151#issuecomment-271402858
-//
-// Test w/
-//
-// curl \
-// --verbose \
-// --request OPTIONS \
-// http://127.0.0.1:8080/hashes \
-// --header 'Origin: http://localhost:9292' \
-// --header 'Access-Control-Request-Headers: Origin, Accept, Content-Type' \
-// --header 'Access-Control-Request-Method: POST'
-//
-var cors = corsMiddleware({
-  preflightMaxAge: 600,
-  origins: ['*']
-})
-server.pre(cors.preflight)
-server.use(cors.actual)
 
 server.use(restify.gzipResponse())
 server.use(restify.queryParser())
