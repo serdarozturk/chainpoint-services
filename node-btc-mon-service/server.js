@@ -17,9 +17,9 @@ const merkleTools = new MerkleTools()
 // This value is set once the connection has been established
 var amqpChannel = null
 
-// initialize blockchainanchor object
+// Initialize BlockchainAnchor object
 let anchor = new BlockchainAnchor({
-  btcUseTestnet: true, // todo: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
+  btcUseTestnet: !env.isProduction,
   service: 'insightapi',
   insightApiBase: env.INSIGHT_API_BASE_URI,
   insightFallback: true

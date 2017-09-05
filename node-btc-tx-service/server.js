@@ -14,9 +14,9 @@ let amqpChannel = null
 let sequelize = btcTxLog.sequelize
 let BtcTxLog = btcTxLog.BtcTxLog
 
-// initialize blockchainanchor object
+// Initialize BlockchainAnchor object
 let anchor = new BlockchainAnchor({
-  btcUseTestnet: true, // TODO: revert back to false when INSIGHT_API_BASE_URI point to mainnet node
+  btcUseTestnet: !env.isProduction,
   service: 'insightapi',
   insightApiBase: env.INSIGHT_API_BASE_URI,
   insightFallback: true
