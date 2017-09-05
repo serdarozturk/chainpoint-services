@@ -27,7 +27,7 @@ module.exports = (nodeUri) => {
 
     console.log('Using wallet with provider : ' + nodeUri)
 
-    let wallet = Wallet.fromV3(env.ETH_WALLET, env.ETH_WALLET_PASSWORD)
+    let wallet = Wallet.fromV3(JSON.parse(env.ETH_WALLET), env.ETH_WALLET_PASSWORD)
 
     var engine = new ProviderEngine()
     engine.addProvider(new WalletSubprovider(wallet, {}))
