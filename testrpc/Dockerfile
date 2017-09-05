@@ -1,10 +1,6 @@
 FROM quay.io/chainpoint/node-base
 
-# Create the db dir
-RUN mkdir -p /root/testrpc/db
-
-# Install testprc
-RUN npm install -g ethereumjs-testrpc
+RUN yarn global add ethereumjs-testrpc
 
 EXPOSE 8545
 
