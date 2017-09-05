@@ -59,7 +59,7 @@ server.use(restify.bodyParser({
 
 // API RESOURCES
 
-// validate hashes are individually well formed
+// validate addresses are individually well formed
 let isEthereumAddr = (address) => {
   return /^0x[0-9a-fA-F]{40}$/i.test(address)
 }
