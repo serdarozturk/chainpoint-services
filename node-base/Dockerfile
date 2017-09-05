@@ -33,6 +33,9 @@ RUN apk add bash nano vim htop curl wget jq --no-cache
 # See : https://github.com/grpc/grpc/issues/8528
 RUN apk add libc6-compat --no-cache
 
+# Needed for ETH libs
+RUN apk add git make gcc g++ python --no-cache
+
 # The `node` user and its home dir is provided by
 # the base image. Create a subdir where the app code
 # will live.

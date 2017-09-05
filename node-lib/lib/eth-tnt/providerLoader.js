@@ -1,10 +1,10 @@
 const env = require('../parse-env.js')('eth-tnt-provider')
-let Wallet = require('ethereumjs-wallet')
-let Web3 = require('web3')
-let ProviderEngine = require('web3-provider-engine')
-let WalletSubprovider = require('web3-provider-engine/subproviders/wallet.js')
-let Web3Subprovider = require('web3-provider-engine/subproviders/web3.js')
-let fs = require('fs')
+const Wallet = require('ethereumjs-wallet')
+const Web3 = require('web3')
+const ProviderEngine = require('web3-provider-engine')
+const WalletSubprovider = require('web3-provider-engine/subproviders/wallet.js')
+const Web3Subprovider = require('web3-provider-engine/subproviders/web3.js')
+const _ = require('lodash')
 
 module.exports = (nodeUri) => {
   // Load the env var to figure out which node to connect to
@@ -14,23 +14,20 @@ module.exports = (nodeUri) => {
   }
 
   // Check to see if a wallet is being used
-  if (env.ETH_WALLET_PATH && env.ETH_WALLET_PATH !== '') {
-    // Check to verify the WALLET_PASSWORD env variable is set
-    if (!env.ETH_WALLET_PASSWORD || env.ETH_WALLET_PASSWORD === '') {
-      console.error('ETH_WALLET_PASSWORD environment variable is not set.  See README. Exiting...')
+  if (env.ETH_WALLET && env.ETH_WALLET !== '') {
+    if (_.isEmpty(env.ETH_WALLET_PASSWORD)) {
+      console.error('ETH_WALLET_PASSWORD environment variable is not set. See README. Exiting...')
       process.exit(-1)
     }
 
-    // Check to verify the wallet.json file is present
-    if (!fs.existsSync(env.ETH_WALLET_PATH)) {
-      console.error('Wallet JSON file was not found.  See README. Exiting...')
+    if (_.isEmpty(env.ETH_WALLET)) {
+      console.error('ETH_WALLET is empty. See README. Exiting...')
       process.exit(-1)
     }
 
-    console.log('Using provider ' + nodeUri + ' with wallet ' + env.ETH_WALLET_PATH)
+    console.log('Using wallet with provider : ' + nodeUri)
 
-    // Read the wallet in from the file
-    let wallet = Wallet.fromV3(fs.readFileSync(env.ETH_WALLET_PATH, 'utf8'), env.ETH_WALLET_PASSWORD)
+    let wallet = Wallet.fromV3(env.ETH_WALLET, env.ETH_WALLET_PASSWORD)
 
     var engine = new ProviderEngine()
     engine.addProvider(new WalletSubprovider(wallet, {}))
@@ -39,6 +36,6 @@ module.exports = (nodeUri) => {
     return engine
   }
 
-  console.log('Using provider without wallet: ' + nodeUri)
+  console.log('Using wallet without provider : ' + nodeUri)
   return new Web3.providers.HttpProvider(nodeUri)
 }
