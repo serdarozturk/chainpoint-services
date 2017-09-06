@@ -114,7 +114,6 @@ let aggregate = () => {
     treeData.proofData = proofData
 
     TREES.push(treeData)
-    // console.log('hashesForTree length : %s', hashesForTree.length)
   }
 }
 
@@ -128,7 +127,6 @@ let finalize = () => {
   // process each set of tree data
   let treesToFinalize = TREES.splice(0)
   _.forEach(treesToFinalize, (treeDataObj) => {
-    // console.log('Processing tree', treesToFinalize.indexOf(treeDataObj) + 1, 'of', treesToFinalize.length)
 
     // queue state messages, and when complete, queue message for calendar service to continue processing
     async.series([
@@ -159,7 +157,6 @@ let finalize = () => {
             console.error('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'had errors.')
             return callback(err)
           } else {
-            // console.log('Processing of tree', treesToFinalize.indexOf(treeDataObj) + 1, 'complete')
             // pass all the hash_msg objects to the series() callback
             let messages = treeDataObj.proofData.map((proofDataItem) => {
               return proofDataItem.hash_msg
@@ -274,8 +271,8 @@ async function start () {
     // init interval functions
     startIntervals()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

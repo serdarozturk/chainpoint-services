@@ -59,7 +59,7 @@ async function performRewardAsync () {
       console.log(`${qualifiedNodes.length} qualifying Nodes were found for reward`)
     }
   } catch (error) {
-    console.error(`Audit Log read error : ${error.message}`)
+    console.error(`Audit Log read error: ${error.message}`)
     return
   }
 
@@ -103,7 +103,7 @@ async function performRewardAsync () {
         qualifiedNodeETHAddr = selectedNodeETHAddr
       }
     } catch (error) {
-      console.error(`TNT balance read error : ${error.message}`)
+      console.error(`TNT balance read error: ${error.message}`)
       return
     }
   }
@@ -113,7 +113,7 @@ async function performRewardAsync () {
   try {
     calculatedShares = await calculateCurrentRewardShares()
   } catch (error) {
-    console.error(`Unable to calculate reward shares : ${error.message}`)
+    console.error(`Unable to calculate reward shares: ${error.message}`)
     return
   }
 
@@ -126,7 +126,7 @@ async function performRewardAsync () {
     let lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'stackId'], order: [['id', 'DESC']] })
     if (lastBtcAnchorBlock) selectedCoreStackId = lastBtcAnchorBlock.stackId
   } catch (error) {
-    console.error(`Unable to query recent btc-a block : ${error.message}`)
+    console.error(`Unable to query recent btc-a block: ${error.message}`)
     return
   }
   // Get registered Core data for the Core having selectedCoreStackId
@@ -136,7 +136,7 @@ async function performRewardAsync () {
       coreRewardEthAddr = selectedCore.tntAddr
     }
   } catch (error) {
-    console.error(`Unable to query registered core table : ${error.message}`)
+    console.error(`Unable to query registered core table: ${error.message}`)
     return
   }
   // if the Core is not receiving a reward, distribute Core's share to the Node
@@ -166,7 +166,7 @@ async function performRewardAsync () {
       }
     }
   } catch (error) {
-    console.error(`Unable to query recent reward block : ${error.message}`)
+    console.error(`Unable to query recent reward block: ${error.message}`)
     return
   }
 
@@ -196,7 +196,7 @@ async function performRewardAsync () {
     nodeRewardTxId = rewardResponse.body.trx_id
     console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
   } catch (error) {
-    console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr} : ${error.message}`)
+    console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr}: ${error.message}`)
     return
   }
 
@@ -227,7 +227,7 @@ async function performRewardAsync () {
       coreRewardTxId = rewardResponse.body.trx_id
       console.log(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
     } catch (error) {
-      console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr} : ${error.message}`)
+      console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr}: ${error.message}`)
     }
   }
 
@@ -270,7 +270,7 @@ async function calculateCurrentRewardShares () {
   try {
     rewardBlockCount = await CalendarBlock.count({ where: { type: 'reward' } })
   } catch (error) {
-    throw new Error(`Unable to query reward block count : ${error.message}`)
+    throw new Error(`Unable to query reward block count: ${error.message}`)
   }
   let nodeTNTRewardShare = 0
   let coreTNTRewardShare = 0
@@ -427,7 +427,6 @@ async function openStorageConnectionAsync () {
     } catch (error) {
       // catch errors when attempting to establish connection
       console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
-      console.error(error.message)
       await utils.sleep(5000)
     }
   }
@@ -443,7 +442,7 @@ async function registerCoreAsync () {
   try {
     currentCore = await RegisteredCore.findOne({ where: { stackId: env.CHAINPOINT_CORE_BASE_URI } })
   } catch (error) {
-    throw new Error(`Unable to query registered core table : ${error.message}`)
+    throw new Error(`Unable to query registered core table: ${error.message}`)
   }
   if (!currentCore) {
     // the current Core is not registered, so add it to the registration table
@@ -456,7 +455,7 @@ async function registerCoreAsync () {
       let regCore = await RegisteredCore.create(newCore)
       console.log(`Core ${regCore.stackId} successfully registered`)
     } catch (error) {
-      throw new Error(`Unable to register core : ${error.message}`)
+      throw new Error(`Unable to register core: ${error.message}`)
     }
   } else {
     console.log(`Core ${currentCore.stackId} registration found`)
@@ -476,8 +475,8 @@ async function start () {
     // init interval functions
     startIntervals()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

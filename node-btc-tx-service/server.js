@@ -34,10 +34,10 @@ let logBtcTxDataAsync = async (txResult) => {
 
   try {
     let newRow = await BtcTxLog.create(row)
-    console.log(`$BTC log : tx_id : ${newRow.get({ plain: true }).txId}`)
+    console.log(`$BTC log: tx_id: ${newRow.get({ plain: true }).txId}`)
     return newRow.get({ plain: true })
   } catch (error) {
-    throw new Error(`BTC log create error: ${error.message} : ${error.stack}`)
+    throw new Error(`BTC log create error: ${error.message}: ${error.stack}`)
   }
 }
 
@@ -64,7 +64,7 @@ const sendTxToBTCAsync = async (hash) => {
     let averageTxInBytes = 235 // 235 represents the average btc anchor transaction size in bytes
     feeTotalSatoshi = feeSatPerByte * averageTxInBytes
   } catch (error) {
-    throw new Error(`Error retrieving estimated fee : ${error.message}`)
+    throw new Error(`Error retrieving estimated fee: ${error.message}`)
   }
 
   let txResult
@@ -75,7 +75,7 @@ const sendTxToBTCAsync = async (hash) => {
     txResult.feePaidSatoshi = feeTotalSatoshi
     return txResult
   } catch (error) {
-    throw new Error(`Error sending anchor transaction : ${error.message}`)
+    throw new Error(`Error sending anchor transaction: ${error.message}`)
   }
 }
 
@@ -126,11 +126,12 @@ async function processIncomingAnchorBTCJobAsync (msg) {
     } catch (error) {
       // An error has occurred publishing the transaction, nack consumption of message
       // set a 30 second delay for nacking this message to prevent a flood of retries hitting insight api
-      console.error(error.message)
+      let retryMS = 30000
+      console.error(`Unable to process BTC anchor message: ${error.message}: Retrying in ${retryMS / 1000} seconds`)
       setTimeout(() => {
         amqpChannel.nack(msg)
         console.error(env.RMQ_WORK_IN_BTCTX_QUEUE, 'consume message nacked')
-      }, 30000)
+      }, retryMS)
     }
   }
 }
@@ -202,8 +203,8 @@ async function start () {
     // init RabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

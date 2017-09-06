@@ -89,7 +89,6 @@ async function getProofsByIDV1Async (req, res, next) {
       return next(new restify.InvalidCredentialsError('authorization denied: bad hmac value'))
     }
   } catch (error) {
-    console.error(error)
     return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
   }
 
@@ -98,7 +97,6 @@ async function getProofsByIDV1Async (req, res, next) {
     return { hash_id: hashId.trim(), proof: null }
   })
   let requestedType = req.accepts(JSONLD_MIME_TYPE) ? JSONLD_MIME_TYPE : BASE64_MIME_TYPE
-  // console.log(req.accepts(requestedType))
 
   async.eachLimit(hashIdResults, 50, (hashIdResult, callback) => {
     // validate id param is proper UUIDv1

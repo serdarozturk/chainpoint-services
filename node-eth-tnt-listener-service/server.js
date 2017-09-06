@@ -218,8 +218,8 @@ async function start () {
     await initListenerAsync()
 
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

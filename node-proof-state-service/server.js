@@ -31,10 +31,10 @@ async function ConsumeAggregationMessageAsync (msg) {
     await storageClient.logAggregatorEventForHashIdAsync(stateObj.hash_id)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
-    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    console.log(`${msg.fields.routingKey} [${msg.properties.type}] consume message acked`)
   } catch (error) {
     amqpChannel.nack(msg)
-    console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+    console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
   }
 }
 
@@ -100,11 +100,11 @@ async function ConsumeCalendarMessageAsync (msg) {
       // until the data is read, in cases of hash data not being fully readable yet
       setTimeout(() => {
         amqpChannel.nack(msg)
-        console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + error.message)
+        console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
       }, 1000)
     } else {
       amqpChannel.nack(msg)
-      console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + error.message)
+      console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
     }
   }
 }
@@ -125,10 +125,10 @@ async function ConsumeAnchorBTCAggMessageAsync (msg) {
     await storageClient.writeAnchorBTCAggStateObjectAsync(stateObj)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
-    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    console.log(`${msg.fields.routingKey} [${msg.properties.type}] consume message acked`)
   } catch (error) {
     amqpChannel.nack(msg)
-    console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+    console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
   }
 }
 
@@ -148,10 +148,10 @@ async function ConsumeBtcTxMessageAsync (msg) {
     await storageClient.writeBTCTxStateObjectAsync(stateObj)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
-    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
+    console.log(`${msg.fields.routingKey} [${msg.properties.type}] consume message acked`)
   } catch (error) {
     amqpChannel.nack(msg)
-    console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+    console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
   }
 }
 
@@ -210,7 +210,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
     console.error('error consuming calendar message', error)
     // An error as occurred publishing a message, nack consumption of original message
     amqpChannel.nack(msg)
-    console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+    console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
   }
 }
 
@@ -253,10 +253,10 @@ async function ConsumeProofReadyMessageAsync (msg) {
         amqpChannel.ack(msg)
         console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
       } catch (error) {
-        console.error('error consuming proof ready message', error)
+        console.error(`Unable to process proof ready message: ${error.message}`)
         // An error as occurred consuming a message, nack consumption of original message
         amqpChannel.nack(msg)
-        console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+        console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
       }
       break
     case 'btc':
@@ -303,10 +303,10 @@ async function ConsumeProofReadyMessageAsync (msg) {
         amqpChannel.ack(msg)
         console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
       } catch (error) {
-        console.error('error consuming proof ready message', error)
+        console.error(`Unable to process proof ready message: ${error.message}`)
         // An error as occurred consuming a message, nack consumption of original message
         amqpChannel.nack(msg)
-        console.error(msg.fields.routingKey, '[' + msg.properties.type + '] consume message nacked - ' + JSON.stringify(error))
+        console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
       }
       break
     default:
@@ -325,25 +325,25 @@ async function PruneStateDataAsync () {
   try {
     // remove all rows from agg_states that have been processed and from which proofs have been generated
     let rowCount = await storageClient.deleteProcessedHashesFromAggStatesAsync()
-    console.log(`Pruned agg_states - ${rowCount} row(s) deleted`)
+    if (rowCount) console.log(`Pruned agg_states - ${rowCount} row(s) deleted`)
     // remove all rows from hash_tracker_logs for the hashes that have been processed and from which proofs have been generated
     rowCount = await storageClient.deleteHashTrackerLogEntriesAsync()
-    console.log(`Pruned hash_tracker_logs - ${rowCount} row(s) deleted`)
+    if (rowCount) console.log(`Pruned hash_tracker_logs - ${rowCount} row(s) deleted`)
     // remove all rows from cal_states whose agg_states children have all been deleted
     rowCount = await storageClient.deleteCalStatesWithNoRemainingAggStatesAsync()
-    console.log(`Pruned cal_states - ${rowCount} row(s) deleted`)
+    if (rowCount) console.log(`Pruned cal_states - ${rowCount} row(s) deleted`)
     // remove all rows from anchor_btc_agg_states whose cal_states children have all been deleted
     rowCount = await storageClient.deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync()
-    console.log(`Pruned anchor_btc_agg_states - ${rowCount} row(s) deleted`)
+    if (rowCount) console.log(`Pruned anchor_btc_agg_states - ${rowCount} row(s) deleted`)
     // remove all rows from btctx_states whose anchor_btc_agg_states children have all been deleted
     rowCount = await storageClient.deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync()
-    console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
+    if (rowCount) console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
     // remove all rows from btchead_states whose btctx_states children have all been deleted
     rowCount = await storageClient.deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()
-    console.log(`Pruned btcheadstates - ${rowCount} row(s) deleted`)
-    console.log('Pruning complete')
+    if (rowCount) console.log(`Pruned btcheadstates - ${rowCount} row(s) deleted`)
+    console.log('Pruning process completed')
   } catch (error) {
-    console.error('error with pruning', error)
+    console.error(`Unable to complete pruning process: ${error.message}`)
   }
 }
 
@@ -388,7 +388,7 @@ function processMessage (msg) {
         break
       default:
         // This is an unknown state type
-        console.error('Unknown state type', msg.properties.type)
+        console.error(`Unknown state type: ${msg.properties.type}`)
     }
   }
 }
@@ -466,8 +466,8 @@ async function start () {
     // Init intervals
     startIntervals()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

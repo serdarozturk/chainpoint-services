@@ -68,7 +68,7 @@ webSocketServer.on('connection', (ws) => {
     // remove ping interval
     clearInterval(pingInterval)
   })
-  ws.on('error', (e) => console.error(e))
+  ws.on('error', (e) => console.error(`Websocket error has occurred: ${e}`))
 })
 
 // Clean up sloppy paths like //todo//////1//
@@ -168,7 +168,7 @@ function processProofMessage (msg) {
       ], (err) => {
         if (err) {
           amqpChannel.nack(msg)
-          console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message nacked')
+          console.error(env.RMQ_WORK_IN_API_QUEUE, 'consume message nacked')
         } else {
           amqpChannel.ack(msg)
           console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message acked')
@@ -269,7 +269,8 @@ function openRedisConnection (redisURI) {
     config.setRedis(redis)
     console.log('Redis connection established')
   })
-  redis.on('error', async () => {
+  redis.on('error', async (err) => {
+    console.error(`A redis error has ocurred: ${err}`)
     redis.quit()
     redis = null
     proofs.setRedis(null)
@@ -333,8 +334,8 @@ async function start () {
     // Init Restify
     await listenRestifyAsync()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

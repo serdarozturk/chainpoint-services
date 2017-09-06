@@ -54,7 +54,7 @@ async function getConfigInfoV1Async (req, res, next) {
       }
     }
   } catch (error) {
-    console.error(`could not generate config object : ${error}`)
+    console.error(`Could not generate config object: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 

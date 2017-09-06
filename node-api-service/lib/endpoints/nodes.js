@@ -105,10 +105,10 @@ async function postNodeV1Async (req, res, next) {
   try {
     let count = await RegisteredNode.count({ where: { tntAddr: req.params.tnt_addr } })
     if (count >= 1) {
-      return next(new restify.ConflictError('tnt_addr : address already exists'))
+      return next(new restify.ConflictError('tnt_addr address already exists'))
     }
   } catch (error) {
-    console.error(`could not count : ${error}`)
+    console.error(`Unable to count regsitered Nodes: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -122,7 +122,7 @@ async function postNodeV1Async (req, res, next) {
       hmacKey: randHMACKey
     })
   } catch (error) {
-    console.error(`could not create RegisteredNode : ${error}`)
+    console.error(`Could not create RegisteredNode: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -187,7 +187,6 @@ async function putNodeV1Async (req, res, next) {
     let formattedDate = moment().utc().format('YYYYMMDDHHmm')
     let hmacTxt = [req.params.tnt_addr, req.params.public_uri, formattedDate].join('')
     let calculatedHMAC = hash.update(hmacTxt).digest('hex')
-    // console.log('calculatedHMAC : ', calculatedHMAC)
 
     if (!_.isEqual(calculatedHMAC, req.params.hmac)) {
       return next(new restify.InvalidArgumentError('incorrect hmac'))
@@ -201,7 +200,7 @@ async function putNodeV1Async (req, res, next) {
 
     await regNode.save()
   } catch (error) {
-    console.error(`could not update : ${error}`)
+    console.error(`Could not update RegisteredNode: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 

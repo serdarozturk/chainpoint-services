@@ -271,7 +271,8 @@ function openRedisConnection (redisURI) {
   redis.on('ready', () => {
     console.log('Redis connection established')
   })
-  redis.on('error', async () => {
+  redis.on('error', async (err) => {
+    console.error(`A redis error has ocurred: ${err}`)
     redis.quit()
     redis = null
     console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
@@ -329,8 +330,8 @@ async function start () {
     // init RabbitMQ
     await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

@@ -26,7 +26,7 @@ let getNistLatest = () => {
           } else {
             // Only write to the key if the value changed.
             if (timeAndSeed !== result) {
-              console.log(timeAndSeed)
+              console.log(`New NIST value received: ${timeAndSeed}`)
               consul.kv.set(env.NIST_KEY, timeAndSeed, function (err, result) {
                 if (err) throw err
               })
@@ -42,8 +42,8 @@ function startIntervals () {
   setInterval(() => {
     try {
       getNistLatest()
-    } catch (err) {
-      console.error('getNistLatest : caught err : ', err.message)
+    } catch (error) {
+      console.error('getNistLatest: caught err: ', error.message)
     }
   }, env.NIST_INTERVAL_MS)
 }
@@ -59,8 +59,8 @@ async function start () {
     // init interval functions
     startIntervals()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

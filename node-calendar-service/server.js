@@ -113,10 +113,10 @@ let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyNa
 
   try {
     let block = await CalendarBlock.create(b)
-    console.log(`${friendlyName} BLOCK : id : ${block.get({ plain: true }).id}`)
+    console.log(`${friendlyName} BLOCK: id: ${block.get({ plain: true }).id}`)
     return block.get({ plain: true })
   } catch (error) {
-    throw new Error(`${friendlyName} BLOCK create error: ${error.message} : ${error.stack}`)
+    throw new Error(`${friendlyName} BLOCK create error: ${error.message}: ${error.stack}`)
   }
 }
 
@@ -136,7 +136,7 @@ let createCalendarBlockAsync = async (root) => {
       throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error(`could not write block : ${error}`)
+    throw new Error(`Could not write calendar block: ${error.message}`)
   }
 }
 
@@ -154,7 +154,7 @@ let createNistBlockAsync = async (nistDataObj) => {
       throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error(`could not write block : ${error}`)
+    throw new Error(`Could not write NIST block: ${error.message}`)
   }
 }
 
@@ -171,7 +171,7 @@ let createBtcAnchorBlockAsync = async (root) => {
       throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error(`could not write block : ${error}`)
+    throw new Error(`Could not write btc anchor block: ${error.message}`)
   }
 }
 
@@ -187,7 +187,7 @@ let createBtcConfirmBlockAsync = async (height, root) => {
       throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error(`could not write block : ${error}`)
+    throw new Error(`Could not write btc confirm block: ${error.message}`)
   }
 }
 
@@ -203,7 +203,7 @@ let createRewardBlockAsync = async (dataId, dataVal) => {
       throw new Error('no genesis block found')
     }
   } catch (error) {
-    throw new Error(`could not write block : ${error}`)
+    throw new Error(`Could not write reward block: ${error.message}`)
   }
 }
 
@@ -323,8 +323,8 @@ function consumeBtcMonMessage (msg) {
     BTC_MON_MESSAGES.push(msg)
     try {
       btcConfirmLock.acquire()
-    } catch (err) {
-      console.error('btcConfirmLock.acquire() : caught err : ', err.message)
+    } catch (error) {
+      console.error('btcConfirmLock.acquire(): caught err: ', error.message)
     }
   }
 }
@@ -334,8 +334,8 @@ function consumeRewardMessage (msg) {
     REWARD_MESSAGES.push(msg)
     try {
       rewardLock.acquire()
-    } catch (err) {
-      console.error('rewardLock.acquire() : caught err : ', err.message)
+    } catch (error) {
+      console.error('rewardLock.acquire(): caught err : ', error.message)
     }
   }
 }
@@ -640,7 +640,7 @@ function registerLockEvents (lock, lockName, acquireFunction) {
   })
 
   lock.on('error', (err) => {
-    console.log(`${lockName} error - ${err}`)
+    console.error(`${lockName} error - ${err}`)
   })
 
   lock.on('release', () => {
@@ -885,7 +885,6 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
         console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
       } catch (error) {
         // nack consumption of all original message
-        console.error(error)
         amqpChannel.nack(msg)
         console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
         throw new Error(`Unable to create reward block: ${error.message}`)
@@ -925,8 +924,8 @@ let setBtcInterval = () => {
         setTimeout(() => {
           try {
             btcAnchorLock.acquire()
-          } catch (err) {
-            console.error('btcAnchorLock.acquire() : caught err : ', err.message)
+          } catch (error) {
+            console.error('btcAnchorLock.acquire(): caught err: ', error.message)
           }
         }, randomFuzzyMS)
       }
@@ -960,8 +959,8 @@ let setEthInterval = () => {
         setTimeout(() => {
           try {
             ethAnchorLock.acquire()
-          } catch (err) {
-            console.error('ethAnchorLock.acquire() : caught err : ', err.message)
+          } catch (error) {
+            console.error('ethAnchorLock.acquire(): caught err: ', error.message)
           }
         }, randomFuzzyMS)
       }
@@ -1035,7 +1034,7 @@ async function openRMQConnectionAsync (connectionString) {
 
 // This initalizes all the consul watches and JS intervals that fire all calendar events
 function startWatchesAndIntervals () {
-  // console.log('starting watches and intervals')
+  console.log('starting watches and intervals')
 
   // Continuous watch on the consul key holding the NIST object.
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
@@ -1047,8 +1046,8 @@ function startWatchesAndIntervals () {
       nistLatest = data.Value
       try {
         nistLock.acquire()
-      } catch (err) {
-        console.error('nistLock.acquire() : caught err : ', err.message)
+      } catch (error) {
+        console.error('nistLock.acquire(): caught err: ', error.message)
       }
     }
   })
@@ -1066,11 +1065,9 @@ function startWatchesAndIntervals () {
       if (amqpChannel === null) return
       if (AGGREGATION_ROOTS.length > 0) { // there will be data to process, acquire lock and continue
         calendarLock.acquire()
-      } else { // there will not be any data to process, do nothing
-        // console.log('calendar interval elapsed, no data')
       }
-    } catch (err) {
-      console.error('calendarLock.acquire() : caught err : ', err.message)
+    } catch (error) {
+      console.error('calendarLock.acquire(): caught err: ', error.message)
     }
   }, env.CALENDAR_INTERVAL_MS)
 
@@ -1102,8 +1099,8 @@ async function start () {
     // Init intervals and watches
     startWatchesAndIntervals()
     console.log('startup completed successfully')
-  } catch (err) {
-    console.error(`An error has occurred on startup: ${err}`)
+  } catch (error) {
+    console.error(`An error has occurred on startup: ${error.message}`)
     process.exit(1)
   }
 }

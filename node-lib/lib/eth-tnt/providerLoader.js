@@ -12,7 +12,7 @@ module.exports = (nodeUri) => {
     process.exit(-1)
   }
 
-  console.log('nodeUri : ', nodeUri)
+  console.log('nodeUri: ', nodeUri)
 
   // Check to see if a wallet is being used
   if (env.ETH_WALLET && env.ETH_WALLET !== '') {
@@ -26,11 +26,11 @@ module.exports = (nodeUri) => {
       process.exit(-1)
     }
 
-    // console.log('env.ETH_WALLET : ', env.ETH_WALLET)
+    // console.log('env.ETH_WALLET: ', env.ETH_WALLET)
 
     let wallet = Wallet.fromV3(JSON.parse(env.ETH_WALLET), env.ETH_WALLET_PASSWORD)
 
-    console.log('Using wallet with provider : ' + nodeUri)
+    console.log('Using wallet with provider: ' + nodeUri)
 
     var engine = new ProviderEngine()
     engine.addProvider(new WalletSubprovider(wallet, {}))
@@ -39,6 +39,6 @@ module.exports = (nodeUri) => {
     return engine
   }
 
-  console.log('Using wallet without provider : ' + nodeUri)
+  console.log('Using wallet without provider: ' + nodeUri)
   return new Web3.providers.HttpProvider(nodeUri)
 }

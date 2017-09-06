@@ -171,7 +171,7 @@ async function postHashV1Async (req, res, next) {
     let NTPEpoch = Math.ceil(Date.now() / 1000) + 1 // round up and add 1 second forgiveness in time sync
     if (NTPEpoch < nistLatestEpoch) {
       // this shoud not occur, log and return error to initiate retry
-      console.error(`Bad NTP time generated in UUID : NTP ${NTPEpoch} < NIST ${nistLatestEpoch}`)
+      console.error(`Bad NTP time generated in UUID: NTP ${NTPEpoch} < NIST ${nistLatestEpoch}`)
       return next(new restify.InternalServerError('Bad NTP time'))
     }
   }
@@ -194,12 +194,11 @@ async function postHashV1Async (req, res, next) {
       return next(new restify.InvalidCredentialsError('authorization denied: bad hmac value'))
     }
     if (regNode.tntCredit < TNT_CREDIT_COST_POST_HASH) {
-      return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining : ${regNode.tntCredit}`))
+      return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining: ${regNode.tntCredit}`))
     }
     // decrement tntCredit by TNT_CREDIT_COST_POST_HASH
     await regNode.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
   } catch (error) {
-    console.error(error)
     return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
   }
 
