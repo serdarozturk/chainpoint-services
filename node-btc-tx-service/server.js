@@ -92,27 +92,37 @@ async function processIncomingAnchorBTCJobAsync (msg) {
 
     // if amqpChannel is null for any reason, dont bother sending transaction until that is resolved, return error
     if (!amqpChannel) throw new Error('no amqpConnection available')
-    // create and publish the transaction
 
     try {
-      let txResult = await sendTxToBTCAsync(anchorData)
+      // create and publish the transaction
+      let txResult
+      try {
+        txResult = await sendTxToBTCAsync(anchorData)
+      } catch (error) {
+        throw new Error(`Unable to publish BTC transaction: ${error.message}`)
+      }
+
       // log the btc tx transaction
-      let newLogEntry = await logBtcTxDataAsync(txResult)
-      console.log(newLogEntry)
+      let newLogEntry
+      try {
+        newLogEntry = await logBtcTxDataAsync(txResult)
+        console.log(newLogEntry)
+      } catch (error) {
+        throw new Error(`Unable to log BTC transaction: ${error.message}`)
+      }
+
       // queue return message for calendar containing the new transaction information
       // adding btc transaction id and full transaction body to original message and returning
       messageObj.btctx_id = txResult.txId
       messageObj.btctx_body = txResult.rawTx
-      amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' },
-        (err, ok) => {
-          if (err !== null) {
-            console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
-            throw new Error(err)
-          } else {
-            console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
-            amqpChannel.ack(msg)
-          }
-        })
+      try {
+        await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btctx' })
+      } catch (error) {
+        console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
+        throw new Error(`Unable to publish to RMQ_WORK_OUT_CAL_QUEUE: ${error.message}`)
+      }
+      console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+      amqpChannel.ack(msg)
     } catch (error) {
       // An error has occurred publishing the transaction, nack consumption of message
       // set a 30 second delay for nacking this message to prevent a flood of retries hitting insight api
