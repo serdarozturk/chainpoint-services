@@ -211,15 +211,13 @@ async function postHashV1Async (req, res, next) {
     nist: responseObj.nist
   }
 
-  amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true },
-    (err) => {
-      if (err !== null) {
-        console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
-        return next(new restify.InternalServerError('Message could not be delivered'))
-      } else {
-        console.log(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message acked')
-      }
-    })
+  try {
+    await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AGG_QUEUE, Buffer.from(JSON.stringify(hashObj)), { persistent: true })
+  } catch (error) {
+    console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
+    return next(new restify.InternalServerError('Message could not be delivered'))
+  }
+  console.log(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message acked')
 
   res.send(responseObj)
   return next()

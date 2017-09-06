@@ -238,22 +238,20 @@ async function ConsumeProofReadyMessageAsync (msg) {
         dataOutObj.cal_state = JSON.parse(calStateRow.cal_state)
 
         // Publish a proof data object for consumption by the proof generation service
-        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'cal' },
-          async (err, ok) => {
-            if (err !== null) {
-              // An error as occurred publishing a message
-              console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
-              throw new Error(err)
-            } else {
-              // New message has been published
-              console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
-              // logs the calendar proof event
-              await storageClient.logCalendarEventForHashIdAsync(aggStateRow.hash_id)
-              // Proof ready message has been consumed, ack consumption of original message
-              amqpChannel.ack(msg)
-              console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
-            }
-          })
+        try {
+          await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'cal' })
+        } catch (error) {
+          // An error as occurred publishing a message
+          console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
+          throw new Error(`Unable tp publish message to RMQ_WORK_OUT_GEN_QUEUE: ${error.message}`)
+        }
+        // New message has been published
+        console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
+        // logs the calendar proof event
+        await storageClient.logCalendarEventForHashIdAsync(aggStateRow.hash_id)
+        // Proof ready message has been consumed, ack consumption of original message
+        amqpChannel.ack(msg)
+        console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
       } catch (error) {
         console.error('error consuming proof ready message', error)
         // An error as occurred consuming a message, nack consumption of original message
@@ -290,22 +288,20 @@ async function ConsumeProofReadyMessageAsync (msg) {
         dataOutObj.btchead_state = JSON.parse(btcHeadStateRow.btchead_state)
 
         // Publish a proof data object for consumption by the proof generation service
-        amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'btc' },
-          async (err, ok) => {
-            if (err !== null) {
-              // An error as occurred publishing a message
-              console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
-              throw new Error(err)
-            } else {
-              // New message has been published
-              console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
-              // logs the btc proof event
-              await storageClient.logBtcEventForHashIdAsync(aggStateRow.hash_id)
-              // Proof ready message has been consumed, ack consumption of original message
-              amqpChannel.ack(msg)
-              console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
-            }
-          })
+        try {
+          await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_GEN_QUEUE, Buffer.from(JSON.stringify(dataOutObj)), { persistent: true, type: 'btc' })
+        } catch (error) {
+          // An error as occurred publishing a message
+          console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
+          throw new Error(`Unable tp publish message to RMQ_WORK_OUT_GEN_QUEUE: ${error.message}`)
+        }
+        // New message has been published
+        console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
+        // logs the btc proof event
+        await storageClient.logBtcEventForHashIdAsync(aggStateRow.hash_id)
+        // Proof ready message has been consumed, ack consumption of original message
+        amqpChannel.ack(msg)
+        console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
       } catch (error) {
         console.error('error consuming proof ready message', error)
         // An error as occurred consuming a message, nack consumption of original message
