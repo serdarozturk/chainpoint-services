@@ -207,7 +207,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
       }
     })
   } catch (error) {
-    console.error(`Unable to process calendar message: ${error.message}`)
+    console.error(`Unable to process btc mon message: ${error.message}`)
     // An error as occurred publishing a message, nack consumption of original message
     amqpChannel.nack(msg)
     console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)

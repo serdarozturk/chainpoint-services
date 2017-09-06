@@ -108,7 +108,7 @@ async function postNodeV1Async (req, res, next) {
       return next(new restify.ConflictError('tnt_addr address already exists'))
     }
   } catch (error) {
-    console.error(`Unable to count regsitered Nodes: ${error.message}`)
+    console.error(`Unable to count registered Nodes: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
