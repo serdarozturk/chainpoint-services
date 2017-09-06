@@ -93,7 +93,7 @@ async function ConsumeCalendarMessageAsync (msg) {
       }
     })
   } catch (error) {
-    console.error('error consuming calendar message', error.message)
+    console.error(`Unable to process calendar message: ${error.message}`)
     // An error as occurred publishing a message, nack consumption of original message
     if (error.message === 'unable to read all hash data') {
       // delay the nack for 1000ms to slightly delay requeuing to prevent a flood of retries
@@ -207,7 +207,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
       }
     })
   } catch (error) {
-    console.error('error consuming calendar message', error)
+    console.error(`Unable to process calendar message: ${error.message}`)
     // An error as occurred publishing a message, nack consumption of original message
     amqpChannel.nack(msg)
     console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
