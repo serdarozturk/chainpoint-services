@@ -722,21 +722,21 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     }
     if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
-      // if not, release lock and return
+      // if not, return and release lock
       let lastBtcAnchorMS = lastBtcAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastBtcAnchorMS
       let lastAnchorTooRecent = (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
       if (lastAnchorTooRecent) {
         console.log('aggregateAndAnchorBTCAsync skipped, btcAnchorIntervalMinutes not elapsed since last btc anchor block')
-      } else {
-        try {
-          let lastBtcAnchorBlockId = lastBtcAnchorBlock ? parseInt(lastBtcAnchorBlock.id, 10) : null
-          await aggregateAndAnchorBTCAsync(lastBtcAnchorBlockId)
-        } catch (error) {
-          throw new Error(`Unable to aggregate and create btc anchor block: ${error.message}`)
-        }
+        return
       }
+    }
+    try {
+      let lastBtcAnchorBlockId = lastBtcAnchorBlock ? parseInt(lastBtcAnchorBlock.id, 10) : null
+      await aggregateAndAnchorBTCAsync(lastBtcAnchorBlockId)
+    } catch (error) {
+      throw new Error(`Unable to aggregate and create btc anchor block: ${error.message}`)
     }
   } catch (error) {
     console.error(error.message)
@@ -824,21 +824,21 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
     }
     if (lastEthAnchorBlock) {
       // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
-      // if not, release lock and return
+      // if not, return and release lock
       let lastEthAnchorMS = lastEthAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastEthAnchorMS
       let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
       if (lastAnchorTooRecent) {
         console.log('aggregateAndAnchorETHAsync skipped, ethAnchorIntervalMinutes not elapsed since last eth anchor block')
-      } else {
-        try {
-          let lastBtcAnchorBlockId = lastEthAnchorBlock ? parseInt(lastEthAnchorBlock.id, 10) : null
-          await aggregateAndAnchorETHAsync(lastBtcAnchorBlockId)
-        } catch (error) {
-          throw new Error(`Unable to aggregate and create eth anchor block: ${error.message}`)
-        }
+        return
       }
+    }
+    try {
+      let lastEthAnchorBlockId = lastEthAnchorBlock ? parseInt(lastEthAnchorBlock.id, 10) : null
+      await aggregateAndAnchorETHAsync(lastEthAnchorBlockId)
+    } catch (error) {
+      throw new Error(`Unable to aggregate and create eth anchor block: ${error.message}`)
     }
   } catch (error) {
     console.error(error.message)
