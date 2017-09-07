@@ -125,7 +125,7 @@ server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlock
 // get the block objects for the calendar in the specified range, incusive
 server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1)
 // get nodes list
-server.get({ path: '/nodes', version: '1.0.0' }, nodes.getNodesV1Async)
+server.get({ path: '/nodes/random', version: '1.0.0' }, nodes.getNodesRandomV1Async)
 // register a new node
 server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node
