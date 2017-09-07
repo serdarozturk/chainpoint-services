@@ -26,7 +26,7 @@ const signingKeypair = nacl.sign.keyPair.fromSecretKey(signingSecretKeyBytes)
 const zeroStr = '0000000000000000000000000000000000000000000000000000000000000000'
 
 // the fuzz factor for anchor interval meant to give each core instance a random chance of being first
-const maxFuzzyMS = 10000
+const maxFuzzyMS = 1000
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -699,6 +699,21 @@ registerLockEvents(calendarLock, 'calendarLock', async () => {
 registerLockEvents(nistLock, 'nistLock', async () => {
   try {
     if (!nistLatest) throw new Error(`No value for nistLatest has been assigned`)
+    let lastNistBlock
+    try {
+      lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['dataId', 'dataVal'], order: [['id', 'DESC']] })
+    } catch (error) {
+      throw new Error(`Unable to retrieve most recent nist block: ${error.message}`)
+    }
+    if (lastNistBlock) {
+      // check if the last nist block is equal to the one we are attempting to write
+      // if they are identical, return and release lock
+      let lastNistBlockDataString = `${lastNistBlock.dataId}:${lastNistBlock.dataVal}`
+      if (nistLatest === lastNistBlockDataString) {
+        console.log('createNistBlockAsync skipped, current nist data already written to block by other Core instance')
+        return
+      }
+    }
     await createNistBlockAsync(nistLatest)
   } catch (error) {
     console.error(`Unable to create NIST block: ${error.message}`)
@@ -718,7 +733,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     try {
       lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
     } catch (error) {
-      throw new Error(`Unable to retreive most recent btc anchor block: ${error.message}`)
+      throw new Error(`Unable to retrieve most recent btc anchor block: ${error.message}`)
     }
     if (lastBtcAnchorBlock) {
       // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
@@ -820,7 +835,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
     try {
       lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
     } catch (error) {
-      throw new Error(`Unable to retreive most recent eth anchor block: ${error.message}`)
+      throw new Error(`Unable to retrieve most recent eth anchor block: ${error.message}`)
     }
     if (lastEthAnchorBlock) {
       // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
@@ -1040,15 +1055,18 @@ function startWatchesAndIntervals () {
   var nistWatch = consul.watch({ method: consul.kv.get, options: { key: env.NIST_KEY } })
 
   // Store the updated nist object on change
-  nistWatch.on('change', function (data, res) {
+  nistWatch.on('change', async function (data, res) {
     // process only if a value has been returned and it is different than what is already stored
     if (data && data.Value && nistLatest !== data.Value) {
       nistLatest = data.Value
-      try {
-        nistLock.acquire()
-      } catch (error) {
-        console.error('nistLock.acquire(): caught err: ', error.message)
-      }
+      let randomFuzzyMS = await rand(0, maxFuzzyMS)
+      setTimeout(() => {
+        try {
+          nistLock.acquire()
+        } catch (error) {
+          console.error('nistLock.acquire(): caught err: ', error.message)
+        }
+      }, randomFuzzyMS)
     }
   })
 

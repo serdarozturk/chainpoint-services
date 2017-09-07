@@ -24,7 +24,7 @@ let isHMAC = (hmac) => {
 }
 
 /**
- * GET /nodes retreive handler
+ * GET /nodes retrieve handler
  *
  * Retrieve a random subset of registered and healthy Nodes
  */
