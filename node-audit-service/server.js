@@ -236,34 +236,39 @@ async function generateAuditChallengeAsync () {
     setTimeout(() => {
       generateAuditChallengeAsync()
     }, 5000)
-  } else {
-    try {
-      let time = Date.now()
-      let height
-      let topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
-      if (topBlock) {
-        height = parseInt(topBlock.id, 10)
-      } else {
-        throw new Error('no genesis block found')
-      }
-      // calulcate min and max values with special exception for low block count
-      let max = height > 2000 ? height - 1000 : height
-      let randomNum = await rnd(10, 1000)
-      let min = max - randomNum
-      if (min < 0) min = 0
-      let nonce = crypto.randomBytes(32).toString('hex')
+    return
+  }
 
-      let challengeAnswer = await calculateChallengeAnswerAsync(min, max, nonce)
-      let auditChallenge = `${time}:${min}:${max}:${nonce}:${challengeAnswer}`
-      let challengeKey = `calendar_audit_challenge:${time}`
-      // store the new challenge at its own unique key
-      await redis.setAsync(challengeKey, auditChallenge, 'EX', CHALLENGE_EXPIRE_MINUTES * 60)
-      // keep track of the newest challenge key so /config knows what the latest to display is
-      await redis.setAsync(`calendar_audit_challenge:latest_key`, challengeKey)
-      console.log(`Challenge set: ${auditChallenge}`)
-    } catch (error) {
-      console.error((`Could not generate audit challenge: ${error.message}`))
+  try {
+    let time = Date.now()
+    let height
+    let topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
+    if (topBlock) {
+      height = parseInt(topBlock.id, 10)
+    } else {
+      console.error('Cannot generate challenge, no genesis block found. Attempting in 5 seconds...')
+      setTimeout(() => {
+        generateAuditChallengeAsync()
+      }, 5000)
+      return
     }
+    // calulcate min and max values with special exception for low block count
+    let max = height > 2000 ? height - 1000 : height
+    let randomNum = await rnd(10, 1000)
+    let min = max - randomNum
+    if (min < 0) min = 0
+    let nonce = crypto.randomBytes(32).toString('hex')
+
+    let challengeAnswer = await calculateChallengeAnswerAsync(min, max, nonce)
+    let auditChallenge = `${time}:${min}:${max}:${nonce}:${challengeAnswer}`
+    let challengeKey = `calendar_audit_challenge:${time}`
+    // store the new challenge at its own unique key
+    await redis.setAsync(challengeKey, auditChallenge, 'EX', CHALLENGE_EXPIRE_MINUTES * 60)
+    // keep track of the newest challenge key so /config knows what the latest to display is
+    await redis.setAsync(`calendar_audit_challenge:latest_key`, challengeKey)
+    console.log(`Challenge set: ${auditChallenge}`)
+  } catch (error) {
+    console.error((`Could not generate audit challenge: ${error.message}`))
   }
 }
 
