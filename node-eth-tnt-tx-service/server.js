@@ -42,7 +42,7 @@ let isEthereumAddr = (address) => {
   return /^0x[0-9a-fA-F]{40}$/i.test(address)
 }
 
-// get the TNT balance of node
+// get the TNT balance of node in grains
 server.get({ path: '/balance/:tnt_addr/', version: '1.0.0' }, (req, res, next) => {
   // Verify address
   if (!req.params.hasOwnProperty('tnt_addr')) {
@@ -73,7 +73,7 @@ server.get({ path: '/balance/:tnt_addr/', version: '1.0.0' }, (req, res, next) =
   })
 })
 
-// send TNT to an address
+// send TNT grains to an address
 server.post({ path: '/transfer/', version: '1.0.0' }, (req, res, next) => {
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))

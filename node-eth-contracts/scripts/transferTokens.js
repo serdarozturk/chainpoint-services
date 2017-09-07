@@ -20,7 +20,7 @@ loadToken(web3Provider, env.ETH_TNT_TOKEN_ADDR).then((tokenContract) => {
   let toAddr = process.argv[2]
   let amt = parseInt(process.argv[3])
 
-  console.log('Sending ' + amt + ' TNT to: ' + toAddr)
+  console.log('Sending ' + amt + ' TNT grains to: ' + toAddr)
 
   ops.sendTokens(toAddr, amt, (error, res) => {
     // Check for error

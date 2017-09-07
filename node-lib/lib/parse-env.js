@@ -143,7 +143,7 @@ let envDefinitions = {
   // ETH TNT Listener / TNT TX services specific variables
   ETH_PROVIDER_URI: envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' }),
   LISTEN_TX_PORT: envalid.num({ default: 8085, desc: 'Port of the ETH provider.' }),
-  TNT_TO_CREDIT_RATE: envalid.num({ default: 5000, desc: 'Exchange rate for TNT tokens to Credits. Default is give 5000 credits for each TNT token.' }),
+  TNT_TO_CREDIT_RATE: envalid.num({ default: 200, desc: 'Exchange rate for TNT tokens to Credits. Default is give 200 credits for each TNT token.' }),
   ETH_TNT_TX_CONNECT_URI: envalid.url({ default: 'http://eth-tnt-tx-service:8085', desc: 'The eth-tnt-tx-service REST connection URI' }),
   ETH_WALLET: envalid.str({ default: '', desc: 'The JSON wallet file. Leave empty to not use a wallet for transactions.' }),
   ETH_WALLET_PASSWORD: envalid.str({ default: '', desc: 'The password to unlock the ETH wallet. Leave blank if no wallet is used.' }),

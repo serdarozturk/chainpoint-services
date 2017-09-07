@@ -86,17 +86,17 @@ function saveLatestTx (params) {
  * @param  {number} tntAmount Grains of TNT to convert
  * @return {number}           Amount of credits
  */
-function convertTntToCredit (tntAmount) {
-  return new BigNumber(tntAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(10 ** 8).toNumber()
+function convertTntGrainsToCredit (tntGrainsAmount) {
+  return new BigNumber(tntGrainsAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(10 ** 8).toNumber()
 }
 
 /**
  * When a node sends in TNT tokens, their account balance should be updated with credit.
  *
  * @param {string} nodeAddress
- * @param {bigint} tntAmount
+ * @param {bigint} tntGrainsAmount
  */
-function incrementNodeBalance (nodeAddress, tntAmount, sequelizeTransaction) {
+function incrementNodeBalance (nodeAddress, tntGrainsAmount, sequelizeTransaction) {
   // Find the node that sent in the balance
   return RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
   .then((node) => {
@@ -109,7 +109,7 @@ function incrementNodeBalance (nodeAddress, tntAmount, sequelizeTransaction) {
     }
 
     // Convert the TNT to credits
-    let credits = convertTntToCredit(tntAmount)
+    let credits = convertTntGrainsToCredit(tntGrainsAmount)
 
     console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
     node.tntCredit += credits
