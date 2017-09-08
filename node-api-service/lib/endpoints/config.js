@@ -30,7 +30,7 @@ async function getConfigInfoV1Async (req, res, next) {
     let latestChallengeKey = await redis.getAsync(`calendar_audit_challenge:latest_key`)
     let latestChallenge = await redis.getAsync(latestChallengeKey)
 
-    // the challenge value contains the solution in the last segment, remove it before adding to teh response
+    // the challenge value contains the solution in the last segment, remove it before adding to the response
     if (latestChallenge) {
       let challengeSegments = latestChallenge.split(':')
       challengeSegments.pop()
