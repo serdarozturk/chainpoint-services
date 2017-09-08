@@ -52,7 +52,7 @@ const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 const CHALLENGE_EXPIRE_MINUTES = 75
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
-const ACCEPTABLE_DELTA_MS = 1000 // 1 second
+const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
