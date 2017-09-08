@@ -85,6 +85,7 @@ async function auditNodesAsync () {
           publicUri: null,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
+          nodeMSDelta: null,
           timePass: false,
           calStatePass: false
         })
@@ -122,6 +123,7 @@ async function auditNodesAsync () {
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
+          nodeMSDelta: null,
           timePass: false,
           calStatePass: false
         })
@@ -139,6 +141,7 @@ async function auditNodesAsync () {
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
+          nodeMSDelta: null,
           timePass: false,
           calStatePass: false
         })
@@ -156,6 +159,7 @@ async function auditNodesAsync () {
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
+          nodeMSDelta: null,
           timePass: false,
           calStatePass: false
         })
@@ -178,7 +182,8 @@ async function auditNodesAsync () {
 
       // check if the Node timestamp is withing the acceptable range
       let timePass = false
-      if (Math.abs(nodeAuditTimestamp - coreAuditTimestamp) <= ACCEPTABLE_DELTA_MS) {
+      let nodeMSDelta = (nodeAuditTimestamp - coreAuditTimestamp)
+      if (Math.abs(nodeMSDelta) <= ACCEPTABLE_DELTA_MS) {
         timePass = true
       }
 
@@ -205,6 +210,7 @@ async function auditNodesAsync () {
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: publicIPPass,
+          nodeMSDelta: nodeMSDelta,
           timePass: timePass,
           calStatePass: calStatePass
         })

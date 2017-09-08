@@ -71,6 +71,15 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       field: 'public_ip_pass',
       allowNull: false
     },
+    nodeMSDelta: {
+      comment: 'The number of milliseconds difference between Node time and Core time.',
+      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
+      validate: {
+        isInt: true
+      },
+      field: 'node_ms_delta',
+      allowNull: true
+    },
     timePass: {
       comment: 'Boolean logging if the Node reported time was verified to be in tolerance by Core.',
       type: Sequelize.BOOLEAN,
