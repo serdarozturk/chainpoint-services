@@ -109,11 +109,11 @@ async function auditNodesAsync () {
       resolveWithFullResponse: true
     }
 
-    let coreAuditTimestamp
+    let coreAuditTimestamp = Date.now()
     let nodeResponse
     try {
-      coreAuditTimestamp = Date.now()
       nodeResponse = await rp(options)
+      coreAuditTimestamp = Date.now()
     } catch (error) {
       console.error(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
       try {
