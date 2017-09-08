@@ -32,8 +32,8 @@ let registeredCoreSequelize = registeredCore.sequelize
 let RegisteredCore = registeredCore.RegisteredCore
 
 // Randomly select and deliver token reward from the list
-// of registered nodes that meet the minimum audit and tnt balance
-// eligability requirements for receiving TNT rewards
+// of registered nodes that meet the minimum audit and TNT balance
+// eligibility requirements for receiving TNT rewards
 async function performRewardAsync () {
   let minAuditPasses = env.MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD
   let minGrainsBalanceNeeded = env.MIN_TNT_GRAINS_BALANCE_FOR_REWARD
