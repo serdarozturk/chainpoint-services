@@ -35,7 +35,7 @@ async function getNodesRandomV1Async (req, res, next) {
   let thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
   let sqlQuery = `SELECT rn.tnt_addr, rn.public_uri, rn.last_audit_at FROM ${regNodesTableName} rn 
                   WHERE rn.public_uri IS NOT NULL AND rn.tnt_addr IN (
-                    SELECT al.tnt_addr FROM ${nodeAuditLogTableName} al 
+                    SELECT DISTINCT al.tnt_addr FROM ${nodeAuditLogTableName} al 
                     WHERE al.audit_at >= ${thirtyMinutesAgo} AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE
                   )
                   ORDER BY RANDOM() LIMIT ${RANDOM_NODES_RESULT_LIMIT}`
