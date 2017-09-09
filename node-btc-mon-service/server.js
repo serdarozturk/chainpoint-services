@@ -54,7 +54,12 @@ let monitorTransactionsAsync = async () => {
     try {
       // Get BTC Transaction Stats
       let txStats = await anchor.btcGetTxStatsAsync(btcTxIdObj.tx_id)
-      if (txStats.confirmations < env.MIN_BTC_CONFIRMS) throw new Error(`transaction ${txStats.id} not ready`)
+      if (txStats.confirmations < env.MIN_BTC_CONFIRMS) {
+        // nack consumption of this message
+        amqpChannel.nack(btcTxIdObj.msg)
+        console.log(`${txStats.id} monitoring requeued: ${txStats.confirmations} of ${env.MIN_BTC_CONFIRMS} confirmations`)
+        continue
+      }
 
       // if ready, Get BTC Block Stats with Transaction Ids
       let blockStats = await anchor.btcGetBlockStatsAsync(txStats.blockHash)
