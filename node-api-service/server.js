@@ -266,7 +266,6 @@ function openRedisConnection (redisURI) {
     cachedCalendarBlock.setRedis(redis)
     verify.setRedis(redis)
     calendar.setRedis(redis)
-    config.setRedis(redis)
     console.log('Redis connection established')
   })
   redis.on('error', async (err) => {
@@ -278,7 +277,6 @@ function openRedisConnection (redisURI) {
     cachedCalendarBlock.setRedis(null)
     verify.setRedis(null)
     calendar.setRedis(null)
-    config.setRedis(null)
     console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
     await utils.sleep(5000)
     openRedisConnection(redisURI)

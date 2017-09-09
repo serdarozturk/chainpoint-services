@@ -67,6 +67,7 @@ services:
       CHAINPOINT_CORE_BASE_URI: ${CHAINPOINT_CORE_BASE_URI}
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
+      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}    
       VIRTUAL_HOST: api.local
 
   api-test:
@@ -86,6 +87,7 @@ services:
       CHAINPOINT_CORE_BASE_URI: http://test.chainpoint.org
       ANCHOR_BTC: ${ANCHOR_BTC}
       ANCHOR_ETH: ${ANCHOR_ETH}
+      ETH_TNT_LISTEN_ADDRS: ${ETH_TNT_LISTEN_ADDRS}    
       VIRTUAL_HOST: api.local
 
   # Aggregator

@@ -1216,9 +1216,15 @@ describe('Verify Controller', () => {
 })
 
 describe('Config Controller', () => {
-  app.config.setRedis({
-    getAsync: async () => {
-      return 'qwe:qwe:qwe:qwe:qwe'
+  app.config.setAuditChallenge({
+    findOne: async () => {
+      return {
+        time: 1504898081430,
+        minBlock: 9661,
+        maxBlock: 10483,
+        nonce: 'd9a52b6e1e4cdc46d03b58c6b4b58a01e0eb7b252a83ee5346314a1240561c4d',
+        solution: '57d17352247cbbdd2551d5b2401c85c54cb47e92265ac034ada2577cb00f012d'
+      }
     }
   })
   app.config.setCalendarBlock({
@@ -1247,7 +1253,8 @@ describe('Config Controller', () => {
           expect(res.body).to.have.property('public_keys')
           expect(res.body).to.have.property('calendar')
           expect(res.body.calendar).to.have.property('height')
-          expect(res.body.calendar).to.have.property('audit_challenge')
+          expect(res.body.calendar).to.have.property('audit_challenge').and.to.equal('1504898081430:9661:10483:d9a52b6e1e4cdc46d03b58c6b4b58a01e0eb7b252a83ee5346314a1240561c4d')
+          expect(res.body).to.have.property('core_eth_address')
           done()
         })
     })

@@ -5,22 +5,17 @@ const rp = require('request-promise-native')
 const registeredNode = require('./lib/models/RegisteredNode.js')
 const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const utils = require('./lib/utils.js')
-const r = require('redis')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
+const auditChallenge = require('./lib/models/AuditChallenge.js')
 const crypto = require('crypto')
 const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
-const bluebird = require('bluebird')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
 // see: https://github.com/dchest/tweetnacl-js#signatures
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
-
-// The redis connection used for all redis communication
-// This value is set once the connection has been established
-let redis = null
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -32,6 +27,8 @@ let nodeAuditSequelize = nodeAuditLog.sequelize
 let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
+let auditChallengeSequelize = auditChallenge.sequelize
+let AuditChallenge = auditChallenge.CalendarBlock
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify and its caching layer.
@@ -47,9 +44,6 @@ const AUDIT_NEEDED_AGE_MS = 1000 * 60 * 30 // 30 minutes
 
 // The frequency in which audit challenges are generated, in minutes
 const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
-
-// The lifespan of an audit challenge in Redis
-const CHALLENGE_EXPIRE_MINUTES = 75
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
 const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
@@ -171,10 +165,10 @@ async function auditNodesAsync () {
     }
 
     try {
-      let nodeAuditResponseData = nodeResponse.body.calendar.audit_response.split(':')
-      let nodeAuditResponseCoreChallengeCreateTimestamp = nodeAuditResponseData[0]
-      let nodeAuditResponseSolution = nodeAuditResponseData[1]
-      let coreAuditChallenge = await redis.getAsync(`calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}`)
+      let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
+      let nodeAuditResponseTimestamp = nodeAuditResponse[0]
+      let nodeAuditResponseSolution = nodeAuditResponse[1]
+      let coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
       let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
 
       // We've gotten this far, so at least auditedPublicIPAt has passed
@@ -190,17 +184,14 @@ async function auditNodesAsync () {
       // check if the Node challenge solution is correct
       let calStatePass = false
       if (coreAuditChallenge) {
-        let coreChallengeSegments = coreAuditChallenge.split(':')
-        let coreChallengeSolution = coreChallengeSegments.pop()
-
+        let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
         nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
-        coreChallengeSolution = nacl.util.decodeUTF8(coreChallengeSolution)
 
         if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
           calStatePass = true
         }
       } else {
-        console.error(`NodeAudit: No challenge data found for key 'calendar_audit_challenge:${nodeAuditResponseCoreChallengeCreateTimestamp}'`)
+        console.error(`NodeAudit: No audit challenge record found for time ${nodeAuditResponseTimestamp}`)
       }
 
       // update the Node audit results in RegisteredNode
@@ -232,25 +223,15 @@ async function auditNodesAsync () {
   }
 }
 
-// Generate a new audit challenge for the Nodes
-// Audit challenges should be refreshed hourly.
+// Generate a new audit challenge for the Nodes. Audit challenges should be refreshed hourly.
+// Audit challenges include a timestamp, minimum block height, maximum block height, and a nonce
 async function generateAuditChallengeAsync () {
-  if (!redis) {
-    // redis has not yet been initialized, or has temporarily become unavailable
-    // retry this operation in 5 seconds, the same rate redis connections attempt to reconnect
-    console.error('Cannot generate challenge, no Redis connection. Attempting in 5 seconds...')
-    setTimeout(() => {
-      generateAuditChallengeAsync()
-    }, 5000)
-    return
-  }
-
   try {
-    let time = Date.now()
-    let height
+    let challengeTime = Date.now()
+    let currentBlockHeight
     let topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
     if (topBlock) {
-      height = parseInt(topBlock.id, 10)
+      currentBlockHeight = parseInt(topBlock.id, 10)
     } else {
       console.error('Cannot generate challenge, no genesis block found. Attempting in 5 seconds...')
       setTimeout(() => {
@@ -259,26 +240,29 @@ async function generateAuditChallengeAsync () {
       return
     }
     // calulcate min and max values with special exception for low block count
-    let max = height > 2000 ? height - 1000 : height
+    let challengeMaxBlockHeight = currentBlockHeight > 2000 ? currentBlockHeight - 1000 : currentBlockHeight
     let randomNum = await rnd(10, 1000)
-    let min = max - randomNum
-    if (min < 0) min = 0
-    let nonce = crypto.randomBytes(32).toString('hex')
+    let challengeMinBlockHeight = challengeMaxBlockHeight - randomNum
+    if (challengeMinBlockHeight < 0) challengeMinBlockHeight = 0
+    let challengeNonce = crypto.randomBytes(32).toString('hex')
 
-    let challengeAnswer = await calculateChallengeAnswerAsync(min, max, nonce)
-    let auditChallenge = `${time}:${min}:${max}:${nonce}:${challengeAnswer}`
-    let challengeKey = `calendar_audit_challenge:${time}`
-    // store the new challenge at its own unique key
-    await redis.setAsync(challengeKey, auditChallenge, 'EX', CHALLENGE_EXPIRE_MINUTES * 60)
-    // keep track of the newest challenge key so /config knows what the latest to display is
-    await redis.setAsync(`calendar_audit_challenge:latest_key`, challengeKey)
-    console.log(`Challenge set: ${auditChallenge}`)
+    let challengeSolution = await calculateChallengeSolutionAsync(challengeMinBlockHeight, challengeMaxBlockHeight, challengeNonce)
+
+    let newChallenge = await AuditChallenge.create({
+      time: challengeTime,
+      minBlock: challengeMinBlockHeight,
+      maxBlock: challengeMaxBlockHeight,
+      nonce: challengeNonce,
+      solution: challengeSolution
+    })
+    let auditChallenge = `${newChallenge.time}:${newChallenge.minBlock}:${newChallenge.maxBlock}:${newChallenge.nonce}:${newChallenge.solution}`
+    console.log(`New challenge generated: ${auditChallenge}`)
   } catch (error) {
     console.error((`Could not generate audit challenge: ${error.message}`))
   }
 }
 
-async function calculateChallengeAnswerAsync (min, max, nonce) {
+async function calculateChallengeSolutionAsync (min, max, nonce) {
   let blocks = await CalendarBlock.findAll({ where: { id: { $between: [min, max] } }, order: [['id', 'ASC']] })
 
   if (blocks.length === 0) throw new Error('No blocks returned to create challenge tree')
@@ -297,31 +281,10 @@ async function calculateChallengeAnswerAsync (min, max, nonce) {
   merkleTools.addLeaves(leaves)
   merkleTools.makeTree()
 
-  // calculate the merkle root
-  let challengeRoot = merkleTools.getMerkleRoot().toString('hex')
+  // calculate the merkle root, the solution to the challenge
+  let challengeSolution = merkleTools.getMerkleRoot().toString('hex')
 
-  return challengeRoot
-}
-
-/**
- * Opens a Redis connection
- *
- * @param {string} connectionString - The connection string for the Redis instance, an Redis URI
- */
-function openRedisConnection (redisURI) {
-  redis = r.createClient(redisURI)
-  redis.on('ready', () => {
-    bluebird.promisifyAll(redis)
-    console.log('Redis connection established')
-  })
-  redis.on('error', async (err) => {
-    console.error(`A redis error has ocurred: ${err}`)
-    redis.quit()
-    redis = null
-    console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
-    await utils.sleep(5000)
-    openRedisConnection(redisURI)
-  })
+  return challengeSolution
 }
 
 /**
@@ -334,6 +297,7 @@ async function openStorageConnectionAsync () {
       await regNodeSequelize.sync({ logging: false })
       await nodeAuditSequelize.sync({ logging: false })
       await calBlockSequelize.sync({ logging: false })
+      await auditChallengeSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
@@ -355,8 +319,6 @@ async function startIntervalsAsync () {
 async function start () {
   if (env.NODE_ENV === 'test') return
   try {
-    // init Redis
-    openRedisConnection(env.REDIS_CONNECT_URI)
     // init DB
     await openStorageConnectionAsync()
     // start main processing

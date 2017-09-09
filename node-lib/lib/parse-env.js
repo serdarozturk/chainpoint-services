@@ -159,6 +159,7 @@ module.exports = (service) => {
   switch (service) {
     case 'api':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
+      envDefinitions.ETH_TNT_LISTEN_ADDRS = envalid.str({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
       break
     case 'cal':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })

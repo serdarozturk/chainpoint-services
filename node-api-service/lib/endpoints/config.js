@@ -1,13 +1,11 @@
 const env = require('../parse-env.js')('api')
 
 const calendarBlock = require('../models/CalendarBlock.js')
+const auditChallenge = require('../models/AuditChallenge.js')
 const restify = require('restify')
 
-// The redis connection used for all redis communication
-// This value is set once the connection has been established
-let redis = null
-
 let CalendarBlock = calendarBlock.CalendarBlock
+let AuditChallenge = auditChallenge.AuditChallenge
 
 function getCorePublicKeyList () {
   return {
@@ -15,6 +13,9 @@ function getCorePublicKeyList () {
     'fcbc2ba6c808': 'UWJSQwBjlvlkSirJcdFKP4zGQIq1mfrk7j0xV0CZ9yI='
   }
 }
+
+// get the first entry in the ETH_TNT_LISTEN_ADDRS CSV to publicize
+let coreEthAddress = env.ETH_TNT_LISTEN_ADDRS.split(',')[0]
 
 /**
  * GET /config handler
@@ -27,14 +28,11 @@ async function getConfigInfoV1Async (req, res, next) {
     let topCoreBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
     if (!topCoreBlock) throw new Error('no blocks found on calendar')
 
-    let latestChallengeKey = await redis.getAsync(`calendar_audit_challenge:latest_key`)
-    let latestChallenge = await redis.getAsync(latestChallengeKey)
+    let mostRecentChallenge = await AuditChallenge.findOne({ order: [['time', 'DESC']] })
 
-    // the challenge value contains the solution in the last segment, remove it before adding to the response
-    if (latestChallenge) {
-      let challengeSegments = latestChallenge.split(':')
-      challengeSegments.pop()
-      latestChallenge = challengeSegments.join(':')
+    let mostRecentChallengeText
+    if (mostRecentChallenge) {
+      mostRecentChallengeText = `${mostRecentChallenge.time}:${mostRecentChallenge.minBlock}:${mostRecentChallenge.maxBlock}:${mostRecentChallenge.nonce}`
     }
 
     result = {
@@ -50,8 +48,9 @@ async function getConfigInfoV1Async (req, res, next) {
       public_keys: getCorePublicKeyList(),
       calendar: {
         height: parseInt(topCoreBlock.id),
-        audit_challenge: latestChallenge || undefined
-      }
+        audit_challenge: mostRecentChallengeText || undefined
+      },
+      core_eth_address: coreEthAddress
     }
   } catch (error) {
     console.error(`Could not generate config object: ${error.message}`)
@@ -64,6 +63,6 @@ async function getConfigInfoV1Async (req, res, next) {
 
 module.exports = {
   getConfigInfoV1Async: getConfigInfoV1Async,
-  setRedis: (redisClient) => { redis = redisClient },
-  setCalendarBlock: (calBlock) => { CalendarBlock = calBlock }
+  setCalendarBlock: (calBlock) => { CalendarBlock = calBlock },
+  setAuditChallenge: (auditChallenge) => { AuditChallenge = auditChallenge }
 }
