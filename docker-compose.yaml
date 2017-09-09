@@ -60,6 +60,7 @@ services:
       - roach1
       - redis
       - rabbitmq
+      - consul
     networks:
       - chainpoint
     environment:
@@ -80,6 +81,7 @@ services:
       - roach1
       - redis
       - rabbitmq
+      - consul
     networks:
       - chainpoint
     environment:
@@ -138,6 +140,7 @@ services:
     container_name: nist-beacon-core
     depends_on:
       - redis
+      - consul
     networks:
       - chainpoint
     environment:
@@ -160,6 +163,7 @@ services:
     depends_on:
       - roach1
       - rabbitmq
+      - consul
     networks:
       - chainpoint
     environment:
@@ -180,7 +184,6 @@ services:
     container_name: btc-tx-core
     depends_on:
       - roach1
-      - consul
       - rabbitmq
     networks:
       - chainpoint
