@@ -204,7 +204,11 @@ async function auditNodesAsync () {
       nodeResponse = await rp(options)
       coreAuditTimestamp = Date.now()
     } catch (error) {
-      console.error(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+      if (error.statusCode) {
+        console.error(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+      } else {
+        console.error(`NodeAudit: GET failed for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+      }
       try {
         await NodeAuditLog.create({
           tntAddr: nodesReadyForAudit[x].tntAddr,
