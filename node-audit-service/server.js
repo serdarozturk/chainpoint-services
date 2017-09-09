@@ -10,12 +10,20 @@ const auditChallenge = require('./lib/models/AuditChallenge.js')
 const crypto = require('crypto')
 const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
+const cnsl = require('consul')
+const _ = require('lodash')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
 // see: https://github.com/dchest/tweetnacl-js#signatures
 const nacl = require('tweetnacl')
 nacl.util = require('tweetnacl-util')
+
+// the fuzz factor for anchor interval meant to give each core instance a random chance of being first
+const maxFuzzyMS = 1000
+
+let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+console.log('Consul connection established')
 
 // The merkle tools object for building trees and generating proof paths
 const merkleTools = new MerkleTools()
@@ -28,7 +36,7 @@ let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let auditChallengeSequelize = auditChallenge.sequelize
-let AuditChallenge = auditChallenge.CalendarBlock
+let AuditChallenge = auditChallenge.AuditChallenge
 
 // See : https://github.com/ranm8/requestify
 // Setup requestify and its caching layer.
@@ -47,6 +55,92 @@ const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
 const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
+
+// The maximum age of a node audit response to accept
+const MAX_CHALLENGE_AGE_MINUTES = 75
+
+let challengeLockOpts = {
+  key: env.CHALLENGE_LOCK_KEY,
+  lockwaittime: '60s',
+  lockwaittimeout: '60s',
+  lockretrytime: '100ms',
+  session: {
+    behavior: 'delete',
+    checks: ['serfHealth'],
+    lockdelay: '1ms',
+    name: 'challenge-lock',
+    ttl: '30s'
+  }
+}
+
+let challengeLock = consul.lock(_.merge({}, challengeLockOpts, { value: 'challenge' }))
+
+let auditLockOpts = {
+  key: env.AUDIT_LOCK_KEY,
+  lockwaittime: '60s',
+  lockwaittimeout: '60s',
+  lockretrytime: '100ms',
+  session: {
+    behavior: 'delete',
+    checks: ['serfHealth'],
+    lockdelay: '1ms',
+    name: 'audit-lock',
+    ttl: '30s'
+  }
+}
+
+let auditLock = consul.lock(_.merge({}, auditLockOpts, { value: 'audit' }))
+
+function registerLockEvents (lock, lockName, acquireFunction) {
+  lock.on('acquire', () => {
+    console.log(`${lockName} acquired`)
+    acquireFunction()
+  })
+
+  lock.on('error', (err) => {
+    console.error(`${lockName} error - ${err}`)
+  })
+
+  lock.on('release', () => {
+    console.log(`${lockName} release`)
+  })
+}
+
+// LOCK HANDLERS : challenge
+registerLockEvents(challengeLock, 'challengeLock', async () => {
+  try {
+    // check if the last challenge is at least GEN_AUDIT_CHALLENGE_MIN - maxFuzzyMS old
+    // if not, return and release lock
+    let mostRecentChallenge = await AuditChallenge.findOne({ order: [['time', 'DESC']] })
+    if (mostRecentChallenge) {
+      let currentMS = Date.now()
+      let ageMS = currentMS - mostRecentChallenge.time
+      let lastChallengeTooRecent = (ageMS < (GEN_AUDIT_CHALLENGE_MIN * 60 * 1000 - maxFuzzyMS))
+      if (lastChallengeTooRecent) {
+        console.log('generateAuditChallengeAsync skipped, GEN_AUDIT_CHALLENGE_MIN not elapsed since last challenge generated')
+        return
+      }
+    }
+    await generateAuditChallengeAsync()
+  } catch (error) {
+    console.error(`Unable to generate audit challenge: ${error.message}`)
+  } finally {
+    // always release lock
+    challengeLock.release()
+  }
+})
+
+// LOCK HANDLERS : challenge
+registerLockEvents(auditLock, 'auditLock', async () => {
+  try {
+    await auditNodesAsync()
+  } catch (error) {
+    console.error(`Unable to perform node audits: ${error.message}`)
+  } finally {
+    // always release lock
+    auditLock.release()
+  }
+})
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
@@ -168,8 +262,14 @@ async function auditNodesAsync () {
       let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
       let nodeAuditResponseTimestamp = nodeAuditResponse[0]
       let nodeAuditResponseSolution = nodeAuditResponse[1]
-      let coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
       let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
+
+      // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
+      let coreAuditChallenge
+      let minTimestamp = coreAuditTimestamp - (MAX_CHALLENGE_AGE_MINUTES * 60 * 1000)
+      if (parseInt(nodeAuditResponseTimestamp) >= minTimestamp) {
+        coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
+      }
 
       // We've gotten this far, so at least auditedPublicIPAt has passed
       let publicIPPass = true
@@ -233,10 +333,7 @@ async function generateAuditChallengeAsync () {
     if (topBlock) {
       currentBlockHeight = parseInt(topBlock.id, 10)
     } else {
-      console.error('Cannot generate challenge, no genesis block found. Attempting in 5 seconds...')
-      setTimeout(() => {
-        generateAuditChallengeAsync()
-      }, 5000)
+      console.error('Cannot generate challenge, no genesis block found.')
       return
     }
     // calulcate min and max values with special exception for low block count
@@ -308,11 +405,33 @@ async function openStorageConnectionAsync () {
   }
 }
 
+async function acquireChallengeLockWithFuzzyDelayAsync () {
+  let randomFuzzyMS = await rnd(0, maxFuzzyMS)
+  setTimeout(() => {
+    try {
+      challengeLock.acquire()
+    } catch (error) {
+      console.error('challengeLock.acquire(): caught err: ', error.message)
+    }
+  }, randomFuzzyMS)
+}
+
+async function acquireAuditLockWithFuzzyDelayAsync () {
+  let randomFuzzyMS = await rnd(0, maxFuzzyMS)
+  setTimeout(() => {
+    try {
+      auditLock.acquire()
+    } catch (error) {
+      console.error('auditLock.acquire(): caught err: ', error.message)
+    }
+  }, randomFuzzyMS)
+}
 async function startIntervalsAsync () {
-  await generateAuditChallengeAsync()
-  await auditNodesAsync()
-  setInterval(async () => await generateAuditChallengeAsync(), GEN_AUDIT_CHALLENGE_MIN * 60 * 1000)
-  setInterval(async () => await auditNodesAsync(), AUDIT_NODES_INTERVAL_MS)
+  await acquireChallengeLockWithFuzzyDelayAsync()
+  setInterval(async () => await acquireChallengeLockWithFuzzyDelayAsync(), GEN_AUDIT_CHALLENGE_MIN * 60 * 1000)
+
+  await acquireAuditLockWithFuzzyDelayAsync()
+  setInterval(async () => await acquireAuditLockWithFuzzyDelayAsync(), AUDIT_NODES_INTERVAL_MS)
 }
 
 // process all steps need to start the application
