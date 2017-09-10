@@ -195,6 +195,7 @@ async function auditNodesAsync () {
       uri: `${nodesReadyForAudit[x].publicUri}/config`,
       json: true,
       gzip: true,
+      timeout: 2500,
       resolveWithFullResponse: true
     }
 
