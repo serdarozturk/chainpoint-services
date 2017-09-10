@@ -31,7 +31,7 @@ async function getLastKnownEventInfoAsync () {
   // Get the latest incoming transfer from the DB
   let lastTransfer = await EthTokenTxLog.findOne({
     where: { toAddress: addresses },
-    order: [[ 'createdAt', 'DESC' ]]
+    order: [['createdAt', 'DESC']]
   })
 
   // Check to make sure one was found or we are in developement mode
@@ -50,12 +50,11 @@ async function getLastKnownEventInfoAsync () {
   }
 }
 
-function saveLatestTx (params) {
-  // Save off the last seen info to the local copy
-  lastEventInfo = {
-    blockNumber: params.blockNumber,
-    transactionIndex: params.transactionIndex
-  }
+async function processNewTxAsync (params) {
+  // Log out the transaction
+  let tntGrainsAmount = params.args.value
+  let tntAmount = new BigNumber(tntGrainsAmount).dividedBy(10 ** 8).toNumber()
+  console.log(`${tntGrainsAmount} grains (${tntAmount} TNT) transferred from ${params.args.from} to ${params.args.to} on block ${params.blockNumber}`)
 
   let tx = {
     txId: params.transactionHash,
@@ -66,19 +65,39 @@ function saveLatestTx (params) {
     amount: params.args.value
   }
 
-  // Wrap this in a sequelize transaction.  If anything fails, it will all roll back.
-  return ethTokenTxSequelize.transaction((t) => {
-    // Try to save the tx record
-    return EthTokenTxLog.create(tx, {transaction: t})
-    .then(() => {
-      // Now that the tx was saved, update the balance for the node
-      return incrementNodeBalance(params.args.from, params.args.value, t)
-    })
-    .catch(() => {
-      // Most likely failed due to another node already processing this tx
-      console.warn('Trx update failed.')
-    })
-  })
+  try {
+    // Log the Ethereum token transfer event
+    await EthTokenTxLog.create(tx)
+  } catch (error) {
+    // TODO: catch the SequelizeUniqueConstraintError specifically, and respond without error
+    console.log(JSON.stringify(error))
+    console.error(`Unable to add eth transaction to log: ${error.message}`)
+    return
+  }
+
+  let nodeToCredit
+  try {
+    // Find the node that sent in the balance
+    nodeToCredit = await RegisteredNode.findOne({ where: { tntAddr: tx.fromAddress } })
+    if (!nodeToCredit) {
+      // TODO - Store unkowns for later processing if node registers after sending in for some reason
+      // NOTE - If a node sends in TNT before it registers... it will not get counted.
+      console.error('Incoming TNT from address not recognized as a registered Node: ' + tx.fromAddress)
+      return
+    }
+  } catch (error) {
+    console.error(`Unable to query RegisteredNodes table: ${error.message}`)
+    return
+  }
+
+  try {
+    // Convert the TNT to credits
+    let credits = convertTntGrainsToCredit(tntGrainsAmount)
+    await nodeToCredit.increment({ tntCredit: credits })
+    console.log(`Issued ${credits} credits to Node ${nodeToCredit.tntAddr} with previous balance of ${nodeToCredit.tntCredit}, new balance is ${credits + nodeToCredit.tntCredit}`)
+  } catch (error) {
+    console.error(`Unable to issue credits to Node ${nodeToCredit.tntAddr}: ${error.message}`)
+  }
 }
 
 /**
@@ -88,33 +107,6 @@ function saveLatestTx (params) {
  */
 function convertTntGrainsToCredit (tntGrainsAmount) {
   return new BigNumber(tntGrainsAmount).times(env.TNT_TO_CREDIT_RATE).dividedBy(10 ** 8).toNumber()
-}
-
-/**
- * When a node sends in TNT tokens, their account balance should be updated with credit.
- *
- * @param {string} nodeAddress
- * @param {bigint} tntGrainsAmount
- */
-function incrementNodeBalance (nodeAddress, tntGrainsAmount, sequelizeTransaction) {
-  // Find the node that sent in the balance
-  return RegisteredNode.findOne({where: { tntAddr: nodeAddress }})
-  .then((node) => {
-    if (!node) {
-      // TODO - Store unkowns for later processing if node registers after sending in for some reason
-
-      // NOTE - If a node sends in TNT before it registers... it will not get counted.
-      console.error('Incoming TNT tokens were not mapped to any node: ' + nodeAddress)
-      return
-    }
-
-    // Convert the TNT to credits
-    let credits = convertTntGrainsToCredit(tntGrainsAmount)
-
-    console.log(`Incrementing node ${node.tntAddr} with current credit ${node.tntCredit} by amount ${credits}`)
-    node.tntCredit += credits
-    return node.save({transaction: sequelizeTransaction})
-  })
 }
 
 /**
@@ -172,13 +164,17 @@ function incomingTokenTransferEvent (error, params) {
     console.warn('Found an event that should have already been processed: ')
     console.warn(params)
     return
+  } else {
+    // Save off the last seen info to the local copy
+    lastEventInfo = {
+      blockNumber: params.blockNumber,
+      transactionIndex: params.transactionIndex
+    }
   }
 
-  // Log out the transaction
-  console.log('Transfer occurred on Block ' + params.blockNumber + ' From: ' + params.args.from + ' To: ' + params.args.to + ' AMT: ' + params.args.value)
-
-  // Save off block number here from latest seen event.
-  saveLatestTx(params)
+  // process this new transaction information
+  // log the transaction and assign proper TNT credits to sender address
+  processNewTxAsync(params)
 }
 
 /**
