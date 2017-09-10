@@ -54,7 +54,6 @@ async function processNewTxAsync (params) {
   // Log out the transaction
   let tntGrainsAmount = params.args.value
   let tntAmount = new BigNumber(tntGrainsAmount).dividedBy(10 ** 8).toNumber()
-  console.log(`${tntGrainsAmount} grains (${tntAmount} TNT) transferred from ${params.args.from} to ${params.args.to} on block ${params.blockNumber}`)
 
   let tx = {
     txId: params.transactionHash,
@@ -68,6 +67,7 @@ async function processNewTxAsync (params) {
   try {
     // Log the Ethereum token transfer event
     await EthTokenTxLog.create(tx)
+    console.log(`${tntGrainsAmount} grains (${tntAmount} TNT) transferred from ${params.args.from} to ${params.args.to} on block ${params.blockNumber}`)
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
       // this transaction has already been processed by another Core instance
