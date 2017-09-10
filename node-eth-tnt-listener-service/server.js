@@ -69,8 +69,11 @@ async function processNewTxAsync (params) {
     // Log the Ethereum token transfer event
     await EthTokenTxLog.create(tx)
   } catch (error) {
-    // TODO: catch the SequelizeUniqueConstraintError specifically, and respond without error
-    console.log(JSON.stringify(error))
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      // this transaction has already been processed by another Core instance
+      console.log(`Transaction ${tx.txId} has already been logged by another Core instance`)
+      return
+    }
     console.error(`Unable to add eth transaction to log: ${error.message}`)
     return
   }
