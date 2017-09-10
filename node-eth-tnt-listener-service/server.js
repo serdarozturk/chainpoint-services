@@ -96,8 +96,9 @@ async function processNewTxAsync (params) {
   try {
     // Convert the TNT to credits
     let credits = convertTntGrainsToCredit(tntGrainsAmount)
+    let prevBalance = nodeToCredit.tntCredit
     await nodeToCredit.increment({ tntCredit: credits })
-    console.log(`Issued ${credits} credits to Node ${nodeToCredit.tntAddr} with previous balance of ${nodeToCredit.tntCredit}, new balance is ${credits + nodeToCredit.tntCredit}`)
+    console.log(`Issued ${credits} credits to Node ${nodeToCredit.tntAddr} with previous balance of ${prevBalance}, new balance is ${nodeToCredit.tntCredit}`)
   } catch (error) {
     console.error(`Unable to issue credits to Node ${nodeToCredit.tntAddr}: ${error.message}`)
   }
