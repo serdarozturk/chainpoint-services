@@ -206,9 +206,9 @@ async function auditNodesAsync () {
       coreAuditTimestamp = Date.now()
     } catch (error) {
       if (error.statusCode) {
-        console.error(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+        console.log(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
       } else {
-        console.error(`NodeAudit: GET failed for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+        console.log(`NodeAudit: GET failed for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
       }
       try {
         await NodeAuditLog.create({
@@ -227,7 +227,7 @@ async function auditNodesAsync () {
       continue
     }
     if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
-      console.error(`NodeAudit: GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
+      console.log(`NodeAudit: GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
       try {
         await NodeAuditLog.create({
           tntAddr: nodesReadyForAudit[x].tntAddr,
@@ -245,7 +245,7 @@ async function auditNodesAsync () {
       continue
     }
     if (!nodeResponse.body.time) {
-      console.error(`NodeAudit: GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
+      console.log(`NodeAudit: GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
       try {
         await NodeAuditLog.create({
           tntAddr: nodesReadyForAudit[x].tntAddr,
