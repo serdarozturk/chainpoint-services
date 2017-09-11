@@ -353,7 +353,7 @@ async function PruneStateDataAsync () {
     // remove all rows from btchead_states whose btctx_states children have all been deleted
     rowCount = await storageClient.deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()
     if (rowCount) console.log(`Pruned btcheadstates - ${rowCount} row(s) deleted`)
-    console.log('Pruning process completed')
+    // console.log('Pruning process completed')
   } catch (error) {
     console.error(`Unable to complete pruning process: ${error.message}`)
   }
