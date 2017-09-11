@@ -162,7 +162,7 @@ async function performRewardAsync () {
   // check that most recent reward block is older than interval time
   let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
   try {
-    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
     if (lastRewardBlock) {
       // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
       // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
@@ -172,7 +172,8 @@ async function performRewardAsync () {
       let currentMS = Date.now()
       let ageMS = currentMS - lastRewardMS
       if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
-        console.log('Reward distribution skipped, rewardIntervalMinutes not elapsed since last reward block')
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${lastRewardBlock} minutes must elapse between each new reward block. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
         return
       }
     }

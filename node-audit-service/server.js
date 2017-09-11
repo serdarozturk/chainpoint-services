@@ -131,7 +131,8 @@ registerLockEvents(challengeLock, 'challengeLock', async () => {
       let ageMS = currentMS - mostRecentChallenge.time
       let lastChallengeTooRecent = (ageMS < (GEN_AUDIT_CHALLENGE_MIN * 60 * 1000 - oneMinuteMS))
       if (lastChallengeTooRecent) {
-        console.log('generateAuditChallengeAsync skipped, GEN_AUDIT_CHALLENGE_MIN not elapsed since last challenge generated')
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${GEN_AUDIT_CHALLENGE_MIN} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
         return
       }
     }

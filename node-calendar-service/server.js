@@ -713,7 +713,7 @@ registerLockEvents(nistLock, 'nistLock', async () => {
     let nistBlockIntervalMinutes = 60 / env.NIST_BLOCKS_PER_HOUR
     let lastNistBlock
     try {
-      lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['time'], order: [['id', 'DESC']] })
+      lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['time', 'stackId'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent nist block: ${error.message}`)
     }
@@ -726,7 +726,8 @@ registerLockEvents(nistLock, 'nistLock', async () => {
       let ageMS = currentMS - lastNistBlockMS
       let lastNISTTooRecent = (ageMS < (nistBlockIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastNISTTooRecent) {
-        console.log('createNistBlockAsync skipped, nistBlockIntervalMinutes not elapsed since last NIST block')
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${nistBlockIntervalMinutes} minutes must elapse between each new nist block. The last one was generated ${ageSec} seconds ago by Core ${lastNistBlock.stackId}.`)
         return
       }
     }
@@ -745,7 +746,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
     let lastBtcAnchorBlock
     try {
-      lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+      lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent btc anchor block: ${error.message}`)
     }
@@ -758,7 +759,8 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
       let ageMS = currentMS - lastBtcAnchorMS
       let lastAnchorTooRecent = (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastAnchorTooRecent) {
-        console.log('aggregateAndAnchorBTCAsync skipped, btcAnchorIntervalMinutes not elapsed since last btc anchor block')
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${btcAnchorIntervalMinutes} minutes must elapse between each new btc-a block. The last one was generated ${ageSec} seconds ago by Core ${lastBtcAnchorBlock.stackId}.`)
         return
       }
     }
@@ -846,7 +848,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
     let ethAnchorIntervalMinutes = 60 / env.ANCHOR_ETH_PER_HOUR
     let lastEthAnchorBlock
     try {
-      lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
+      lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent eth anchor block: ${error.message}`)
     }
@@ -859,7 +861,8 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
       let ageMS = currentMS - lastEthAnchorMS
       let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastAnchorTooRecent) {
-        console.log('aggregateAndAnchorETHAsync skipped, ethAnchorIntervalMinutes not elapsed since last eth anchor block')
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${lastEthAnchorBlock} minutes must elapse between each new eth-a block. The last one was generated ${ageSec} seconds ago by Core ${lastEthAnchorBlock.stackId}.`)
         return
       }
     }
