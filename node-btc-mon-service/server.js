@@ -46,7 +46,7 @@ let monitorTransactionsAsync = async () => {
 
   // process each set of btctxid data
   let btcTxIdsToMonitor = BTCTXIDS.splice(0)
-  console.log(`Btc Tx montoring process starting for ${btcTxIdsToMonitor.length} transaction(s)`)
+  console.log(`Btc Tx monitoring process starting for ${btcTxIdsToMonitor.length} transaction(s)`)
 
   for (let index = 0; index < btcTxIdsToMonitor.length; index++) {
     let btcTxIdObj = btcTxIdsToMonitor[index]
@@ -107,7 +107,7 @@ let monitorTransactionsAsync = async () => {
     }
   }
 
-  console.log(`Btc Tx montoring process complete`)
+  console.log(`Btc Tx monitoring process complete`)
 }
 
 /**
