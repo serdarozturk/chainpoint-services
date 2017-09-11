@@ -21,7 +21,7 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
   else throw new Error('Value must be between 1 and 16, inclusive')
 })
 const validateFactorOfSixty = envalid.makeValidator(x => {
-  if (60 % x === 0) return x
+  if (x > 0 && 60 % x === 0) return x
   else throw new Error('Value must be a factor of 60')
 })
 const validateETHAddress = envalid.makeValidator(x => {
@@ -126,6 +126,7 @@ let envDefinitions = {
   CALENDAR_INTERVAL_MS: envalid.num({ default: 10000, desc: 'The frequency to generate new calendar blocks, defaults to 10 seconds' }),
   ANCHOR_BTC_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new btc-a blocks and btc anchoring, defaults to 2, must be a factor of 60' }),
   ANCHOR_ETH_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new eth-a blocks and eth anchoring, defaults to 2, must be a factor of 60' }),
+  NIST_BLOCKS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of NIST blocks to generate per hour, defaults to 2, must be a factor of 60' }),
 
   // NIST beacon service specific variables
   NIST_INTERVAL_MS: envalid.num({ default: 60000, desc: 'The frequency to get latest NIST beacon data, in milliseconds' }),

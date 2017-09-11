@@ -698,19 +698,24 @@ registerLockEvents(calendarLock, 'calendarLock', async () => {
 // LOCK HANDLERS : nist
 registerLockEvents(nistLock, 'nistLock', async () => {
   try {
-    if (!nistLatest) throw new Error(`No value for nistLatest has been assigned`)
+    let nistBlockIntervalMinutes = 60 / env.NIST_BLOCKS_PER_HOUR
+    // checks if the last NIST block is at least nistBlockIntervalMinutes - maxFuzzyMS old
+    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
     let lastNistBlock
     try {
-      lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['dataId', 'dataVal'], order: [['id', 'DESC']] })
+      lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['time'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent nist block: ${error.message}`)
     }
     if (lastNistBlock) {
-      // check if the last nist block is equal to the one we are attempting to write
-      // if they are identical, return and release lock
-      let lastNistBlockDataString = `${lastNistBlock.dataId}:${lastNistBlock.dataVal}`
-      if (nistLatest === lastNistBlockDataString) {
-        console.log('createNistBlockAsync skipped, current nist data already written to block by other Core instance')
+      // check if the last NIST block is at least nistBlockIntervalMinutes - maxFuzzyMS old
+      // if not, return and release lock
+      let lastNistBlockMS = lastNistBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastNistBlockMS
+      let lastNISTTooRecent = (ageMS < (nistBlockIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      if (lastNISTTooRecent) {
+        console.log('createNistBlockAsync skipped, nistBlockIntervalMinutes not elapsed since last NIST block')
         return
       }
     }
@@ -726,7 +731,7 @@ registerLockEvents(nistLock, 'nistLock', async () => {
 // LOCK HANDLERS : btc-anchor
 registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
   try {
-    let btcAnchorIntervalMinutes = 60 / (env.ANCHOR_BTC_PER_HOUR || 2) // default to 2, avoid possible divide by 0
+    let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
     // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
     // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
     let lastBtcAnchorBlock
@@ -914,7 +919,6 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
 })
 
 // Set the BTC anchor interval
-// and return a reference to that configured interval, enabling BTC anchoring
 let setBtcInterval = () => {
   let currentMinute = new Date().getUTCMinutes()
 
@@ -949,7 +953,6 @@ let setBtcInterval = () => {
 }
 
 // Set the ETH anchor interval
-// and return a reference to that configured interval, enabling ETH anchoring
 let setEthInterval = () => {
   let currentMinute = new Date().getUTCMinutes()
 
@@ -976,6 +979,43 @@ let setEthInterval = () => {
             ethAnchorLock.acquire()
           } catch (error) {
             console.error('ethAnchorLock.acquire(): caught err: ', error.message)
+          }
+        }, randomFuzzyMS)
+      }
+    }
+  })
+}
+
+// Set the NIST block interval
+let setNISTBlockInterval = () => {
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on NIST_BLOCKS_PER_HOUR
+  let nistBlockMinutes = []
+  let minuteOfHour = 0
+  // offset interval to minimize occurances of nist block at the same time as other blocks
+  let offset = Math.floor((60 / env.NIST_BLOCKS_PER_HOUR) / 2)
+  while (minuteOfHour < 60) {
+    let offsetMinutes = minuteOfHour + offset + ((minuteOfHour + offset) < 60 ? 0 : -60)
+    nistBlockMinutes.push(offsetMinutes)
+    minuteOfHour += (60 / env.NIST_BLOCKS_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (nistBlockMinutes.includes(currentMinute)) {
+        // if the nistLatest is null, processing should not continue, defer to next interval
+        if (nistLatest === null) return
+        let randomFuzzyMS = await rand(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            nistLock.acquire()
+          } catch (error) {
+            console.error('nistLock.acquire(): caught err: ', error.message)
           }
         }, randomFuzzyMS)
       }
@@ -1059,14 +1099,6 @@ function startWatchesAndIntervals () {
     // process only if a value has been returned and it is different than what is already stored
     if (data && data.Value && nistLatest !== data.Value) {
       nistLatest = data.Value
-      let randomFuzzyMS = await rand(0, maxFuzzyMS)
-      setTimeout(() => {
-        try {
-          nistLock.acquire()
-        } catch (error) {
-          console.error('nistLock.acquire(): caught err: ', error.message)
-        }
-      }, randomFuzzyMS)
     }
   })
 
@@ -1075,6 +1107,9 @@ function startWatchesAndIntervals () {
   })
 
   // PERIODIC TIMERS
+
+  // Init heartbeat process for NIST blocks
+  setNISTBlockInterval()
 
   // Write a new calendar block
   setInterval(() => {

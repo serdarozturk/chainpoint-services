@@ -341,8 +341,7 @@ async function calculateCurrentRewardShares () {
   }
 }
 
-// Set the BTC anchor interval
-// and return a reference to that configured interval, enabling BTC anchoring
+// Set the TNT Reward interval
 function setTNTRewardInterval () {
   let currentMinute = new Date().getUTCMinutes()
 
