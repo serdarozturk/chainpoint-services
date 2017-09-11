@@ -15,11 +15,11 @@ class TokenOps {
    * The "From" address signing the transaction will be the default account set in the web3 object.
    *
    * @param {*} sendToAddr - Target address
-   * @param {*} amt - base units to transfer... If the contract has 18 decimals, 1 token => Math.pow(10, 18) => 1000000000000000000
-   * @param {*} callback - Called after the transaction is broadcasted
+   * @param {*} amt - base units to transfer (TNT Grains, 8 decimals), 1 TNT => Math.pow(10, 8) => 100000000 Grains
+   * @param {*} callback - Called after the transaction is broadcast
    */
   sendTokens (sendToAddr, amt, callback) {
-    return this.tokenContract.transfer(sendToAddr, amt, callback)
+    return this.tokenContract.transfer(sendToAddr, amt, {gas: 500000}, callback)
   }
 
   /**

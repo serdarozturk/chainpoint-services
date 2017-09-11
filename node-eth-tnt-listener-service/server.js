@@ -31,7 +31,7 @@ async function getLastKnownEventInfoAsync () {
   // Get the latest incoming transfer from the DB
   let lastTransfer = await EthTokenTxLog.findOne({
     where: { toAddress: { $in: addresses } },
-    order: [['createdAt', 'DESC']]
+    order: [['created_at', 'DESC']]
   })
 
   // Check to make sure one was found or we are in developement mode
