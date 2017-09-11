@@ -63,6 +63,7 @@ const AUDIT_NODES_INTERVAL_MS = 1000 * 60 // 1 minute
 const AUDIT_NEEDED_AGE_MS = 1000 * 60 * 30 // 30 minutes
 
 // The frequency in which audit challenges are generated, in minutes
+// Value must be greater than 2, or results may be unpredictable
 const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
@@ -121,13 +122,14 @@ function registerLockEvents (lock, lockName, acquireFunction) {
 // LOCK HANDLERS : challenge
 registerLockEvents(challengeLock, 'challengeLock', async () => {
   try {
-    // check if the last challenge is at least GEN_AUDIT_CHALLENGE_MIN - maxFuzzyMS old
+    // check if the last challenge is at least GEN_AUDIT_CHALLENGE_MIN - oneMinuteMS old
     // if not, return and release lock
     let mostRecentChallenge = await AuditChallenge.findOne({ order: [['time', 'DESC']] })
     if (mostRecentChallenge) {
+      let oneMinuteMS = 60000
       let currentMS = Date.now()
       let ageMS = currentMS - mostRecentChallenge.time
-      let lastChallengeTooRecent = (ageMS < (GEN_AUDIT_CHALLENGE_MIN * 60 * 1000 - maxFuzzyMS))
+      let lastChallengeTooRecent = (ageMS < (GEN_AUDIT_CHALLENGE_MIN * 60 * 1000 - oneMinuteMS))
       if (lastChallengeTooRecent) {
         console.log('generateAuditChallengeAsync skipped, GEN_AUDIT_CHALLENGE_MIN not elapsed since last challenge generated')
         return

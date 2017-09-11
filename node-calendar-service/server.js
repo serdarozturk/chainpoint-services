@@ -64,7 +64,7 @@ let REWARD_MESSAGES = []
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
 // decreasing the interval of the heartbeat and checking current time resolves this
-var heart = heartbeats.createHeart(200)
+let heart = heartbeats.createHeart(200)
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
@@ -711,8 +711,6 @@ registerLockEvents(calendarLock, 'calendarLock', async () => {
 registerLockEvents(nistLock, 'nistLock', async () => {
   try {
     let nistBlockIntervalMinutes = 60 / env.NIST_BLOCKS_PER_HOUR
-    // checks if the last NIST block is at least nistBlockIntervalMinutes - maxFuzzyMS old
-    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
     let lastNistBlock
     try {
       lastNistBlock = await CalendarBlock.findOne({ where: { type: 'nist' }, attributes: ['time'], order: [['id', 'DESC']] })
@@ -720,12 +718,13 @@ registerLockEvents(nistLock, 'nistLock', async () => {
       throw new Error(`Unable to retrieve most recent nist block: ${error.message}`)
     }
     if (lastNistBlock) {
-      // check if the last NIST block is at least nistBlockIntervalMinutes - maxFuzzyMS old
-      // if not, return and release lock
+      // checks if the last NIST block is at least nistBlockIntervalMinutes - oneMinuteMS old
+      // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+      let oneMinuteMS = 60000
       let lastNistBlockMS = lastNistBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastNistBlockMS
-      let lastNISTTooRecent = (ageMS < (nistBlockIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      let lastNISTTooRecent = (ageMS < (nistBlockIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastNISTTooRecent) {
         console.log('createNistBlockAsync skipped, nistBlockIntervalMinutes not elapsed since last NIST block')
         return
@@ -744,8 +743,6 @@ registerLockEvents(nistLock, 'nistLock', async () => {
 registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
   try {
     let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
-    // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
-    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
     let lastBtcAnchorBlock
     try {
       lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
@@ -753,12 +750,13 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
       throw new Error(`Unable to retrieve most recent btc anchor block: ${error.message}`)
     }
     if (lastBtcAnchorBlock) {
-      // check if the last btc anchor block is at least btcAnchorIntervalMinutes - maxFuzzyMS old
-      // if not, return and release lock
+      // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - oneMinuteMS old
+      // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+      let oneMinuteMS = 60000
       let lastBtcAnchorMS = lastBtcAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastBtcAnchorMS
-      let lastAnchorTooRecent = (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      let lastAnchorTooRecent = (ageMS < (btcAnchorIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastAnchorTooRecent) {
         console.log('aggregateAndAnchorBTCAsync skipped, btcAnchorIntervalMinutes not elapsed since last btc anchor block')
         return
@@ -845,9 +843,7 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', async () => {
 // LOCK HANDLERS : eth-anchor
 registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
   try {
-    let ethAnchorIntervalMinutes = 60 / (env.ANCHOR_ETH_PER_HOUR || 2) // default to 2, avoid possible divide by 0
-    // checks if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
-    // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+    let ethAnchorIntervalMinutes = 60 / env.ANCHOR_ETH_PER_HOUR
     let lastEthAnchorBlock
     try {
       lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
@@ -855,12 +851,13 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
       throw new Error(`Unable to retrieve most recent eth anchor block: ${error.message}`)
     }
     if (lastEthAnchorBlock) {
-      // check if the last eth anchor block is at least ethAnchorIntervalMinutes - maxFuzzyMS old
-      // if not, return and release lock
+      // checks if the last eth anchor block is at least ethAnchorIntervalMinutes - oneMinuteMS old
+      // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
+      let oneMinuteMS = 60000
       let lastEthAnchorMS = lastEthAnchorBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastEthAnchorMS
-      let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - maxFuzzyMS))
+      let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastAnchorTooRecent) {
         console.log('aggregateAndAnchorETHAsync skipped, ethAnchorIntervalMinutes not elapsed since last eth anchor block')
         return

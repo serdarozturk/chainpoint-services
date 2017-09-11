@@ -33,8 +33,8 @@ const validateMinConfirmRange = envalid.makeValidator(x => {
   else throw new Error('Value must be between 1 and 16, inclusive')
 })
 const validateFactorOfSixty = envalid.makeValidator(x => {
-  if (x > 0 && 60 % x === 0) return x
-  else throw new Error('Value must be a factor of 60')
+  if (x > 0 && x <= 20 && 60 % x === 0) return x
+  else throw new Error('Value must be a factor of 60, and no greater than 20')
 })
 const validateETHAddress = envalid.makeValidator(x => {
   if (/^0x[0-9a-f]{40}$/i.test(x)) return x
@@ -136,9 +136,9 @@ let envDefinitions = {
   RMQ_PREFETCH_COUNT_CAL: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_CAL_QUEUE: envalid.str({ default: 'work.cal', desc: 'The queue name for message consumption originating from the aggregator, btc-tx, and btc-mon services' }),
   CALENDAR_INTERVAL_MS: envalid.num({ default: 10000, desc: 'The frequency to generate new calendar blocks, defaults to 10 seconds' }),
-  ANCHOR_BTC_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new btc-a blocks and btc anchoring, defaults to 2, must be a factor of 60' }),
-  ANCHOR_ETH_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new eth-a blocks and eth anchoring, defaults to 2, must be a factor of 60' }),
-  NIST_BLOCKS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of NIST blocks to generate per hour, defaults to 2, must be a factor of 60' }),
+  ANCHOR_BTC_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new btc-a blocks and btc anchoring, defaults to 2, must be a factor of 60, no greater than 20' }),
+  ANCHOR_ETH_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new eth-a blocks and eth anchoring, defaults to 2, must be a factor of 60, no greater than 20' }),
+  NIST_BLOCKS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of NIST blocks to generate per hour, defaults to 2, must be a factor of 60, no greater than 20' }),
 
   // NIST beacon service specific variables
   NIST_INTERVAL_MS: envalid.num({ default: 60000, desc: 'The frequency to get latest NIST beacon data, in milliseconds' }),
@@ -162,7 +162,7 @@ let envDefinitions = {
   ETH_WALLET_PASSWORD: envalid.str({ default: '', desc: 'The password to unlock the ETH wallet. Leave blank if no wallet is used.' }),
 
   // TNT Reward service specific variables
-  REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60' }),
+  REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60, no greater than 20' }),
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligible for a reward' }),
   MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' }),
 

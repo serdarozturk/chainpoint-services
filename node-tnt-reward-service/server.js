@@ -33,7 +33,7 @@ const maxFuzzyMS = 10000
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
 // decreasing the interval of the heartbeat and checking current time resolves this
-var heart = heartbeats.createHeart(200)
+let heart = heartbeats.createHeart(200)
 
 // pull in variables defined in shared database models
 let nodeAuditSequelize = nodeAuditLog.sequelize
@@ -161,18 +161,17 @@ async function performRewardAsync () {
 
   // check that most recent reward block is older than interval time
   let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
-  // checks if the last reward block is at least rewardIntervalMinutes - maxFuzzyMS old
-  // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
-  // has performed these tasks for this interval already, so we do nothing.
   try {
     let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time'], order: [['id', 'DESC']] })
     if (lastRewardBlock) {
-      // check if the last reward block is at least rewardIntervalMinutes - maxFuzzyMS old
-      // if not, return
+      // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
+      // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
+      // has performed these tasks for this interval already, so we do nothing.
+      let oneMinuteMS = 60000
       let lastRewardMS = lastRewardBlock.time * 1000
       let currentMS = Date.now()
       let ageMS = currentMS - lastRewardMS
-      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - maxFuzzyMS)) {
+      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
         console.log('Reward distribution skipped, rewardIntervalMinutes not elapsed since last reward block')
         return
       }
