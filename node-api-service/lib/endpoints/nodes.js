@@ -114,7 +114,7 @@ async function postNodeV1Async (req, res, next) {
   let newNode
   try {
     newNode = await RegisteredNode.create({
-      tntAddr: req.params.tnt_addr,
+      tntAddr: req.params.tnt_addr.toLowerCase(),
       publicUri: req.params.public_uri,
       hmacKey: randHMACKey
     })

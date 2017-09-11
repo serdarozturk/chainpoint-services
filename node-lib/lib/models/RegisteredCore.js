@@ -62,7 +62,7 @@ var RegisteredCore = sequelize.define(env.COCKROACH_REG_CORE_TABLE_NAME,
       comment: 'A seemingly valid Ethereum address that the Core may receive Core rewards with.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^0x[0-9a-f]{40}$', 'i']
+        is: ['^0x[0-9a-f]{40}$']
       },
       field: 'tnt_addr',
       allowNull: true

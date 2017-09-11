@@ -35,15 +35,15 @@ const maxFuzzyMS = 10000
 // decreasing the interval of the heartbeat and checking current time resolves this
 let heart = heartbeats.createHeart(200)
 
-// Array of Nodes not eligable to receive rewards under any circumstances
+// Array of Nodes not eligible to receive rewards under any circumstances
 // Initially, this represents all Tierion hosted Nodes
 let NODE_REWARD_TNT_ADDR_BLACKLIST = [
-  '0xB432aD51fF09623F37690b5C14e7fDdee21A8952',
-  '0xF659ed20A589371AD0857f08d9869f6e0cf6625e',
-  '0x644CC32cf0Fa4A747c478BD43D1cAce2B3D0c1b9',
-  '0xbEAE24B9e07AE50936b582Ce7f75E996f1046436',
-  '0x7B37B300C1ED5F6BaE302611789Cb60b3F5A6463',
-  '0x444b1B76da517281ef92bc6689C0108b5074addf'
+  '0xB432aD51fF09623F37690b5C14e7fDdee21A8952'.toLowerCase(),
+  '0xF659ed20A589371AD0857f08d9869f6e0cf6625e'.toLowerCase(),
+  '0x644CC32cf0Fa4A747c478BD43D1cAce2B3D0c1b9'.toLowerCase(),
+  '0xbEAE24B9e07AE50936b582Ce7f75E996f1046436'.toLowerCase(),
+  '0x7B37B300C1ED5F6BaE302611789Cb60b3F5A6463'.toLowerCase(),
+  '0x444b1B76da517281ef92bc6689C0108b5074addf'.toLowerCase()
 ]
 
 // pull in variables defined in shared database models
@@ -470,7 +470,7 @@ async function registerCoreAsync () {
     // the current Core is not registered, so add it to the registration table
     let newCore = {
       stackId: env.CHAINPOINT_CORE_BASE_URI,
-      tntAddr: env.CORE_REWARD_ETH_ADDR,
+      tntAddr: env.CORE_REWARD_ETH_ADDR.toLowerCase(),
       rewardEligible: env.CORE_REWARD_ELIGIBLE
     }
     try {

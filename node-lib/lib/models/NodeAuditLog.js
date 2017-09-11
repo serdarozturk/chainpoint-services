@@ -54,7 +54,7 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       comment: 'A seemingly valid Ethereum address that the Node will send TNT from, or receive rewards with.',
       type: Sequelize.STRING,
       validate: {
-        is: ['^0x[0-9a-f]{40}$', 'i']
+        is: ['^0x[0-9a-f]{40}$']
       },
       field: 'tnt_addr',
       allowNull: false
