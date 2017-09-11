@@ -88,7 +88,12 @@ var EthTokenLog = sequelize.define(env.COCKROACH_ETH_TNT_TX_LOG_TABLE_NAME,
     // Disable the modification of table names; By default, sequelize will automatically
     // transform all passed model names (first parameter of define) into plural.
     // if you don't want that, set the following
-    freezeTableName: true
+    freezeTableName: true,
+    // enable timestamps
+    timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+    underscored: true
   }
 )
 
