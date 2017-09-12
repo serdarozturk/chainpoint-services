@@ -76,6 +76,9 @@ const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
 // The maximum age of a node audit response to accept
 const MAX_CHALLENGE_AGE_MINUTES = 75
 
+// The minimum credit balance to receive awards and be publicly advertised
+const MIN_PASSING_CREDIT_BALANCE = 10800
+
 let challengeLockOpts = {
   key: env.CHALLENGE_LOCK_KEY,
   lockwaittime: '60s',
@@ -183,7 +186,11 @@ async function auditNodesAsync () {
 
   // iterate through each Node, requesting an answer to the challenge
   for (let x = 0; x < nodesReadyForAudit.length; x++) {
-    // if there is no public_uri set for this Node, fail all audit tests and continue to the next
+    // perform the minimum credit check
+    let currentCreditBalance = nodesReadyForAudit[x].tntCredit
+    let minCreditsPass = (currentCreditBalance >= MIN_PASSING_CREDIT_BALANCE)
+
+    // if there is no public_uri set for this Node, fail all remaining audit tests and continue to the next
     if (!nodesReadyForAudit[x].publicUri) {
       let coreAuditTimestamp = Date.now()
       try {
@@ -194,7 +201,8 @@ async function auditNodesAsync () {
           publicIPPass: false,
           nodeMSDelta: null,
           timePass: false,
-          calStatePass: false
+          calStatePass: false,
+          minCreditsPass: minCreditsPass
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
@@ -203,6 +211,9 @@ async function auditNodesAsync () {
       continue
     }
 
+    // perform the /config checks for the Node
+    let coreAuditTimestamp = Date.now()
+    let nodeResponse
     let options = {
       headers: [
         {
@@ -218,8 +229,6 @@ async function auditNodesAsync () {
       resolveWithFullResponse: true
     }
 
-    let coreAuditTimestamp = Date.now()
-    let nodeResponse
     try {
       nodeResponse = await rp(options)
       coreAuditTimestamp = Date.now()
@@ -237,7 +246,8 @@ async function auditNodesAsync () {
           publicIPPass: false,
           nodeMSDelta: null,
           timePass: false,
-          calStatePass: false
+          calStatePass: false,
+          minCreditsPass: minCreditsPass
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
@@ -245,6 +255,7 @@ async function auditNodesAsync () {
       }
       continue
     }
+
     if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
       console.log(`NodeAudit: GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
       try {
@@ -255,7 +266,8 @@ async function auditNodesAsync () {
           publicIPPass: false,
           nodeMSDelta: null,
           timePass: false,
-          calStatePass: false
+          calStatePass: false,
+          minCreditsPass: minCreditsPass
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
@@ -273,7 +285,8 @@ async function auditNodesAsync () {
           publicIPPass: false,
           nodeMSDelta: null,
           timePass: false,
-          calStatePass: false
+          calStatePass: false,
+          minCreditsPass: minCreditsPass
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
@@ -327,7 +340,8 @@ async function auditNodesAsync () {
           publicIPPass: publicIPPass,
           nodeMSDelta: nodeMSDelta,
           timePass: timePass,
-          calStatePass: calStatePass
+          calStatePass: calStatePass,
+          minCreditsPass: minCreditsPass
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
@@ -339,6 +353,7 @@ async function auditNodesAsync () {
       results.publicIPPass = publicIPPass
       results.timePass = timePass
       results.calStatePass = calStatePass
+      results.minCreditsPass = minCreditsPass
 
       console.log(`Audit complete for ${nodesReadyForAudit[x].tntAddr} at ${nodesReadyForAudit[x].publicUri}: ${JSON.stringify(results)}`)
     } catch (error) {

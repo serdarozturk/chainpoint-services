@@ -107,6 +107,12 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       type: Sequelize.BOOLEAN,
       field: 'cal_state_pass',
       allowNull: false
+    },
+    minCreditsPass: {
+      comment: 'Boolean logging if the Node has the minimum credit balance for reward eligibility.',
+      type: Sequelize.BOOLEAN,
+      field: 'min_credits_pass',
+      allowNull: false
     }
   },
   {
