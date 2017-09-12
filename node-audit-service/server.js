@@ -466,6 +466,8 @@ async function acquireAuditLockWithFuzzyDelayAsync () {
   }, randomFuzzyMS)
 }
 async function startIntervalsAsync () {
+  // wait some time for genesis block if first startup, otherwise first challenge generation will fail
+  await utils.sleep(30000)
   await acquireChallengeLockWithFuzzyDelayAsync()
   setInterval(async () => await acquireChallengeLockWithFuzzyDelayAsync(), GEN_AUDIT_CHALLENGE_MIN * 60 * 1000)
 
