@@ -44,7 +44,7 @@ async function ConsumeAggregationMessageAsync (msg) {
     // Store this state information
     await storageClient.writeAggStateObjectAsync(stateObj)
     // logs the aggregation event
-    await storageClient.logAggregatorEventForHashIdAsync(stateObj.hash_id)
+    await storageClient.logAggregatorEventForHashIdAsync(stateObj.hash_id, stateObj.hash)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
     console.log(`${msg.fields.routingKey} [${msg.properties.type}] consume message acked`)

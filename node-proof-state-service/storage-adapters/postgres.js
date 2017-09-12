@@ -297,11 +297,11 @@ async function writeBTCHeadStateObjectAsync (stateObject) {
   return true
 }
 
-async function logAggregatorEventForHashIdAsync (hashId) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, aggregator_at, steps_complete)
-    VALUES ('${hashId}', clock_timestamp(), 1)
+async function logAggregatorEventForHashIdAsync (hashId, hash) {
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, aggregator_at, steps_complete)
+    VALUES ('${hashId}', '${hash}', clock_timestamp(), 1)
     ON CONFLICT (hash_id)
-    DO UPDATE SET (aggregator_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (hash, aggregator_at, steps_complete) = ('${hash}', clock_timestamp(), hash_tracker_logs.steps_complete + 1)
     WHERE hash_tracker_logs.hash_id = '${hashId}'`)
   return true
 }
