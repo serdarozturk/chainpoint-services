@@ -41,7 +41,7 @@ let getNistLatest = () => {
             console.error(err)
           } else {
             // Only write to the key if the value changed.
-            if (timeAndSeed !== result) {
+            if (timeAndSeed !== result.Value) {
               console.log(`New NIST value received: ${timeAndSeed}`)
               consul.kv.set(env.NIST_KEY, timeAndSeed, function (err, result) {
                 if (err) throw err
