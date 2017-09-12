@@ -62,8 +62,8 @@ let nistLatest = null
 // An array of all Btc-Mon messages received and awaiting processing
 let BTC_MON_MESSAGES = []
 
-// An array of all Reward messages received and awaiting processing
-let REWARD_MESSAGES = []
+// Most recent Reward message received and awaiting processing
+let rewardLatest = null
 
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
@@ -347,7 +347,7 @@ function consumeBtcMonMessage (msg) {
 
 function consumeRewardMessage (msg) {
   if (msg !== null) {
-    REWARD_MESSAGES.push(msg)
+    rewardLatest = msg
     try {
       rewardLock.acquire()
     } catch (error) {
@@ -866,7 +866,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
       let lastAnchorTooRecent = (ageMS < (ethAnchorIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastAnchorTooRecent) {
         let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${lastEthAnchorBlock} minutes must elapse between each new eth-a block. The last one was generated ${ageSec} seconds ago by Core ${lastEthAnchorBlock.stackId}.`)
+        console.log(`No work: ${ethAnchorIntervalMinutes} minutes must elapse between each new eth-a block. The last one was generated ${ageSec} seconds ago by Core ${lastEthAnchorBlock.stackId}.`)
         return
       }
     }
@@ -899,32 +899,31 @@ registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
 // LOCK HANDLERS : reward
 registerLockEvents(rewardLock, 'rewardLock', async () => {
   try {
-    let rewardMessagesToProcess = REWARD_MESSAGES.splice(0)
-    // if there are no messages left to process, release lock and return
-    if (rewardMessagesToProcess.length === 0) return
+    // if there is no message to process, release lock and return
+    if (!rewardLatest) return
 
-    for (let index = 0; index < rewardMessagesToProcess.length; index++) {
-      let msg = rewardMessagesToProcess[index]
-      let rewardMsgObj = JSON.parse(msg.content.toString())
+    let msg = rewardLatest
+    rewardLatest = null
 
-      let dataId = rewardMsgObj.node.eth_tx_id
-      let dataVal = [rewardMsgObj.node.address, rewardMsgObj.node.amount].join(':')
-      if (rewardMsgObj.core) {
-        dataId = [dataId, rewardMsgObj.core.eth_tx_id].join(':')
-        dataVal = [dataVal, rewardMsgObj.core.address, rewardMsgObj.core.amount].join(':')
-      }
+    let rewardMsgObj = JSON.parse(msg.content.toString())
 
-      try {
-        await createRewardBlockAsync(dataId, dataVal)
-        // ack consumption of all original hash messages part of this aggregation event
-        amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
-      } catch (error) {
-        // nack consumption of all original message
-        amqpChannel.nack(msg)
-        console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
-        throw new Error(`Unable to create reward block: ${error.message}`)
-      }
+    let dataId = rewardMsgObj.node.eth_tx_id
+    let dataVal = [rewardMsgObj.node.address, rewardMsgObj.node.amount].join(':')
+    if (rewardMsgObj.core) {
+      dataId = [dataId, rewardMsgObj.core.eth_tx_id].join(':')
+      dataVal = [dataVal, rewardMsgObj.core.address, rewardMsgObj.core.amount].join(':')
+    }
+
+    try {
+      await createRewardBlockAsync(dataId, dataVal)
+      // ack consumption of all original hash messages part of this aggregation event
+      amqpChannel.ack(msg)
+      console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
+    } catch (error) {
+      // nack consumption of all original message
+      amqpChannel.nack(msg)
+      console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
+      throw new Error(`Unable to create reward block: ${error.message}`)
     }
   } catch (error) {
     console.error(error.message)

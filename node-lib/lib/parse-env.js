@@ -77,6 +77,9 @@ let envDefinitions = {
   CONSUL_PORT: envalid.num({ default: 8500, desc: 'Consul server port' }),
   NIST_KEY: envalid.str({ default: 'service/nist/latest', desc: 'The consul key to write to, watch to receive updated NIST object' }),
   CALENDAR_LOCK_KEY: envalid.str({ default: 'service/calendar/blockchain/lock', desc: 'Key used for acquiring calendar write locks' }),
+  CHALLENGE_LOCK_KEY: envalid.str({ default: 'service/audit/challenge/lock', desc: 'Key used for acquiring challenge generation locks' }),
+  AUDIT_LOCK_KEY: envalid.str({ default: 'service/audit/audit/lock', desc: 'Key used for acquiring audit processing locks' }),
+  REWARD_DISTRIBUTE_KEY: envalid.str({ default: 'service/reward/distribute/lock', desc: 'Key used for acquiring reward distribution locks' }),
 
   // RabbitMQ related variables
   RABBITMQ_CONNECT_URI: envalid.url({ default: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
@@ -168,11 +171,7 @@ let envDefinitions = {
   // TNT Reward service specific variables
   REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60, no greater than 20' }),
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligible for a reward' }),
-  MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' }),
-
-  // Audit service specific variables
-  CHALLENGE_LOCK_KEY: envalid.str({ default: 'service/audit/challenge/lock', desc: 'Key used for acquiring challenge generation locks' }),
-  AUDIT_LOCK_KEY: envalid.str({ default: 'service/audit/audit/lock', desc: 'Key used for acquiring audit processing locks' })
+  MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' })
 }
 
 module.exports = (service) => {

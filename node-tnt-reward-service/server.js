@@ -26,18 +26,23 @@ const registeredCore = require('./lib/models/RegisteredCore.js')
 const csprng = require('random-number-csprng')
 const BigNumber = require('bignumber.js')
 const heartbeats = require('heartbeats')
+const cnsl = require('consul')
+const _ = require('lodash')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
 var amqpChannel = null
 
 // the fuzz factor for anchor interval meant to give each core instance a random chance of being first
-const maxFuzzyMS = 10000
+const maxFuzzyMS = 1000
 
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
 // decreasing the interval of the heartbeat and checking current time resolves this
 let heart = heartbeats.createHeart(200)
+
+let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+console.log('Consul connection established')
 
 // Array of Nodes not eligible to receive rewards under any circumstances
 // Initially, this represents all Tierion hosted Nodes
@@ -57,6 +62,70 @@ let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let registeredCoreSequelize = registeredCore.sequelize
 let RegisteredCore = registeredCore.RegisteredCore
+
+var lockOpts = {
+  key: env.REWARD_DISTRIBUTE_KEY,
+  lockwaittime: '60s',
+  lockwaittimeout: '60s',
+  lockretrytime: '100ms',
+  session: {
+    behavior: 'delete',
+    checks: ['serfHealth'],
+    lockdelay: '1ms',
+    name: 'reward-distribute-lock',
+    ttl: '30s'
+  }
+}
+
+let rewardDistributeLock = consul.lock(_.merge({}, lockOpts, { value: 'reward-distribute' }))
+
+function registerLockEvents (lock, lockName, acquireFunction) {
+  lock.on('acquire', () => {
+    console.log(`${lockName} acquired`)
+    acquireFunction()
+  })
+
+  lock.on('error', (err) => {
+    console.error(`${lockName} error - ${err}`)
+  })
+
+  lock.on('release', () => {
+    console.log(`${lockName} release`)
+  })
+}
+
+// LOCK HANDLERS : rewardDistributeLock
+registerLockEvents(rewardDistributeLock, 'rewardDistributeLock', async () => {
+  // check that most recent reward block is older than interval time
+  let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
+  try {
+    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
+    if (lastRewardBlock) {
+      // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
+      // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
+      // has performed these tasks for this interval already, so we do nothing.
+      let oneMinuteMS = 60000
+      let lastRewardMS = lastRewardBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastRewardMS
+      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${rewardIntervalMinutes} minutes must elapse between each new reward distribution. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
+        return
+      }
+    }
+    await performRewardAsync()
+    // give the calendar service enough time to receive and process the reward message
+    // TODO: Maybe move the interval check and /transfer calls to the calendar reward lock,
+    // eliminating the need for this distribution lock as well as the delay below
+    await utils.sleep(5000)
+  } catch (error) {
+    console.error(`Unable to distribute reward: ${error.message}`)
+  } finally {
+    // always release lock
+    rewardDistributeLock.release()
+  }
+})
 
 // Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and TNT balance
@@ -173,29 +242,6 @@ async function performRewardAsync () {
   }
   let nodeRewardTxId = ''
   let coreRewardTxId = ''
-
-  // check that most recent reward block is older than interval time
-  let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
-  try {
-    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
-    if (lastRewardBlock) {
-      // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
-      // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
-      // has performed these tasks for this interval already, so we do nothing.
-      let oneMinuteMS = 60000
-      let lastRewardMS = lastRewardBlock.time * 1000
-      let currentMS = Date.now()
-      let ageMS = currentMS - lastRewardMS
-      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
-        let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${lastRewardBlock} minutes must elapse between each new reward block. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
-        return
-      }
-    }
-  } catch (error) {
-    console.error(`Unable to query recent reward block: ${error.message}`)
-    return
-  }
 
   // reward TNT to ETH address for selected qualifying Node
   let postObject = {
@@ -388,7 +434,13 @@ function setTNTRewardInterval () {
       currentMinute = now.getUTCMinutes()
       if (rewardMinutes.includes(currentMinute)) {
         let randomFuzzyMS = await csprng(0, maxFuzzyMS)
-        setTimeout(performRewardAsync, randomFuzzyMS)
+        setTimeout(() => {
+          try {
+            rewardDistributeLock.acquire()
+          } catch (error) {
+            console.error('rewardDistributeLock.acquire(): caught err: ', error.message)
+          }
+        }, randomFuzzyMS)
       }
     }
   })
