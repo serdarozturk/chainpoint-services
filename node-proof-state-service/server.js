@@ -72,6 +72,7 @@ async function ConsumeCalendarMessageAsync (msg) {
     if (count < messageObj.agg_hash_count) throw new Error('unable to read all hash data')
     let rows = await storageClient.getHashIdsByAggIdAsync(stateObj.agg_id)
     await storageClient.writeCalStateObjectAsync(stateObj)
+    console.log(`Wrote cal state object: ${JSON.stringify(stateObj)}`)
 
     async.waterfall([
       async.constant(rows),
@@ -139,6 +140,7 @@ async function ConsumeAnchorBTCAggMessageAsync (msg) {
 
   try {
     await storageClient.writeAnchorBTCAggStateObjectAsync(stateObj)
+    console.log(`Wrote anchor btc agg state object: ${JSON.stringify(stateObj)}`)
     // New message has been published and event logged, ack consumption of original message
     amqpChannel.ack(msg)
     console.log(`${msg.fields.routingKey} [${msg.properties.type}] consume message acked`)
@@ -185,6 +187,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
 
   try {
     let rows = await storageClient.getHashIdsByBtcTxIdAsync(stateObj.btctx_id)
+    console.log(`${rows} hash(es) have been found for btc transaction ${stateObj.btctx_id}`)
     await storageClient.writeBTCHeadStateObjectAsync(stateObj)
 
     async.waterfall([
