@@ -158,7 +158,7 @@ let envDefinitions = {
   // Proof State service specific variables
   RMQ_PREFETCH_COUNT_STATE: envalid.num({ default: 10, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   RMQ_WORK_IN_STATE_QUEUE: envalid.str({ default: 'work.state', desc: 'The queue name for message consumption originating from the aggregator, calendar, and proof state services' }),
-  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 120, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' }),
+  PRUNE_FREQUENCY_MINUTES: envalid.num({ default: 1, desc: 'The frequency that the proof state and hash tracker log tables have their old, unneeded data pruned, in minutes' }),
 
   // ETH TNT Listener / TNT TX services specific variables
   ETH_PROVIDER_URI: envalid.url({ default: 'http://testrpc:8545', desc: 'URI to the ETH node provider.' }),
