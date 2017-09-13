@@ -54,27 +54,21 @@ let CalendarBlock = calendarBlock.CalendarBlock
 let auditChallengeSequelize = auditChallenge.sequelize
 let AuditChallenge = auditChallenge.AuditChallenge
 
-// See : https://github.com/ranm8/requestify
-// Setup requestify and its caching layer.
-const requestify = require('requestify')
-const coreCacheTransporters = requestify.coreCacheTransporters
-requestify.cacheTransporter(coreCacheTransporters.inMemory())
-
 // The frequency of the Node audit checks
-const AUDIT_NODES_INTERVAL_MS = 1000 * 60 // 1 minute
+const NODE_AUDIT_FREQ_MIN = 1 // 1 minute
 
 // The age of the last successful audit before a new audit should be performed for a Node
-const AUDIT_NEEDED_AGE_MS = 1000 * 60 * 30 // 30 minutes
+const NODE_NEW_AUDIT_INTERVAL_MIN = 30 // 30 minutes
 
 // The frequency in which audit challenges are generated, in minutes
 // Value must be greater than 2, or results may be unpredictable
-const GEN_AUDIT_CHALLENGE_MIN = 60 // 1 hour
+const GEN_NEW_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
 const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
 
 // The maximum age of a node audit response to accept
-const MAX_CHALLENGE_AGE_MINUTES = 75
+const MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN = 75
 
 // The minimum credit balance to receive awards and be publicly advertised
 const MIN_PASSING_CREDIT_BALANCE = 10800
@@ -136,10 +130,10 @@ registerLockEvents(challengeLock, 'challengeLock', async () => {
       let oneMinuteMS = 60000
       let currentMS = Date.now()
       let ageMS = currentMS - mostRecentChallenge.time
-      let lastChallengeTooRecent = (ageMS < (GEN_AUDIT_CHALLENGE_MIN * 60 * 1000 - oneMinuteMS))
+      let lastChallengeTooRecent = (ageMS < (GEN_NEW_AUDIT_CHALLENGE_MIN * 60 * 1000 - oneMinuteMS))
       if (lastChallengeTooRecent) {
         let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${GEN_AUDIT_CHALLENGE_MIN} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
+        console.log(`No work: ${GEN_NEW_AUDIT_CHALLENGE_MIN} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
         return
       }
     }
@@ -168,7 +162,7 @@ registerLockEvents(auditLock, 'auditLock', async () => {
 async function auditNodesAsync () {
   let nodesReadyForAudit = []
   try {
-    let lastAuditCutoff = Date.now() - AUDIT_NEEDED_AGE_MS
+    let lastAuditCutoff = Date.now() - (NODE_NEW_AUDIT_INTERVAL_MIN * 60 * 1000)
     nodesReadyForAudit = await RegisteredNode.findAll(
       {
         where: {
@@ -303,7 +297,7 @@ async function auditNodesAsync () {
 
       // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
       let coreAuditChallenge
-      let minTimestamp = coreAuditTimestamp - (MAX_CHALLENGE_AGE_MINUTES * 60 * 1000)
+      let minTimestamp = coreAuditTimestamp - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
       if (parseInt(nodeAuditResponseTimestamp) >= minTimestamp) {
         coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
       }
@@ -444,6 +438,21 @@ async function openStorageConnectionAsync () {
   }
 }
 
+async function checkForGenesisBlockAsync () {
+  let genesisBlock
+  while (!genesisBlock) {
+    try {
+      genesisBlock = await CalendarBlock.findOne({ where: { id: 0 } })
+      // if the genesis block does not exist, wait 5 seconds and try again
+      if (!genesisBlock) await utils.sleep(5000)
+    } catch (error) {
+      console.error(`Unable to query calendar: ${error.message}`)
+      process.exit(1)
+    }
+  }
+  console.log(`Genesis block found, calendar confirmed to exist`)
+}
+
 async function acquireChallengeLockWithFuzzyDelayAsync () {
   let randomFuzzyMS = await rnd(0, maxFuzzyMS)
   setTimeout(() => {
@@ -466,13 +475,11 @@ async function acquireAuditLockWithFuzzyDelayAsync () {
   }, randomFuzzyMS)
 }
 async function startIntervalsAsync () {
-  // wait some time for genesis block if first startup, otherwise first challenge generation will fail
-  await utils.sleep(30000)
   await acquireChallengeLockWithFuzzyDelayAsync()
-  setInterval(async () => await acquireChallengeLockWithFuzzyDelayAsync(), GEN_AUDIT_CHALLENGE_MIN * 60 * 1000)
+  setInterval(async () => await acquireChallengeLockWithFuzzyDelayAsync(), GEN_NEW_AUDIT_CHALLENGE_MIN * 60 * 1000)
 
   await acquireAuditLockWithFuzzyDelayAsync()
-  setInterval(async () => await acquireAuditLockWithFuzzyDelayAsync(), AUDIT_NODES_INTERVAL_MS)
+  setInterval(async () => await acquireAuditLockWithFuzzyDelayAsync(), NODE_AUDIT_FREQ_MIN * 60 * 1000)
 }
 
 // process all steps need to start the application
@@ -481,6 +488,8 @@ async function start () {
   try {
     // init DB
     await openStorageConnectionAsync()
+    // ensure at least 1 calendar block exist
+    await checkForGenesisBlockAsync()
     // start main processing
     await startIntervalsAsync()
     console.log('startup completed successfully')
