@@ -931,7 +931,7 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
       let ageMS = currentMS - lastRewardMS
       if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
         let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${rewardIntervalMinutes} minutes must elapse between each new reward blok. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
+        console.log(`No work: ${rewardIntervalMinutes} minutes must elapse between each new reward block. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
         return
       }
     }
