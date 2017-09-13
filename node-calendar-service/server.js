@@ -28,6 +28,7 @@ const cnsl = require('consul')
 const utils = require('./lib/utils.js')
 const heartbeats = require('heartbeats')
 const rand = require('random-number-csprng')
+const rp = require('request-promise-native')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -64,6 +65,9 @@ let BTC_MON_MESSAGES = []
 
 // Most recent Reward message received and awaiting processing
 let rewardLatest = null
+
+// The URI to use for requests to the eth-tnt-tx service
+let ethTntTxUri = env.ETH_TNT_TX_CONNECT_URI
 
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
@@ -904,19 +908,113 @@ registerLockEvents(ethConfirmLock, 'ethConfirmLock', () => {
 
 // LOCK HANDLERS : reward
 registerLockEvents(rewardLock, 'rewardLock', async () => {
+  let msg = rewardLatest
+  let rewardMsgObj = JSON.parse(msg.content.toString())
+  let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
+
   try {
-    // if there is no message to process, release lock and return
-    if (!rewardLatest) return
+    let lastRewardBlock
+    try {
+      lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
+    } catch (error) {
+      // nack consumption of all original message
+      amqpChannel.nack(msg)
+      console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
+      throw new Error(`Unable to retrieve recent reward block: ${error.message}`)
+    }
+    if (lastRewardBlock) {
+      // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
+      // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
+      // has performed these tasks for this interval already, so we do nothing.
+      let oneMinuteMS = 60000
+      let lastRewardMS = lastRewardBlock.time * 1000
+      let currentMS = Date.now()
+      let ageMS = currentMS - lastRewardMS
+      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
+        let ageSec = Math.round(ageMS / 1000)
+        console.log(`No work: ${rewardIntervalMinutes} minutes must elapse between each new reward blok. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
+        return
+      }
+    }
 
-    let msg = rewardLatest
-    rewardLatest = null
+    // transfer TNT according to random reward message selection
+    let nodeRewardTxId = ''
+    let coreRewardTxId = ''
+    let nodeRewardETHAddr = rewardMsgObj.node.address
+    let nodeTNTGrainsRewardShare = rewardMsgObj.node.amount
+    let coreRewardEthAddr = rewardMsgObj.core ? rewardMsgObj.core.address : null
+    let coreTNTGrainsRewardShare = rewardMsgObj.core ? rewardMsgObj.core.amount : 0
 
-    let rewardMsgObj = JSON.parse(msg.content.toString())
+    // reward TNT to ETH address for selected qualifying Node according to random reward message selection
+    let postObject = {
+      to_addr: nodeRewardETHAddr,
+      value: nodeTNTGrainsRewardShare
+    }
 
-    let dataId = rewardMsgObj.node.eth_tx_id
+    let options = {
+      headers: [
+        {
+          name: 'Content-Type',
+          value: 'application/json'
+        }
+      ],
+      method: 'POST',
+      uri: `${ethTntTxUri}/transfer`,
+      body: postObject,
+      json: true,
+      gzip: true,
+      resolveWithFullResponse: true
+    }
+
+    try {
+      let rewardResponse = await rp(options)
+      nodeRewardTxId = rewardResponse.body.trx_id
+      console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${nodeRewardETHAddr} in transaction ${nodeRewardTxId}`)
+    } catch (error) {
+      console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${nodeRewardETHAddr}: ${error.message}`)
+      console.error(`Retrying in 10 seconds`)
+      await utils.sleep(10000)
+      amqpChannel.nack(msg)
+      console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
+      return
+    }
+
+    // reward TNT to Core operator according to random reward message selection (if applicable)
+    if (coreTNTGrainsRewardShare > 0) {
+      let postObject = {
+        to_addr: coreRewardEthAddr,
+        value: coreTNTGrainsRewardShare
+      }
+
+      let options = {
+        headers: [
+          {
+            name: 'Content-Type',
+            value: 'application/json'
+          }
+        ],
+        method: 'POST',
+        uri: `${ethTntTxUri}/transfer`,
+        body: postObject,
+        json: true,
+        gzip: true,
+        resolveWithFullResponse: true
+      }
+
+      try {
+        let rewardResponse = await rp(options)
+        coreRewardTxId = rewardResponse.body.trx_id
+        console.log(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
+      } catch (error) {
+        console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr}: ${error.message}`)
+      }
+    }
+
+    // construct the reward block data
+    let dataId = nodeRewardTxId
     let dataVal = [rewardMsgObj.node.address, rewardMsgObj.node.amount].join(':')
     if (rewardMsgObj.core) {
-      dataId = [dataId, rewardMsgObj.core.eth_tx_id].join(':')
+      dataId = [dataId, coreRewardTxId].join(':')
       dataVal = [dataVal, rewardMsgObj.core.address, rewardMsgObj.core.amount].join(':')
     }
 
@@ -926,8 +1024,9 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
       amqpChannel.ack(msg)
       console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
     } catch (error) {
-      // nack consumption of all original message
-      amqpChannel.nack(msg)
+      // ack consumption of all original message
+      // this message must be acked to avoid reward distribution to node from occuring again
+      amqpChannel.ack(msg)
       console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
       throw new Error(`Unable to create reward block: ${error.message}`)
     }

@@ -26,8 +26,6 @@ const registeredCore = require('./lib/models/RegisteredCore.js')
 const csprng = require('random-number-csprng')
 const BigNumber = require('bignumber.js')
 const heartbeats = require('heartbeats')
-const cnsl = require('consul')
-const _ = require('lodash')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -40,9 +38,6 @@ const maxFuzzyMS = 1000
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
 // decreasing the interval of the heartbeat and checking current time resolves this
 let heart = heartbeats.createHeart(200)
-
-let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
-console.log('Consul connection established')
 
 // Array of Nodes not eligible to receive rewards under any circumstances
 // Initially, this represents all Tierion hosted Nodes
@@ -62,70 +57,6 @@ let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let registeredCoreSequelize = registeredCore.sequelize
 let RegisteredCore = registeredCore.RegisteredCore
-
-var lockOpts = {
-  key: env.REWARD_DISTRIBUTE_KEY,
-  lockwaittime: '60s',
-  lockwaittimeout: '60s',
-  lockretrytime: '100ms',
-  session: {
-    behavior: 'delete',
-    checks: ['serfHealth'],
-    lockdelay: '1ms',
-    name: 'reward-distribute-lock',
-    ttl: '30s'
-  }
-}
-
-let rewardDistributeLock = consul.lock(_.merge({}, lockOpts, { value: 'reward-distribute' }))
-
-function registerLockEvents (lock, lockName, acquireFunction) {
-  lock.on('acquire', () => {
-    console.log(`${lockName} acquired`)
-    acquireFunction()
-  })
-
-  lock.on('error', (err) => {
-    console.error(`${lockName} error - ${err}`)
-  })
-
-  lock.on('release', () => {
-    console.log(`${lockName} release`)
-  })
-}
-
-// LOCK HANDLERS : rewardDistributeLock
-registerLockEvents(rewardDistributeLock, 'rewardDistributeLock', async () => {
-  // check that most recent reward block is older than interval time
-  let rewardIntervalMinutes = 60 / env.REWARDS_PER_HOUR
-  try {
-    let lastRewardBlock = await CalendarBlock.findOne({ where: { type: 'reward' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
-    if (lastRewardBlock) {
-      // checks if the last reward block is at least rewardIntervalMinutes - oneMinuteMS old
-      // Only if so, we distribute rewards and write a new reward block. Otherwise, another process
-      // has performed these tasks for this interval already, so we do nothing.
-      let oneMinuteMS = 60000
-      let lastRewardMS = lastRewardBlock.time * 1000
-      let currentMS = Date.now()
-      let ageMS = currentMS - lastRewardMS
-      if (ageMS < (rewardIntervalMinutes * 60 * 1000 - oneMinuteMS)) {
-        let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${rewardIntervalMinutes} minutes must elapse between each new reward distribution. The last one was generated ${ageSec} seconds ago by Core ${lastRewardBlock.stackId}.`)
-        return
-      }
-    }
-    await performRewardAsync()
-    // give the calendar service enough time to receive and process the reward message
-    // TODO: Maybe move the interval check and /transfer calls to the calendar reward lock,
-    // eliminating the need for this distribution lock as well as the delay below
-    await utils.sleep(5000)
-  } catch (error) {
-    console.error(`Unable to distribute reward: ${error.message}`)
-  } finally {
-    // always release lock
-    rewardDistributeLock.release()
-  }
-})
 
 // Randomly select and deliver token reward from the list
 // of registered nodes that meet the minimum audit and TNT balance
@@ -240,81 +171,16 @@ async function performRewardAsync () {
     nodeTNTGrainsRewardShare = calculatedShares.totalTNTGrainsReward
     coreTNTGrainsRewardShare = 0
   }
-  let nodeRewardTxId = ''
-  let coreRewardTxId = ''
 
-  // reward TNT to ETH address for selected qualifying Node
-  let postObject = {
-    to_addr: qualifiedNodeETHAddr,
-    value: nodeTNTGrainsRewardShare
-  }
-
-  let options = {
-    headers: [
-      {
-        name: 'Content-Type',
-        value: 'application/json'
-      }
-    ],
-    method: 'POST',
-    uri: `${ethTntTxUri}/transfer`,
-    body: postObject,
-    json: true,
-    gzip: true,
-    resolveWithFullResponse: true
-  }
-
-  try {
-    let rewardResponse = await rp(options)
-    nodeRewardTxId = rewardResponse.body.trx_id
-    console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${qualifiedNodeETHAddr} in transaction ${nodeRewardTxId}`)
-  } catch (error) {
-    console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${qualifiedNodeETHAddr}: ${error.message}`)
-    return
-  }
-
-  // reward TNT to Core operator (if applicable)
-  if (coreTNTGrainsRewardShare > 0) {
-    let postObject = {
-      to_addr: coreRewardEthAddr,
-      value: coreTNTGrainsRewardShare
-    }
-
-    let options = {
-      headers: [
-        {
-          name: 'Content-Type',
-          value: 'application/json'
-        }
-      ],
-      method: 'POST',
-      uri: `${ethTntTxUri}/transfer`,
-      body: postObject,
-      json: true,
-      gzip: true,
-      resolveWithFullResponse: true
-    }
-
-    try {
-      let rewardResponse = await rp(options)
-      coreRewardTxId = rewardResponse.body.trx_id
-      console.log(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Core using ETH address ${coreRewardEthAddr} in transaction ${coreRewardTxId}`)
-    } catch (error) {
-      console.error(`${coreTNTGrainsRewardShare} grains (${coreTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Core using ETH address ${coreRewardEthAddr}: ${error.message}`)
-    }
-  }
-
-  // send reward result message to Calendar
+  // send reward calculation message to Calendar
   let messageObj = {}
   messageObj.node = {}
   messageObj.node.address = qualifiedNodeETHAddr
   messageObj.node.amount = nodeTNTGrainsRewardShare
-  messageObj.node.eth_tx_id = nodeRewardTxId
   if (coreTNTGrainsRewardShare > 0) {
     messageObj.core = {}
     messageObj.core.address = coreRewardEthAddr
     messageObj.core.amount = coreTNTGrainsRewardShare
-    messageObj.core.eth_tx_id = coreRewardTxId
   }
 
   try {
@@ -414,47 +280,6 @@ async function calculateCurrentRewardShares () {
   }
 }
 
-// Set the TNT Reward interval
-function setTNTRewardInterval () {
-  let currentMinute = new Date().getUTCMinutes()
-
-  // determine the minutes of the hour to run process based on REWARDS_PER_HOUR
-  let rewardMinutes = []
-  let minuteOfHour = 0
-  while (minuteOfHour < 60) {
-    rewardMinutes.push(minuteOfHour)
-    minuteOfHour += (60 / env.REWARDS_PER_HOUR)
-  }
-
-  heart.createEvent(1, async function (count, last) {
-    let now = new Date()
-
-    // if we are on a new minute
-    if (now.getUTCMinutes() !== currentMinute) {
-      currentMinute = now.getUTCMinutes()
-      if (rewardMinutes.includes(currentMinute)) {
-        let randomFuzzyMS = await csprng(0, maxFuzzyMS)
-        setTimeout(() => {
-          try {
-            rewardDistributeLock.acquire()
-          } catch (error) {
-            console.error('rewardDistributeLock.acquire(): caught err: ', error.message)
-          }
-        }, randomFuzzyMS)
-      }
-    }
-  })
-}
-
-// This initalizes all the JS intervals that fire all aggregator events
-function startIntervals () {
-  console.log('starting intervals')
-
-  // PERIODIC TIMERS
-
-  setTNTRewardInterval()
-}
-
 /**
  * Opens an AMPQ connection and channel
  * Retry logic is included to handle losses of connection
@@ -538,6 +363,41 @@ async function registerCoreAsync () {
   } else {
     console.log(`Core ${currentCore.stackId} registration found`)
   }
+}
+
+// This initalizes all the JS intervals that fire all aggregator events
+function startIntervals () {
+  console.log('starting intervals')
+
+  // PERIODIC TIMERS
+
+  setTNTRewardInterval()
+}
+
+// Set the TNT Reward interval
+function setTNTRewardInterval () {
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on REWARDS_PER_HOUR
+  let rewardMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    rewardMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.REWARDS_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (rewardMinutes.includes(currentMinute)) {
+        let randomFuzzyMS = await csprng(0, maxFuzzyMS)
+        setTimeout(() => performRewardAsync(), randomFuzzyMS)
+      }
+    }
+  })
 }
 
 // process all steps need to start the application

@@ -79,7 +79,6 @@ let envDefinitions = {
   CALENDAR_LOCK_KEY: envalid.str({ default: 'service/calendar/blockchain/lock', desc: 'Key used for acquiring calendar write locks' }),
   CHALLENGE_LOCK_KEY: envalid.str({ default: 'service/audit/challenge/lock', desc: 'Key used for acquiring challenge generation locks' }),
   AUDIT_LOCK_KEY: envalid.str({ default: 'service/audit/audit/lock', desc: 'Key used for acquiring audit processing locks' }),
-  REWARD_DISTRIBUTE_KEY: envalid.str({ default: 'service/reward/distribute/lock', desc: 'Key used for acquiring reward distribution locks' }),
 
   // RabbitMQ related variables
   RABBITMQ_CONNECT_URI: envalid.url({ default: 'amqp://chainpoint:chainpoint@rabbitmq', desc: 'Connection string w/ credentials for RabbitMQ' }),
