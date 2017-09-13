@@ -45,8 +45,12 @@ const validateFactorOfSixtyUpToSixty = envalid.makeValidator(x => {
   else throw new Error('Value must be a factor of 60')
 })
 const validateETHAddress = envalid.makeValidator(x => {
-  if (/^0x[0-9a-f]{40}$/i.test(x)) return x
+  if (/^0x[0-9a-f]{40}$/i.test(x)) return x.toLowerCase()
   else throw new Error('Value must be a well formatted Ethereum address')
+})
+const validateETHAddressesCSV = envalid.makeValidator(x => {
+  if (/^((0x[0-9a-f]{40})(,(0x[0-9a-f]{40}))*)+$/i.test(x)) return x.toLowerCase()
+  else throw new Error('Value must be a comma separated list of well formatted Ethereum addresses')
 })
 
 let envDefinitions = {
@@ -186,7 +190,7 @@ module.exports = (service) => {
   switch (service) {
     case 'api':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
-      envDefinitions.ETH_TNT_LISTEN_ADDRS = envalid.str({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
+      envDefinitions.ETH_TNT_LISTEN_ADDRS = validateETHAddressesCSV({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
       break
     case 'cal':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })
@@ -201,14 +205,14 @@ module.exports = (service) => {
       envDefinitions.BITCOIN_WIF = envalid.str({ desc: 'The Bitcoin private key WIF used for transaction creation' })
       break
     case 'eth-tnt-tx':
-      envDefinitions.ETH_TNT_TOKEN_ADDR = envalid.str({ desc: 'The address where the contract is on the blockchain.' })
+      envDefinitions.ETH_TNT_TOKEN_ADDR = validateETHAddress({ desc: 'The address where the contract is on the blockchain.' })
       break
     case 'eth-contracts':
-      envDefinitions.ETH_TNT_TOKEN_ADDR = envalid.str({ desc: 'The address where the contract is on the blockchain.' })
+      envDefinitions.ETH_TNT_TOKEN_ADDR = validateETHAddress({ desc: 'The address where the contract is on the blockchain.' })
       break
     case 'eth-tnt-listener':
-      envDefinitions.ETH_TNT_LISTEN_ADDRS = envalid.str({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
-      envDefinitions.ETH_TNT_TOKEN_ADDR = envalid.str({ desc: 'The address where the contract is on the blockchain.' })
+      envDefinitions.ETH_TNT_LISTEN_ADDRS = validateETHAddressesCSV({ desc: 'The addresses used to listen for incoming TNT transfers.  If more that one, separate by commas.' })
+      envDefinitions.ETH_TNT_TOKEN_ADDR = validateETHAddress({ desc: 'The address where the contract is on the blockchain.' })
       break
     case 'tnt-reward':
       envDefinitions.CHAINPOINT_CORE_BASE_URI = envalid.url({ desc: 'Base URI for this Chainpoint Core stack of services' })

@@ -351,7 +351,7 @@ async function registerCoreAsync () {
     // the current Core is not registered, so add it to the registration table
     let newCore = {
       stackId: env.CHAINPOINT_CORE_BASE_URI,
-      tntAddr: env.CORE_REWARD_ETH_ADDR.toLowerCase(),
+      tntAddr: env.CORE_REWARD_ETH_ADDR,
       rewardEligible: env.CORE_REWARD_ELIGIBLE
     }
     try {

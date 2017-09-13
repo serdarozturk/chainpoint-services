@@ -162,8 +162,11 @@ async function postHashV1Async (req, res, next) {
   }
 
   // validate tnt-address value
+  let tntAddrHeaderParam
   if (!/^0x[0-9a-f]{40}$/i.test(req.headers['tnt-address'])) {
     return next(new restify.InvalidCredentialsError('authorization denied: invalid tnt-address value'))
+  } else {
+    tntAddrHeaderParam = req.headers['tnt-address'].toLowerCase()
   }
 
   // validate params has parse a 'hash' key
@@ -200,7 +203,7 @@ async function postHashV1Async (req, res, next) {
   // validate the calculated hmac
   let regNode = null
   try {
-    regNode = await RegisteredNode.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
+    regNode = await RegisteredNode.findOne({ where: { tntAddr: tntAddrHeaderParam }, attributes: ['tntAddr', 'hmacKey', 'tntCredit'] })
     if (!regNode) {
       return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }

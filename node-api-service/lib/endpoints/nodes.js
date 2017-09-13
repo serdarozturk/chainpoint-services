@@ -89,8 +89,11 @@ async function postNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, empty tnt_addr'))
   }
 
+  let lowerCasedTntAddrParam
   if (!isEthereumAddr(req.params.tnt_addr)) {
     return next(new restify.InvalidArgumentError('invalid JSON body, malformed tnt_addr'))
+  } else {
+    lowerCasedTntAddrParam = req.params.tnt_addr.toLowerCase()
   }
 
   // a POST without public_uri prop represents a non-public Node
@@ -104,7 +107,7 @@ async function postNodeV1Async (req, res, next) {
   }
 
   try {
-    let count = await RegisteredNode.count({ where: { tntAddr: req.params.tnt_addr } })
+    let count = await RegisteredNode.count({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (count >= 1) {
       return next(new restify.ConflictError('tnt_addr address already exists'))
     }
@@ -118,7 +121,7 @@ async function postNodeV1Async (req, res, next) {
   let newNode
   try {
     newNode = await RegisteredNode.create({
-      tntAddr: req.params.tnt_addr.toLowerCase(),
+      tntAddr: lowerCasedTntAddrParam,
       publicUri: req.params.public_uri,
       hmacKey: randHMACKey
     })
@@ -153,8 +156,11 @@ async function putNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, empty tnt_addr'))
   }
 
+  let lowerCasedTntAddrParam
   if (!isEthereumAddr(req.params.tnt_addr)) {
     return next(new restify.InvalidArgumentError('invalid JSON body, malformed tnt_addr'))
+  } else {
+    lowerCasedTntAddrParam = req.params.tnt_addr.toLowerCase()
   }
 
   // if an public_uri is provided, it must be valid
@@ -177,7 +183,7 @@ async function putNodeV1Async (req, res, next) {
   }
 
   try {
-    let regNode = await RegisteredNode.find({ where: { tntAddr: req.params.tnt_addr } })
+    let regNode = await RegisteredNode.find({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (!regNode) {
       return next(new restify.ResourceNotFoundError('not found'))
     }
@@ -186,6 +192,8 @@ async function putNodeV1Async (req, res, next) {
     // Forces Nodes to be within 1 min of Core to generate a valid HMAC
     let hash = crypto.createHmac('sha256', regNode.hmacKey)
     let formattedDate = moment().utc().format('YYYYMMDDHHmm')
+    // use req.params.tnt_addr below instead of lowerCasedTntAddrParam to preserve
+    // formatting submitted from Node and used in that Node's calculation
     let hmacTxt = [req.params.tnt_addr, req.params.public_uri, formattedDate].join('')
     let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
@@ -206,7 +214,7 @@ async function putNodeV1Async (req, res, next) {
   }
 
   res.send({
-    tnt_addr: req.params.tnt_addr,
+    tnt_addr: lowerCasedTntAddrParam,
     public_uri: req.params.public_uri
   })
   return next()

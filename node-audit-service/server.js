@@ -189,7 +189,7 @@ async function auditNodesAsync () {
       let coreAuditTimestamp = Date.now()
       try {
         await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr.toLowerCase(),
+          tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: null,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
@@ -234,7 +234,7 @@ async function auditNodesAsync () {
       }
       try {
         await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr.toLowerCase(),
+          tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
@@ -254,7 +254,7 @@ async function auditNodesAsync () {
       console.log(`NodeAudit: GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
       try {
         await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr.toLowerCase(),
+          tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
@@ -273,7 +273,7 @@ async function auditNodesAsync () {
       console.log(`NodeAudit: GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
       try {
         await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr.toLowerCase(),
+          tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: false,
@@ -328,7 +328,7 @@ async function auditNodesAsync () {
       // update the Node audit results in RegisteredNode
       try {
         await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr.toLowerCase(),
+          tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: nodesReadyForAudit[x].publicUri,
           auditAt: coreAuditTimestamp,
           publicIPPass: publicIPPass,

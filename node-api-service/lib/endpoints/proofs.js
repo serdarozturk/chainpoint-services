@@ -64,8 +64,11 @@ async function getProofsByIDV1Async (req, res, next) {
   }
 
   // validate tnt-address value
+  let tntAddrHeaderParam
   if (!/^0x[0-9a-f]{40}$/i.test(req.headers['tnt-address'])) {
     return next(new restify.InvalidCredentialsError('authorization denied: invalid tnt-address value'))
+  } else {
+    tntAddrHeaderParam = req.headers['tnt-address'].toLowerCase()
   }
 
   // check if hash_id parameter was included
@@ -95,7 +98,7 @@ async function getProofsByIDV1Async (req, res, next) {
   // validate the calculated hmac
   let regNode = null
   try {
-    regNode = await RegisteredNode.findOne({ where: { tntAddr: req.headers['tnt-address'] }, attributes: ['tntAddr', 'hmacKey'] })
+    regNode = await RegisteredNode.findOne({ where: { tntAddr: tntAddrHeaderParam }, attributes: ['tntAddr', 'hmacKey'] })
     if (!regNode) {
       return next(new restify.InvalidCredentialsError('authorization denied: unknown tnt-address'))
     }

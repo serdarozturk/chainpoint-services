@@ -75,8 +75,8 @@ async function processNewTxAsync (params) {
     txId: params.transactionHash,
     transactionIndex: params.transactionIndex,
     blockNumber: params.blockNumber,
-    fromAddress: params.args.from,
-    toAddress: params.args.to,
+    fromAddress: params.args.from.toLowerCase(),
+    toAddress: params.args.to.toLowerCase(),
     amount: params.args.value
   }
 
