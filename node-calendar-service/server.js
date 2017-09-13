@@ -972,11 +972,6 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
       console.log(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) transferred to Node using ETH address ${nodeRewardETHAddr} in transaction ${nodeRewardTxId}`)
     } catch (error) {
       console.error(`${nodeTNTGrainsRewardShare} grains (${nodeTNTGrainsRewardShare / 10 ** 8} TNT) failed to be transferred to Node using ETH address ${nodeRewardETHAddr}: ${error.message}`)
-      console.error(`Retrying in 10 seconds`)
-      await utils.sleep(10000)
-      amqpChannel.nack(msg)
-      console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
-      return
     }
 
     // reward TNT to Core operator according to random reward message selection (if applicable)
@@ -1027,7 +1022,7 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
       // ack consumption of all original message
       // this message must be acked to avoid reward distribution to node from occuring again
       amqpChannel.ack(msg)
-      console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message nacked')
+      console.error(env.RMQ_WORK_IN_CAL_QUEUE, `[reward] consume message acked with error: ${error.message}`)
       throw new Error(`Unable to create reward block: ${error.message}`)
     }
   } catch (error) {
