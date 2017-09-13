@@ -751,16 +751,16 @@ registerLockEvents(nistLock, 'nistLock', async () => {
 // LOCK HANDLERS : btc-anchor
 registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
   try {
-    // let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
+    let btcAnchorIntervalMinutes = 60 / env.ANCHOR_BTC_PER_HOUR
     let lastBtcAnchorBlock
     try {
-      lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
+      lastBtcAnchorBlock = await CalendarBlock.findOne({ where: { type: 'btc-a', stackId: env.CHAINPOINT_CORE_BASE_URI }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent btc anchor block: ${error.message}`)
     }
     // add a small delay to prevent simultaneous BTC transactions while anchoring with all cores
     await utils.sleep(5000)
-    /*
+
     if (lastBtcAnchorBlock) {
       // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - oneMinuteMS old
       // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
@@ -774,7 +774,7 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
         console.log(`No work: ${btcAnchorIntervalMinutes} minutes must elapse between each new btc-a block. The last one was generated ${ageSec} seconds ago by Core ${lastBtcAnchorBlock.stackId}.`)
         return
       }
-    } */
+    }
     try {
       let lastBtcAnchorBlockId = lastBtcAnchorBlock ? parseInt(lastBtcAnchorBlock.id, 10) : null
       await aggregateAndAnchorBTCAsync(lastBtcAnchorBlockId)
@@ -856,16 +856,15 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', async () => {
 // LOCK HANDLERS : eth-anchor
 registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
   try {
-    // let ethAnchorIntervalMinutes = 60 / env.ANCHOR_ETH_PER_HOUR
+    let ethAnchorIntervalMinutes = 60 / env.ANCHOR_ETH_PER_HOUR
     let lastEthAnchorBlock
     try {
-      lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a' }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
+      lastEthAnchorBlock = await CalendarBlock.findOne({ where: { type: 'eth-a', stackId: env.CHAINPOINT_CORE_BASE_URI }, attributes: ['id', 'hash', 'time', 'stackId'], order: [['id', 'DESC']] })
     } catch (error) {
       throw new Error(`Unable to retrieve most recent eth anchor block: ${error.message}`)
     }
-    // add a small delay to prevent simultaneous BTC transactions while anchoring with all cores
+    // add a small delay to prevent simultaneous ETH transactions while anchoring with all cores
     await utils.sleep(5000)
-    /*
     if (lastEthAnchorBlock) {
       // checks if the last eth anchor block is at least ethAnchorIntervalMinutes - oneMinuteMS old
       // Only if so, we write a new anchor and do the work of that function. Otherwise immediate release lock.
@@ -879,7 +878,7 @@ registerLockEvents(ethAnchorLock, 'ethAnchorLock', async () => {
         console.log(`No work: ${ethAnchorIntervalMinutes} minutes must elapse between each new eth-a block. The last one was generated ${ageSec} seconds ago by Core ${lastEthAnchorBlock.stackId}.`)
         return
       }
-    } */
+    }
     try {
       let lastEthAnchorBlockId = lastEthAnchorBlock ? parseInt(lastEthAnchorBlock.id, 10) : null
       await aggregateAndAnchorETHAsync(lastEthAnchorBlockId)
