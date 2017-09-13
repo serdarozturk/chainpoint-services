@@ -40,6 +40,10 @@ const validateFactorOfSixty = envalid.makeValidator(x => {
   if (x > 0 && x <= 20 && 60 % x === 0) return x
   else throw new Error('Value must be a factor of 60, and no greater than 20')
 })
+const validateFactorOfSixtyUpToSixty = envalid.makeValidator(x => {
+  if (x > 0 && x <= 60 && 60 % x === 0) return x
+  else throw new Error('Value must be a factor of 60')
+})
 const validateETHAddress = envalid.makeValidator(x => {
   if (/^0x[0-9a-f]{40}$/i.test(x)) return x
   else throw new Error('Value must be a well formatted Ethereum address')
@@ -170,7 +174,11 @@ let envDefinitions = {
   // TNT Reward service specific variables
   REWARDS_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to calculate and distribute rewards, defaults to 2, must be a factor of 60, no greater than 20' }),
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligible for a reward' }),
-  MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' })
+  MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' }),
+
+  // Audit service specific variables
+  NEW_AUDIT_CHALLENGES_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new audit challenges, defaults to 2, must be a factor of 60, no greater than 20' }),
+  NODE_AUDIT_ROUNDS_PER_HOUR: validateFactorOfSixtyUpToSixty({ default: 60, desc: 'The number of times per hour to perform Node audit rounds, defaults to 60, must be a factor of 60' })
 }
 
 module.exports = (service) => {

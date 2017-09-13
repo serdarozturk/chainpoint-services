@@ -28,6 +28,7 @@ const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
 const cnsl = require('consul')
 const _ = require('lodash')
+const heartbeats = require('heartbeats')
 
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
@@ -37,6 +38,11 @@ nacl.util = require('tweetnacl-util')
 
 // the fuzz factor for anchor interval meant to give each core instance a random chance of being first
 const maxFuzzyMS = 1000
+
+// create a heartbeat for every 200ms
+// 1 second heartbeats had a drift that caused occasional skipping of a whole second
+// decreasing the interval of the heartbeat and checking current time resolves this
+let heart = heartbeats.createHeart(200)
 
 let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
 console.log('Consul connection established')
@@ -54,15 +60,8 @@ let CalendarBlock = calendarBlock.CalendarBlock
 let auditChallengeSequelize = auditChallenge.sequelize
 let AuditChallenge = auditChallenge.AuditChallenge
 
-// The frequency of the Node audit checks
-const NODE_AUDIT_FREQ_MIN = 1 // 1 minute
-
 // The age of the last successful audit before a new audit should be performed for a Node
 const NODE_NEW_AUDIT_INTERVAL_MIN = 30 // 30 minutes
-
-// The frequency in which audit challenges are generated, in minutes
-// Value must be greater than 2, or results may be unpredictable
-const GEN_NEW_AUDIT_CHALLENGE_MIN = 60 // 1 hour
 
 // The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
 const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
@@ -123,17 +122,18 @@ function registerLockEvents (lock, lockName, acquireFunction) {
 // LOCK HANDLERS : challenge
 registerLockEvents(challengeLock, 'challengeLock', async () => {
   try {
-    // check if the last challenge is at least GEN_AUDIT_CHALLENGE_MIN - oneMinuteMS old
+    let newChallengeIntervalMinutes = 60 / env.NEW_AUDIT_CHALLENGES_PER_HOUR
+    // check if the last challenge is at least newChallengeIntervalMinutes - oneMinuteMS old
     // if not, return and release lock
     let mostRecentChallenge = await AuditChallenge.findOne({ order: [['time', 'DESC']] })
     if (mostRecentChallenge) {
       let oneMinuteMS = 60000
       let currentMS = Date.now()
       let ageMS = currentMS - mostRecentChallenge.time
-      let lastChallengeTooRecent = (ageMS < (GEN_NEW_AUDIT_CHALLENGE_MIN * 60 * 1000 - oneMinuteMS))
+      let lastChallengeTooRecent = (ageMS < (newChallengeIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastChallengeTooRecent) {
         let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${GEN_NEW_AUDIT_CHALLENGE_MIN} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
+        console.log(`No work: ${newChallengeIntervalMinutes} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
         return
       }
     }
@@ -360,7 +360,6 @@ async function auditNodesAsync () {
 // Audit challenges include a timestamp, minimum block height, maximum block height, and a nonce
 async function generateAuditChallengeAsync () {
   try {
-    let challengeTime = Date.now()
     let currentBlockHeight
     let topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
     if (topBlock) {
@@ -370,6 +369,7 @@ async function generateAuditChallengeAsync () {
       return
     }
     // calulcate min and max values with special exception for low block count
+    let challengeTime = Date.now()
     let challengeMaxBlockHeight = currentBlockHeight > 2000 ? currentBlockHeight - 1000 : currentBlockHeight
     let randomNum = await rnd(10, 1000)
     let challengeMinBlockHeight = challengeMaxBlockHeight - randomNum
@@ -453,7 +453,74 @@ async function checkForGenesisBlockAsync () {
   console.log(`Genesis block found, calendar confirmed to exist`)
 }
 
-async function acquireChallengeLockWithFuzzyDelayAsync () {
+function setGenerateNewChallengeInterval () {
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on NEW_AUDIT_CHALLENGES_PER_HOUR
+  let newChallengeMinutes = []
+  let minuteOfHour = 0
+  // offset interval to spread the work around the clock a little bit,
+  // to prevent everuything from happening at the top of the hour
+  let offset = Math.floor((60 / env.NEW_AUDIT_CHALLENGES_PER_HOUR) / 2)
+  while (minuteOfHour < 60) {
+    let offsetMinutes = minuteOfHour + offset + ((minuteOfHour + offset) < 60 ? 0 : -60)
+    newChallengeMinutes.push(offsetMinutes)
+    minuteOfHour += (60 / env.NEW_AUDIT_CHALLENGES_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (newChallengeMinutes.includes(currentMinute)) {
+        let randomFuzzyMS = await rnd(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            challengeLock.acquire()
+          } catch (error) {
+            console.error('challengeLock.acquire(): caught err: ', error.message)
+          }
+        }, randomFuzzyMS)
+      }
+    }
+  })
+}
+
+function setPerformNodeAuditInterval () {
+  let currentMinute = new Date().getUTCMinutes()
+
+  // determine the minutes of the hour to run process based on NODE_AUDIT_ROUNDS_PER_HOUR
+  let nodeAuditRoundsMinutes = []
+  let minuteOfHour = 0
+  while (minuteOfHour < 60) {
+    nodeAuditRoundsMinutes.push(minuteOfHour)
+    minuteOfHour += (60 / env.NODE_AUDIT_ROUNDS_PER_HOUR)
+  }
+
+  heart.createEvent(1, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new minute
+    if (now.getUTCMinutes() !== currentMinute) {
+      currentMinute = now.getUTCMinutes()
+      if (nodeAuditRoundsMinutes.includes(currentMinute)) {
+        let randomFuzzyMS = await rnd(0, maxFuzzyMS)
+        setTimeout(() => {
+          try {
+            auditLock.acquire()
+          } catch (error) {
+            console.error('auditLock.acquire(): caught err: ', error.message)
+          }
+        }, randomFuzzyMS)
+      }
+    }
+  })
+}
+
+async function startIntervalsAsync () {
+  // attempt to generate a new audit chalenge on startup
   let randomFuzzyMS = await rnd(0, maxFuzzyMS)
   setTimeout(() => {
     try {
@@ -462,24 +529,9 @@ async function acquireChallengeLockWithFuzzyDelayAsync () {
       console.error('challengeLock.acquire(): caught err: ', error.message)
     }
   }, randomFuzzyMS)
-}
 
-async function acquireAuditLockWithFuzzyDelayAsync () {
-  let randomFuzzyMS = await rnd(0, maxFuzzyMS)
-  setTimeout(() => {
-    try {
-      auditLock.acquire()
-    } catch (error) {
-      console.error('auditLock.acquire(): caught err: ', error.message)
-    }
-  }, randomFuzzyMS)
-}
-async function startIntervalsAsync () {
-  await acquireChallengeLockWithFuzzyDelayAsync()
-  setInterval(async () => await acquireChallengeLockWithFuzzyDelayAsync(), GEN_NEW_AUDIT_CHALLENGE_MIN * 60 * 1000)
-
-  await acquireAuditLockWithFuzzyDelayAsync()
-  setInterval(async () => await acquireAuditLockWithFuzzyDelayAsync(), NODE_AUDIT_FREQ_MIN * 60 * 1000)
+  setGenerateNewChallengeInterval()
+  setPerformNodeAuditInterval()
 }
 
 // process all steps need to start the application
