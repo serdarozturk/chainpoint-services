@@ -33,7 +33,7 @@ function subscribeForProofs (APIServiceInstanceId, ws, wsConnectionId, hashIds) 
     // validate id param is proper UUIDv1
     let isValidUUID = uuidValidate(hashIdResult.hash_id, 1)
     // validate uuid time is in in valid range
-    let uuidEpoch = uuidTime.v1(hashIdResult.hash_id)
+    let uuidEpoch = parseInt(uuidTime.v1(hashIdResult.hash_id))
     var nowEpoch = new Date().getTime()
     let uuidDiff = nowEpoch - uuidEpoch
     let maxDiff = env.PROOF_EXPIRE_MINUTES * 60 * 1000

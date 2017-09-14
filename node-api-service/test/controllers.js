@@ -780,7 +780,7 @@ describe('Hashes Controller', () => {
           expect(res.body).to.have.property('submitted_at')
           // The UUID timestamp has ms level precision, ISO8601 only to the second.
           // Check that they are within 1000ms of each other.
-          expect(uuidTime.v1(res.body.hash_id) - Date.parse(res.body.submitted_at)).to.be.within(0, 1000)
+          expect(parseInt(uuidTime.v1(res.body.hash_id)) - Date.parse(res.body.submitted_at)).to.be.within(0, 1000)
           done()
         })
     })
@@ -822,7 +822,7 @@ describe('Hashes Controller', () => {
           // you should be able to calculate whether the UUID 'Node ID'
           // data segment is the 5 byte BLAKE2s hash of the timestamp
           // embedded in the UUID and the hash submitted to get this UUID.
-          let t = uuidTime.v1(res.body.hash_id)
+          let t = parseInt(uuidTime.v1(res.body.hash_id))
 
           // 5 byte length BLAKE2s hash w/ personalization
           let h = new BLAKE2s(5, { personalization: Buffer.from('CHAINPNT') })

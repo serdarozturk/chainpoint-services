@@ -210,7 +210,7 @@ function addChainpointHeader (proof, hash, hashId) {
   // the spec does not allow for missing or empty values here
   // these values will be replaced with proper ones by the Node instance
   proof.hash_id_node = hashId
-  proof.hash_submitted_node_at = utils.formatDateISO8601NoMs(new Date(uuidTime.v1(hashId)))
+  proof.hash_submitted_node_at = utils.formatDateISO8601NoMs(new Date(parseInt(uuidTime.v1(hashId))))
 
   proof.hash_id_core = hashId
   proof.hash_submitted_core_at = proof.hash_submitted_node_at
