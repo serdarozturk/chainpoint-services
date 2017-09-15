@@ -1,5 +1,8 @@
 # chainpoint-services
 
+[![JavaScript Style Guide](https://cdn.rawgit.com/feross/standard/master/badge.svg)](https://github.com/feross/standard)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 Chainpoint Services is the Core of the Tierion Network and
 a modern [microservices architecture](https://martinfowler.com/articles/microservices.html)
 that implements the [Chainpoint](https://chainpoint.org) API.
