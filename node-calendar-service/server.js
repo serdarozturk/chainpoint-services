@@ -758,8 +758,6 @@ registerLockEvents(btcAnchorLock, 'btcAnchorLock', async () => {
     } catch (error) {
       throw new Error(`Unable to retrieve most recent btc anchor block: ${error.message}`)
     }
-    // add a small delay to prevent simultaneous BTC transactions while anchoring with all cores
-    await utils.sleep(5000)
 
     if (lastBtcAnchorBlock) {
       // checks if the last btc anchor block is at least btcAnchorIntervalMinutes - oneMinuteMS old
