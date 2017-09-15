@@ -242,7 +242,7 @@ function processMessage (msg) {
       case 'btctx':
         if (env.ANCHOR_BTC === 'enabled') {
           // Consumes a tx  message from the btctx service
-          consumeBtcTxMessage(msg)
+          consumeBtcTxMessageAsync(msg)
         } else {
           // BTC anchoring has been disabled, ack message and do nothing
           amqpChannel.ack(msg)
@@ -277,9 +277,13 @@ function consumeAggRootMessage (msg) {
   }
 }
 
-function consumeBtcTxMessage (msg) {
+async function consumeBtcTxMessageAsync (msg) {
   if (msg !== null) {
     let btcTxObj = JSON.parse(msg.content.toString())
+
+    // add a small delay to prevent btc-mon from attempting to monitor a transaction
+    // before the Bitcore API even acknowledges the existence of the transaction (404)
+    await utils.sleep(30000)
 
     async.series([
       (callback) => {
