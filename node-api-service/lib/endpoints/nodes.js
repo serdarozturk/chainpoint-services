@@ -48,10 +48,6 @@ let isHMAC = (hmac) => {
  * Retrieve an existing registered Node
  */
 async function getNodeByTNTAddrV1Async (req, res, next) {
-  if (req.contentType() !== 'application/json') {
-    return next(new restify.InvalidArgumentError('invalid content type'))
-  }
-
   if (!req.params.hasOwnProperty('tnt_addr')) {
     return next(new restify.InvalidArgumentError('invalid JSON body, missing tnt_addr'))
   }
