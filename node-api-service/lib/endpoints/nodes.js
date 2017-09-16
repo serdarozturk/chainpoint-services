@@ -42,13 +42,12 @@ let isHMAC = (hmac) => {
   return /^[0-9a-fA-F]{64}$/i.test(hmac)
 }
 
-
 /**
  * GET /nodes/:tnt_addr retrieve handler
  *
  * Retrieve an existing registered Node
  */
-async function getNodeByTNTAddrV1Async(req, res, next) {
+async function getNodeByTNTAddrV1Async (req, res, next) {
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
@@ -94,12 +93,12 @@ async function getNodeByTNTAddrV1Async(req, res, next) {
     }
     recentAudits = await NodeAuditLog.findAll({ where: { tntAddr: lowerCasedTntAddrParam }, attributes: ['auditAt', 'publicIPPass', 'timePass', 'calStatePass', 'minCreditsPass'], order: [['auditAt', 'DESC']], limit: AUDIT_HISTORY_COUNT })
   } catch (error) {
-    console.error(`Could not retrieve RegisteredNode: ${ error.message }`)
+    console.error(`Could not retrieve RegisteredNode: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
   // build well formatted result
-  result = {
+  let result = {
     tnt_addr: regNode.tntAddr,
     public_uri: regNode.publicUri,
     credits: regNode.tntCredit,
@@ -117,7 +116,6 @@ async function getNodeByTNTAddrV1Async(req, res, next) {
 
   res.send(result)
   return next()
-
 }
 
 /**
@@ -125,17 +123,17 @@ async function getNodeByTNTAddrV1Async(req, res, next) {
  *
  * Retrieve a random subset of registered and healthy Nodes
  */
-async function getNodesRandomV1Async(req, res, next) {
+async function getNodesRandomV1Async (req, res, next) {
   // get a list of random healthy Nodes
   let regNodesTableName = RegisteredNode.getTableName()
   let nodeAuditLogTableName = NodeAuditLog.getTableName()
   let thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
-  let sqlQuery = `SELECT rn.tnt_addr, rn.public_uri, rn.last_audit_at FROM ${ regNodesTableName } rn 
+  let sqlQuery = `SELECT rn.tnt_addr, rn.public_uri, rn.last_audit_at FROM ${regNodesTableName} rn 
                   WHERE rn.public_uri IS NOT NULL AND rn.tnt_addr IN (
-                    SELECT DISTINCT al.tnt_addr FROM ${nodeAuditLogTableName } al 
-                    WHERE al.audit_at >= ${thirtyMinutesAgo } AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE and al.min_credits_pass = true
+                    SELECT DISTINCT al.tnt_addr FROM ${nodeAuditLogTableName} al 
+                    WHERE al.audit_at >= ${thirtyMinutesAgo} AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE and al.min_credits_pass = true
                   )
-                  ORDER BY RANDOM() LIMIT ${RANDOM_NODES_RESULT_LIMIT }`
+                  ORDER BY RANDOM() LIMIT ${RANDOM_NODES_RESULT_LIMIT}`
   let rndNodes = await registeredNodeSequelize.query(sqlQuery, { type: registeredNodeSequelize.QueryTypes.SELECT })
 
   // build well formatted result array
@@ -157,7 +155,7 @@ async function getNodesRandomV1Async(req, res, next) {
  *
  * Create a new registered Node
  */
-async function postNodeV1Async(req, res, next) {
+async function postNodeV1Async (req, res, next) {
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
@@ -193,7 +191,7 @@ async function postNodeV1Async(req, res, next) {
       return next(new restify.ConflictError('tnt_addr address already exists'))
     }
   } catch (error) {
-    console.error(`Unable to count registered Nodes: ${ error.message }`)
+    console.error(`Unable to count registered Nodes: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -207,7 +205,7 @@ async function postNodeV1Async(req, res, next) {
       hmacKey: randHMACKey
     })
   } catch (error) {
-    console.error(`Could not create RegisteredNode for ${ lowerCasedTntAddrParam } at ${ req.params.public_uri }: ${ error.message }`)
+    console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${req.params.public_uri}: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -224,7 +222,7 @@ async function postNodeV1Async(req, res, next) {
  *
  * Updates an existing registered Node
  */
-async function putNodeV1Async(req, res, next) {
+async function putNodeV1Async (req, res, next) {
   if (req.contentType() !== 'application/json') {
     return next(new restify.InvalidArgumentError('invalid content type'))
   }
@@ -290,7 +288,7 @@ async function putNodeV1Async(req, res, next) {
 
     await regNode.save()
   } catch (error) {
-    console.error(`Could not update RegisteredNode: ${ error.message }`)
+    console.error(`Could not update RegisteredNode: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
