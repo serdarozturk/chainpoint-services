@@ -126,7 +126,7 @@ async function postNodeV1Async (req, res, next) {
       hmacKey: randHMACKey
     })
   } catch (error) {
-    console.error(`Could not create RegisteredNode: ${error.message}`)
+    console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${req.params.public_uri}: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
