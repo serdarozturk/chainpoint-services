@@ -104,18 +104,18 @@ let auditLockOpts = {
 
 let auditLock = consul.lock(_.merge({}, auditLockOpts, { value: 'audit' }))
 
-function registerLockEvents (lock, lockName, acquireFunction) {
+function registerLockEvents(lock, lockName, acquireFunction) {
   lock.on('acquire', () => {
-    console.log(`${lockName} acquired`)
+    console.log(`${ lockName } acquired`)
     acquireFunction()
   })
 
   lock.on('error', (err) => {
-    console.error(`${lockName} error - ${err}`)
+    console.error(`${ lockName } error - ${ err }`)
   })
 
   lock.on('release', () => {
-    console.log(`${lockName} release`)
+    console.log(`${ lockName } release`)
   })
 }
 
@@ -133,13 +133,13 @@ registerLockEvents(challengeLock, 'challengeLock', async () => {
       let lastChallengeTooRecent = (ageMS < (newChallengeIntervalMinutes * 60 * 1000 - oneMinuteMS))
       if (lastChallengeTooRecent) {
         let ageSec = Math.round(ageMS / 1000)
-        console.log(`No work: ${newChallengeIntervalMinutes} minutes must elapse between each new audit challenge. The last one was generated ${ageSec} seconds ago.`)
+        console.log(`No work: ${ newChallengeIntervalMinutes } minutes must elapse between each new audit challenge. The last one was generated ${ ageSec } seconds ago.`)
         return
       }
     }
     await generateAuditChallengeAsync()
   } catch (error) {
-    console.error(`Unable to generate audit challenge: ${error.message}`)
+    console.error(`Unable to generate audit challenge: ${ error.message }`)
   } finally {
     // always release lock
     challengeLock.release()
@@ -151,7 +151,7 @@ registerLockEvents(auditLock, 'auditLock', async () => {
   try {
     await auditNodesAsync()
   } catch (error) {
-    console.error(`Unable to perform node audits: ${error.message}`)
+    console.error(`Unable to perform node audits: ${ error.message }`)
   } finally {
     // always release lock
     auditLock.release()
@@ -159,7 +159,7 @@ registerLockEvents(auditLock, 'auditLock', async () => {
 })
 
 // Retrieve all registered Nodes with public_uris for auditing.
-async function auditNodesAsync () {
+async function auditNodesAsync() {
   let nodesReadyForAudit = []
   try {
     let lastAuditCutoff = Date.now() - (NODE_NEW_AUDIT_INTERVAL_MIN * 60 * 1000)
@@ -173,9 +173,9 @@ async function auditNodesAsync () {
         }
       })
 
-    console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
+    console.log(`${ nodesReadyForAudit.length } public Nodes ready for audit were found`)
   } catch (error) {
-    console.error(`Could not retrieve public Node list: ${error.message}`)
+    console.error(`Could not retrieve public Node list: ${ error.message }`)
   }
 
   // iterate through each Node, requesting an answer to the challenge
@@ -200,7 +200,7 @@ async function auditNodesAsync () {
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+        console.error(`NodeAudit error: ${ nodesReadyForAudit[x].tntAddr }: ${ error.message } `)
       }
       continue
     }
@@ -216,7 +216,7 @@ async function auditNodesAsync () {
         }
       ],
       method: 'GET',
-      uri: `${nodesReadyForAudit[x].publicUri}/config`,
+      uri: `${ nodesReadyForAudit[x].publicUri }/config`,
       json: true,
       gzip: true,
       timeout: 2500,
@@ -228,9 +228,9 @@ async function auditNodesAsync () {
       coreAuditTimestamp = Date.now()
     } catch (error) {
       if (error.statusCode) {
-        console.log(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+        console.log(`NodeAudit: GET failed with status code ${ error.statusCode } for ${ nodesReadyForAudit[x].publicUri }: ${ error.message }`)
       } else {
-        console.log(`NodeAudit: GET failed for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
+        console.log(`NodeAudit: GET failed for ${ nodesReadyForAudit[x].publicUri }: ${ error.message }`)
       }
       try {
         await NodeAuditLog.create({
@@ -245,13 +245,13 @@ async function auditNodesAsync () {
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+        console.error(`NodeAudit error: ${ nodesReadyForAudit[x].tntAddr }: ${ error.message } `)
       }
       continue
     }
 
-    if (!nodeResponse.body.calendar || !nodeResponse.body.calendar.audit_response) {
-      console.log(`NodeAudit: GET failed with missing audit response for ${nodesReadyForAudit[x].publicUri}`)
+    if (!nodeResponse.body.calendar) {
+      console.log(`NodeAudit: GET failed with missing calendar data for ${ nodesReadyForAudit[x].publicUri }`)
       try {
         await NodeAuditLog.create({
           tntAddr: nodesReadyForAudit[x].tntAddr,
@@ -265,12 +265,12 @@ async function auditNodesAsync () {
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+        console.error(`NodeAudit error: ${ nodesReadyForAudit[x].tntAddr }: ${ error.message } `)
       }
       continue
     }
     if (!nodeResponse.body.time) {
-      console.log(`NodeAudit: GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
+      console.log(`NodeAudit: GET failed with missing time for ${ nodesReadyForAudit[x].publicUri }`)
       try {
         await NodeAuditLog.create({
           tntAddr: nodesReadyForAudit[x].tntAddr,
@@ -284,45 +284,52 @@ async function auditNodesAsync () {
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+        console.error(`NodeAudit error: ${ nodesReadyForAudit[x].tntAddr }: ${ error.message } `)
       }
       continue
     }
 
     try {
-      let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
-      let nodeAuditResponseTimestamp = nodeAuditResponse[0]
-      let nodeAuditResponseSolution = nodeAuditResponse[1]
-      let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
-
-      // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
-      let coreAuditChallenge
-      let minTimestamp = coreAuditTimestamp - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
-      if (parseInt(nodeAuditResponseTimestamp) >= minTimestamp) {
-        coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
-      }
 
       // We've gotten this far, so at least auditedPublicIPAt has passed
       let publicIPPass = true
 
       // check if the Node timestamp is withing the acceptable range
+      let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
       let timePass = false
       let nodeMSDelta = (nodeAuditTimestamp - coreAuditTimestamp)
       if (Math.abs(nodeMSDelta) <= ACCEPTABLE_DELTA_MS) {
         timePass = true
       }
 
-      // check if the Node challenge solution is correct
       let calStatePass = false
-      if (coreAuditChallenge) {
-        let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
-        nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+      // When a node first comes online, and is still syncing the calendar
+      // data, it will not have yet generated the challenge response, and
+      // audit_response will be null. In these cases, simply fail the calStatePass
+      // audit. If audit_response is not null, verify the cal state for the Node
+      if (nodeResponse.body.calendar.audit_response) {
+        let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
+        let nodeAuditResponseTimestamp = nodeAuditResponse[0]
+        let nodeAuditResponseSolution = nodeAuditResponse[1]
 
-        if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-          calStatePass = true
+        // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
+        let coreAuditChallenge
+        let minTimestamp = coreAuditTimestamp - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
+        if (parseInt(nodeAuditResponseTimestamp) >= minTimestamp) {
+          coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
         }
-      } else {
-        console.error(`NodeAudit: No audit challenge record found for time ${nodeAuditResponseTimestamp}`)
+
+        // check if the Node challenge solution is correct
+        if (coreAuditChallenge) {
+          let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
+          nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+
+          if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
+            calStatePass = true
+          }
+        } else {
+          console.error(`NodeAudit: No audit challenge record found for time ${ nodeAuditResponseTimestamp }`)
+        }
       }
 
       // update the Node audit results in RegisteredNode
@@ -339,7 +346,7 @@ async function auditNodesAsync () {
         })
         await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
       } catch (error) {
-        throw new Error(`Could not update Node Audit results: ${error.message}`)
+        throw new Error(`Could not update Node Audit results: ${ error.message }`)
       }
 
       let results = {}
@@ -349,16 +356,16 @@ async function auditNodesAsync () {
       results.calStatePass = calStatePass
       results.minCreditsPass = minCreditsPass
 
-      console.log(`Audit complete for ${nodesReadyForAudit[x].tntAddr} at ${nodesReadyForAudit[x].publicUri}: ${JSON.stringify(results)}`)
+      console.log(`Audit complete for ${ nodesReadyForAudit[x].tntAddr } at ${ nodesReadyForAudit[x].publicUri }: ${ JSON.stringify(results) }`)
     } catch (error) {
-      console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+      console.error(`NodeAudit error: ${ nodesReadyForAudit[x].tntAddr }: ${ error.message } `)
     }
   }
 }
 
 // Generate a new audit challenge for the Nodes. Audit challenges should be refreshed hourly.
 // Audit challenges include a timestamp, minimum block height, maximum block height, and a nonce
-async function generateAuditChallengeAsync () {
+async function generateAuditChallengeAsync() {
   try {
     let currentBlockHeight
     let topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
@@ -385,14 +392,14 @@ async function generateAuditChallengeAsync () {
       nonce: challengeNonce,
       solution: challengeSolution
     })
-    let auditChallenge = `${newChallenge.time}:${newChallenge.minBlock}:${newChallenge.maxBlock}:${newChallenge.nonce}:${newChallenge.solution}`
-    console.log(`New challenge generated: ${auditChallenge}`)
+    let auditChallenge = `${ newChallenge.time }:${ newChallenge.minBlock }:${ newChallenge.maxBlock }:${ newChallenge.nonce }:${ newChallenge.solution }`
+    console.log(`New challenge generated: ${ auditChallenge }`)
   } catch (error) {
-    console.error((`Could not generate audit challenge: ${error.message}`))
+    console.error((`Could not generate audit challenge: ${ error.message }`))
   }
 }
 
-async function calculateChallengeSolutionAsync (min, max, nonce) {
+async function calculateChallengeSolutionAsync(min, max, nonce) {
   let blocks = await CalendarBlock.findAll({ where: { id: { $between: [min, max] } }, order: [['id', 'ASC']] })
 
   if (blocks.length === 0) throw new Error('No blocks returned to create challenge tree')
@@ -420,7 +427,7 @@ async function calculateChallengeSolutionAsync (min, max, nonce) {
 /**
  * Opens a storage connection
  **/
-async function openStorageConnectionAsync () {
+async function openStorageConnectionAsync() {
   let dbConnected = false
   while (!dbConnected) {
     try {
@@ -438,7 +445,7 @@ async function openStorageConnectionAsync () {
   }
 }
 
-async function checkForGenesisBlockAsync () {
+async function checkForGenesisBlockAsync() {
   let genesisBlock
   while (!genesisBlock) {
     try {
@@ -446,14 +453,14 @@ async function checkForGenesisBlockAsync () {
       // if the genesis block does not exist, wait 5 seconds and try again
       if (!genesisBlock) await utils.sleep(5000)
     } catch (error) {
-      console.error(`Unable to query calendar: ${error.message}`)
+      console.error(`Unable to query calendar: ${ error.message }`)
       process.exit(1)
     }
   }
   console.log(`Genesis block found, calendar confirmed to exist`)
 }
 
-function setGenerateNewChallengeInterval () {
+function setGenerateNewChallengeInterval() {
   let currentMinute = new Date().getUTCMinutes()
 
   // determine the minutes of the hour to run process based on NEW_AUDIT_CHALLENGES_PER_HOUR
@@ -488,7 +495,7 @@ function setGenerateNewChallengeInterval () {
   })
 }
 
-function setPerformNodeAuditInterval () {
+function setPerformNodeAuditInterval() {
   let currentMinute = new Date().getUTCMinutes()
 
   // determine the minutes of the hour to run process based on NODE_AUDIT_ROUNDS_PER_HOUR
@@ -519,7 +526,7 @@ function setPerformNodeAuditInterval () {
   })
 }
 
-async function startIntervalsAsync () {
+async function startIntervalsAsync() {
   // attempt to generate a new audit chalenge on startup
   let randomFuzzyMS = await rnd(0, maxFuzzyMS)
   setTimeout(() => {
@@ -535,7 +542,7 @@ async function startIntervalsAsync () {
 }
 
 // process all steps need to start the application
-async function start () {
+async function start() {
   if (env.NODE_ENV === 'test') return
   try {
     // init DB
@@ -546,7 +553,7 @@ async function start () {
     await startIntervalsAsync()
     console.log('startup completed successfully')
   } catch (error) {
-    console.error(`An error has occurred on startup: ${error.message}`)
+    console.error(`An error has occurred on startup: ${ error.message }`)
     process.exit(1)
   }
 }
