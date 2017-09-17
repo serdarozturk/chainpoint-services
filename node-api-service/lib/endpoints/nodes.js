@@ -129,7 +129,7 @@ async function getNodesRandomV1Async (req, res, next) {
   let regNodesTableName = RegisteredNode.getTableName()
   let nodeAuditLogTableName = NodeAuditLog.getTableName()
   let thirtyMinutesAgo = Date.now() - 30 * 60 * 1000
-  let sqlQuery = `SELECT rn.tnt_addr, rn.public_uri, rn.last_audit_at FROM ${regNodesTableName} rn 
+  let sqlQuery = `SELECT rn.public_uri FROM ${regNodesTableName} rn 
                   WHERE rn.public_uri IS NOT NULL AND rn.tnt_addr IN (
                     SELECT DISTINCT al.tnt_addr FROM ${nodeAuditLogTableName} al 
                     WHERE al.audit_at >= ${thirtyMinutesAgo} AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE and al.min_credits_pass = true
@@ -140,9 +140,7 @@ async function getNodesRandomV1Async (req, res, next) {
   // build well formatted result array
   rndNodes = rndNodes.map((rndNode) => {
     return {
-      tnt_addr: rndNode.tnt_addr,
-      public_uri: rndNode.public_uri,
-      last_audit_at: parseInt(rndNode.last_audit_at)
+      public_uri: rndNode.public_uri
     }
   })
 
