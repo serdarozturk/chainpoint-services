@@ -213,7 +213,6 @@ async function openStorageConnectionAsync () {
       await hashes.getSequelize().sync({ logging: false })
       await nodes.getRegisteredNodeSequelize().sync({ logging: false })
       await nodes.getNodeAuditLogSequelize().sync({ logging: false })
-      await proofs.getSequelize().sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
@@ -370,7 +369,6 @@ module.exports = {
   setHashesRegisteredNode: (regNode) => { hashes.setHashesRegisteredNode(regNode) },
   setNodesRegisteredNode: (regNode) => { nodes.setNodesRegisteredNode(regNode) },
   setNodesNodeAuditLog: (nodeAuditLog) => { nodes.setNodesNodeAuditLog(nodeAuditLog) },
-  setProofsRegisteredNode: (regNode) => { proofs.setProofsRegisteredNode(regNode) },
   server: server,
   config: config
 }

@@ -37,114 +37,10 @@ describe('Home Controller', () => {
 
 describe('Proofs Controller', () => {
   describe('GET /proofs/hash_id', () => {
-    it('should return proper error with bad authorization value, one string', (done) => {
-      request(server)
-        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', 'qweqwe')
-        .send({ name: 'Manny' })
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: bad authorization value')
-          done()
-        })
-    })
-
-    it('should return proper error with bad authorization value, one string', (done) => {
-      request(server)
-        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', 'qweqwe')
-        .send({ name: 'Manny' })
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: bad authorization value')
-          done()
-        })
-    })
-
-    it('should return proper error with bad authorization value, no bearer', (done) => {
-      request(server)
-        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', 'qweqwe ababababab')
-        .send({ name: 'Manny' })
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: bad authorization value')
-          done()
-        })
-    })
-
-    it('should return proper error with bad authorization value, missing tnt-address', (done) => {
-      request(server)
-        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', 'bearer ababab121212')
-        .send({ name: 'Manny' })
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: missing tnt-address key')
-          done()
-        })
-    })
-
-    it('should return proper error with bad authorization value, bad tnt-address', (done) => {
-      request(server)
-        .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', 'bearer ababab121212')
-        .set('tnt-address', '0xbad')
-        .send({ name: 'Manny' })
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: invalid tnt-address value')
-          done()
-        })
-    })
-
     it('should return proper error with bad hash_id', (done) => {
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update(tntAddr).digest('hex')
-
       request(server)
         .get('/proofs/badid')
         .set('Content-type', 'text/plain')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -166,27 +62,9 @@ describe('Proofs Controller', () => {
         }
       })
 
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update(tntAddr).digest('hex')
-
-      app.setProofsRegisteredNode({
-        findOne: (params) => {
-          return {
-            tntAddr: tntAddr,
-            hmacKey: hmacKey,
-            tntCredit: 10
-          }
-        }
-      })
-
       request(server)
         .get('/proofs/d4f0dc90-2f55-11e7-b598-41e628860234')
         .set('Content-type', 'text/plain')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
@@ -206,8 +84,6 @@ describe('Proofs Controller', () => {
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
-        .set('Authorization', 'bearer ababab121212')
-        .set('tnt-address', '0x1234567890123456789012345678901234567890')
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -232,8 +108,6 @@ describe('Proofs Controller', () => {
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,' +
         'a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a,a')
-        .set('Authorization', 'bearer ababab121212')
-        .set('tnt-address', '0x1234567890123456789012345678901234567890')
         .expect('Content-type', /json/)
         .expect(409)
         .end((err, res) => {
@@ -248,84 +122,6 @@ describe('Proofs Controller', () => {
         })
     })
 
-    it('should return proper error with unknown tnt-address', (done) => {
-      app.setRedis({
-        get: (id, callback) => {
-          callback(null, '{ "chainpoint": "proof" }')
-        }
-      })
-
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update('bad').digest('hex')
-
-      app.setProofsRegisteredNode({
-        findOne: (params) => {
-          return null
-        }
-      })
-      request(server)
-        .get('/proofs/')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
-        .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: unknown tnt-address')
-          done()
-        })
-    })
-
-    it('should return proper error with bad hmac value', (done) => {
-      app.setRedis({
-        get: (id, callback) => {
-          callback(null, '{ "chainpoint": "proof" }')
-        }
-      })
-
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update('bad').digest('hex')
-
-      app.setProofsRegisteredNode({
-        findOne: (params) => {
-          return {
-            tntAddr: tntAddr,
-            hmacKey: hmacKey,
-            tntCredit: 10
-          }
-        }
-      })
-      request(server)
-        .get('/proofs/')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
-        .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
-        .expect('Content-type', /json/)
-        .expect(401)
-        .end((err, res) => {
-          expect(err).to.equal(null)
-          expect(res.body).to.have.property('code')
-            .and.to.be.a('string')
-            .and.to.equal('InvalidCredentials')
-          expect(res.body).to.have.property('message')
-            .and.to.be.a('string')
-            .and.to.equal('authorization denied: bad hmac value')
-          done()
-        })
-    })
-
     it('should return success with one valid hash_id in hashids', (done) => {
       app.setRedis({
         get: (id, callback) => {
@@ -333,28 +129,10 @@ describe('Proofs Controller', () => {
         }
       })
 
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update(tntAddr).digest('hex')
-
-      app.setProofsRegisteredNode({
-        findOne: (params) => {
-          return {
-            tntAddr: tntAddr,
-            hmacKey: hmacKey,
-            tntCredit: 10
-          }
-        }
-      })
-
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
         .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
         .expect('Content-type', /json/)
         .expect(200)
         .end((err, res) => {
@@ -375,27 +153,9 @@ describe('Proofs Controller', () => {
         }
       })
 
-      let tntAddr = '0x1234567890123456789012345678901234567890'
-
-      let hmacKey = crypto.randomBytes(32).toString('hex')
-      let hash = crypto.createHmac('sha256', hmacKey)
-      let hmac = hash.update(tntAddr).digest('hex')
-
-      app.setProofsRegisteredNode({
-        findOne: (params) => {
-          return {
-            tntAddr: tntAddr,
-            hmacKey: hmacKey,
-            tntCredit: 10
-          }
-        }
-      })
-
       request(server)
         .get('/proofs/')
         .set('Content-type', 'text/plain')
-        .set('Authorization', `bearer ${hmac}`)
-        .set('tnt-address', tntAddr)
         .set('hashids', 'd4f0dc90-2f55-11e7-b598-41e628860234, d4f0dc90-2f55-11e7-b598-41e628860234')
         .expect('Content-type', /json/)
         .expect(200)
