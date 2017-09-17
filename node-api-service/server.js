@@ -140,10 +140,10 @@ server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCal
 server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1)
 // get the block objects for the calendar in the specified range, incusive
 server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1)
-// get nodes list
-server.get({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.getNodeByTNTAddrV1Async)
 // get random subset of nodes list
 server.get({ path: '/nodes/random', version: '1.0.0' }, nodes.getNodesRandomV1Async)
+// get nodes list
+server.get({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.getNodeByTNTAddrV1Async)
 // register a new node
 server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node
