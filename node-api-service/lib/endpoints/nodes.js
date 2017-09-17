@@ -96,7 +96,6 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
   // build well formatted result
   let result = {
     tnt_addr: regNode.tntAddr,
-    public_uri: regNode.publicUri,
     credits: regNode.tntCredit,
     created_at: regNode.created_at,
     recent_audits: recentAudits.map((audit) => {
