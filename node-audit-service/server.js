@@ -327,7 +327,7 @@ async function auditNodesAsync () {
             calStatePass = true
           }
         } else {
-          console.error(`NodeAudit: No audit challenge record found for time ${nodeAuditResponseTimestamp}`)
+          console.error(`NodeAudit: No audit challenge record found for time ${nodeAuditResponseTimestamp} in ${nodeResponse.body.calendar.audit_response}`)
         }
       }
 
