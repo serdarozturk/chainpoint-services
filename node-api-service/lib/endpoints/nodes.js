@@ -87,9 +87,15 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     if (!regNode) {
       return next(new restify.ResourceNotFoundError('not found'))
     }
-    recentAudits = await NodeAuditLog.findAll({ where: { tntAddr: lowerCasedTntAddrParam }, attributes: ['auditAt', 'publicIPPass', 'timePass', 'calStatePass', 'minCreditsPass'], order: [['auditAt', 'DESC']], limit: AUDIT_HISTORY_COUNT })
   } catch (error) {
     console.error(`Could not retrieve RegisteredNode: ${error.message}`)
+    return next(new restify.InternalServerError('server error'))
+  }
+
+  try {
+    recentAudits = await NodeAuditLog.findAll({ where: { tntAddr: lowerCasedTntAddrParam }, attributes: ['auditAt', 'publicIPPass', 'timePass', 'calStatePass', 'minCreditsPass'], order: [['auditAt', 'DESC']], limit: AUDIT_HISTORY_COUNT })
+  } catch (error) {
+    console.error(`Could not retrieve NodeAuditLog items: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
