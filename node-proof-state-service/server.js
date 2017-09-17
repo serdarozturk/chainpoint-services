@@ -116,7 +116,7 @@ async function ConsumeCalendarMessageAsync (msg) {
       // until the data is read, in cases of hash data not being fully readable yet
       setTimeout(() => {
         amqpChannel.nack(msg)
-        console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message}`)
+        console.error(`${msg.fields.routingKey} [${msg.properties.type}] consume message nacked: ${error.message} for agg_id ${stateObj.agg_id}`)
       }, 1000)
     } else {
       amqpChannel.nack(msg)
