@@ -306,7 +306,7 @@ async function auditNodesAsync () {
       // data, it will not have yet generated the challenge response, and
       // audit_response will be null. In these cases, simply fail the calStatePass
       // audit. If audit_response is not null, verify the cal state for the Node
-      if (nodeResponse.body.calendar.audit_response) {
+      if (nodeResponse.body.calendar.audit_response && nodeResponse.body.calendar.audit_response !== 'null') {
         let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
         let nodeAuditResponseTimestamp = nodeAuditResponse[0]
         let nodeAuditResponseSolution = nodeAuditResponse[1]
