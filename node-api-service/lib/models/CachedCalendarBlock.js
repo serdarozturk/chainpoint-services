@@ -304,23 +304,11 @@ function getBlockRange (start, end, callback) {
   })
 }
 
-function getLatestBlock (callback) {
-  // this value does not get cached because it frequently changes, just read from db diretly
-  CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] }).then((lastBlock) => {
-    // if a lastBlock was found, convert it to a plain JS object
-    if (lastBlock) lastBlock = lastBlock.get({ plain: true })
-    return callback(null, lastBlock)
-  }).catch((err) => {
-    return callback(err)
-  })
-}
-
 module.exports = {
   getSequelize: () => { return sequelize },
   setRedis: (r) => { redis = r },
   getBlockByHeight: getBlockByHeight,
   getCalBlockConfirmDataByDataId: getCalBlockConfirmDataByDataId,
   getBtcCBlockConfirmDataByDataId: getBtcCBlockConfirmDataByDataId,
-  getBlockRange: getBlockRange,
-  getLatestBlock: getLatestBlock
+  getBlockRange: getBlockRange
 }

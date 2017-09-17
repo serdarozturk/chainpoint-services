@@ -17,7 +17,6 @@
 const _ = require('lodash')
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
-const async = require('async')
 const cachedCalendarBlock = require('../models/CachedCalendarBlock.js')
 
 /**
@@ -74,38 +73,20 @@ function getCalBlockRangeV1 (req, res, next) {
     return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${env.GET_CALENDAR_BLOCKS_MAX} blocks`))
   }
 
-  async.waterfall([
-    (callback) => {
-      cachedCalendarBlock.getLatestBlock((err, lastBlock) => {
-        if (err) return callback(err)
-        if (!lastBlock) return callback('no_blocks')
-        lastBlock.id = parseInt(lastBlock.id, 10)
-        return callback(null, lastBlock.id)
-      })
-    },
-    (blockHeight, callback) => {
-      cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
-        if (err) return callback(err)
-        if (!blocks || blocks.length === 0) blocks = []
-        // convert requisite fields to integers
-        for (let x = 0; x < blocks.length; x++) {
-          blocks[x].id = parseInt(blocks[x].id, 10)
-          blocks[x].time = parseInt(blocks[x].time, 10)
-          blocks[x].version = parseInt(blocks[x].version, 10)
-        }
-        let results = {}
-        results.blocks = blocks
-        results.start = fromHeight
-        results.end = toHeight
-        results.height = blockHeight
-        return callback(null, results)
-      })
-    }
-  ], (err, results) => {
+  cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
     if (err) {
       console.error(err)
       return next(new restify.InternalError(err))
     }
+    if (!blocks || blocks.length === 0) blocks = []
+    // convert requisite fields to integers
+    for (let x = 0; x < blocks.length; x++) {
+      blocks[x].id = parseInt(blocks[x].id, 10)
+      blocks[x].time = parseInt(blocks[x].time, 10)
+      blocks[x].version = parseInt(blocks[x].version, 10)
+    }
+    let results = {}
+    results.blocks = blocks
     res.send(results)
     return next()
   })
