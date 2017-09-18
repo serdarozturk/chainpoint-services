@@ -39,6 +39,9 @@ nacl.util = require('tweetnacl-util')
 // the fuzz factor for anchor interval meant to give each core instance a random chance of being first
 const maxFuzzyMS = 1000
 
+// the amount of credits to top off all Nodes with daily
+const creditTopoffAmount = 86400
+
 // create a heartbeat for every 200ms
 // 1 second heartbeats had a drift that caused occasional skipping of a whole second
 // decreasing the interval of the heartbeat and checking current time resolves this
@@ -423,6 +426,15 @@ async function calculateChallengeSolutionAsync (min, max, nonce) {
   return challengeSolution
 }
 
+async function performCreditTopoffAsync (creditAmount) {
+  try {
+    await RegisteredNode.update({ tntCredit: creditAmount }, { where: { tntCredit: { $lt: creditAmount } } })
+    console.log(`All Nodes topped off to ${creditAmount} credits`)
+  } catch (error) {
+    console.error(`Unable to perform credit topoff: ${error.message}`)
+  }
+}
+
 /**
  * Opens a storage connection
  **/
@@ -525,6 +537,20 @@ function setPerformNodeAuditInterval () {
   })
 }
 
+function setPerformCreditTopoffInterval () {
+  let currentDay = new Date().getUTCDate()
+
+  heart.createEvent(5, async function (count, last) {
+    let now = new Date()
+
+    // if we are on a new day
+    if (now.getUTCDate() !== currentDay) {
+      currentDay = now.getUTCDate()
+      await performCreditTopoffAsync(creditTopoffAmount)
+    }
+  })
+}
+
 async function startIntervalsAsync () {
   // attempt to generate a new audit chalenge on startup
   let randomFuzzyMS = await rnd(0, maxFuzzyMS)
@@ -538,6 +564,7 @@ async function startIntervalsAsync () {
 
   setGenerateNewChallengeInterval()
   setPerformNodeAuditInterval()
+  setPerformCreditTopoffInterval()
 }
 
 // process all steps need to start the application
@@ -548,6 +575,8 @@ async function start () {
     await openStorageConnectionAsync()
     // ensure at least 1 calendar block exist
     await checkForGenesisBlockAsync()
+    // perform initial credit topoff
+    await performCreditTopoffAsync(creditTopoffAmount)
     // start main processing
     await startIntervalsAsync()
     console.log('startup completed successfully')
