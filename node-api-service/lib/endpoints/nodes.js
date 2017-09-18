@@ -179,8 +179,9 @@ async function postNodeV1Async (req, res, next) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid empty public_uri, remove if non-public IP'))
   }
 
+  let lowerCasedPublicUri = req.params.public_uri ? req.params.public_uri.toLowerCase() : null
   // if an public_uri is provided, it must be valid
-  if (req.params.public_uri && !validUrl.isWebUri(req.params.public_uri)) {
+  if (lowerCasedPublicUri && !validUrl.isWebUri(lowerCasedPublicUri)) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
   }
 
@@ -200,11 +201,11 @@ async function postNodeV1Async (req, res, next) {
   try {
     newNode = await RegisteredNode.create({
       tntAddr: lowerCasedTntAddrParam,
-      publicUri: req.params.public_uri,
+      publicUri: lowerCasedPublicUri,
       hmacKey: randHMACKey
     })
   } catch (error) {
-    console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${req.params.public_uri}: ${error.message}`)
+    console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${lowerCasedPublicUri}: ${error.message}`)
     return next(new restify.InternalServerError('server error'))
   }
 
@@ -241,9 +242,10 @@ async function putNodeV1Async (req, res, next) {
     lowerCasedTntAddrParam = req.params.tnt_addr.toLowerCase()
   }
 
+  let lowerCasedPublicUri = req.params.public_uri ? req.params.public_uri.toLowerCase() : null
   // if an public_uri is provided, it must be valid
-  if (req.params.hasOwnProperty('public_uri') && !_.isEmpty(req.params.public_uri)) {
-    if (!validUrl.isWebUri(req.params.public_uri)) {
+  if (lowerCasedPublicUri && !_.isEmpty(lowerCasedPublicUri)) {
+    if (!validUrl.isWebUri(lowerCasedPublicUri)) {
       return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
     }
   }
@@ -272,6 +274,8 @@ async function putNodeV1Async (req, res, next) {
     let formattedDate = moment().utc().format('YYYYMMDDHHmm')
     // use req.params.tnt_addr below instead of lowerCasedTntAddrParam to preserve
     // formatting submitted from Node and used in that Node's calculation
+    // use req.params.public_uri below instead of lowerCasedPublicUri to preserve
+    // formatting submitted from Node and used in that Node's calculation
     let hmacTxt = [req.params.tnt_addr, req.params.public_uri, formattedDate].join('')
     let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
@@ -279,10 +283,10 @@ async function putNodeV1Async (req, res, next) {
       return next(new restify.InvalidArgumentError('incorrect hmac'))
     }
 
-    if (!req.params.hasOwnProperty('public_uri') || _.isEmpty(req.params.public_uri)) {
+    if (lowerCasedPublicUri == null || _.isEmpty(lowerCasedPublicUri)) {
       regNode.publicUri = null
     } else {
-      regNode.publicUri = req.params.public_uri
+      regNode.publicUri = lowerCasedPublicUri
     }
 
     await regNode.save()
