@@ -21,6 +21,7 @@ const moment = require('moment')
 var validUrl = require('valid-url')
 const registeredNode = require('../models/RegisteredNode.js')
 const nodeAuditLog = require('../models/NodeAuditLog.js')
+const url = require('url')
 
 let registeredNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
@@ -183,6 +184,16 @@ async function postNodeV1Async (req, res, next) {
   // if an public_uri is provided, it must be valid
   if (lowerCasedPublicUri && !validUrl.isWebUri(lowerCasedPublicUri)) {
     return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
+  }
+
+  let parsedPublicUri = url.parse(lowerCasedPublicUri)
+  // disallow localhost
+  if (parsedPublicUri.hostname === 'localhost') {
+    return next(new restify.InvalidArgumentError('localhost not allowed in CHAINPOINT_NODE_PUBLIC_URI'))
+  }
+  // disallow 0.0.0.0
+  if (parsedPublicUri.hostname === '0.0.0.0') {
+    return next(new restify.InvalidArgumentError('0.0.0.0 not allowed in CHAINPOINT_NODE_PUBLIC_URI'))
   }
 
   try {
