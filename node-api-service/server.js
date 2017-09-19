@@ -144,7 +144,7 @@ server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calend
 // get random subset of nodes list
 server.get({ path: '/nodes/random', version: '1.0.0' }, nodes.getNodesRandomV1Async)
 // get nodes list
-// server.get({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.getNodeByTNTAddrV1Async)
+server.get({ path: '/nodes/:tnt_addr', version: '1.0.0' }, nodes.getNodeByTNTAddrV1Async)
 // register a new node
 server.post({ path: '/nodes', version: '1.0.0' }, nodes.postNodeV1Async)
 // update an existing node

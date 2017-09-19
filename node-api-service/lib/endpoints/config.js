@@ -73,6 +73,7 @@ async function getConfigInfoV1Async (req, res, next) {
     return next(new restify.InternalServerError('server error'))
   }
 
+  res.cache('public', {maxAge: 60})
   res.send(result)
   return next()
 }

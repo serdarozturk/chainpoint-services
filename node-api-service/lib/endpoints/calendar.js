@@ -45,12 +45,20 @@ async function getCalBlockByHeightV1Async (req, res, next) {
   } catch (error) {
     return next(new restify.InternalError(error.message))
   }
-  if (!block) return next(new restify.NotFoundError())
+
+  if (!block) {
+    res.status(404)
+    res.noCache()
+    res.send({code: 'NotFoundError', message: ''})
+    return next()
+  }
+
   block = block.get({ plain: true })
   res.contentType = 'application/json'
   block.id = parseInt(block.id, 10)
   block.time = parseInt(block.time, 10)
   block.version = parseInt(block.version, 10)
+  res.cache('public', {maxAge: 86400})
   res.send(block)
   return next()
 }
@@ -94,18 +102,21 @@ async function getCalBlockRangeV1Async (req, res, next) {
   }
   let results = {}
   results.blocks = blocks
+  res.noCache()
   res.send(results)
   return next()
 }
 
 /**
- * GET /calendar/:fromHeight/:toHeight handler
+ * GET /calendar/blockrange/:index handler
  *
- * Expects path parameters 'fromHeight' and 'topHeight' as an integers
+ * Expects path parameter index as an integer to represent a block range to retrieve
  *
  * Returns an array of calendar blocks
  */
 async function getCalBlockRangeV2Async (req, res, next) {
+  console.log('AAAAa')
+
   let blockRangeIndex = parseInt(req.params.index, 10)
 
   // ensure that :index is an integer
@@ -125,7 +136,10 @@ async function getCalBlockRangeV2Async (req, res, next) {
 
   let maxBlockRangeReady = Math.floor((parseInt(topBlock.id) + 1) / BLOCKRANGE_SIZE) - 1
   if (blockRangeIndex > maxBlockRangeReady) {
-    return next(new restify.NotFoundError())
+    res.status(404)
+    res.noCache()
+    res.send({code: 'NotFoundError', message: ''})
+    return next()
   }
 
   let blocks
@@ -146,6 +160,7 @@ async function getCalBlockRangeV2Async (req, res, next) {
   }
   let results = {}
   results.blocks = blocks
+  res.cache('public', {maxAge: 86400})
   res.send(results)
   return next()
 }
@@ -155,7 +170,7 @@ async function getCalBlockRangeV2Async (req, res, next) {
  *
  * Expects a path parameter 'height' as an integer
  *
- * Returns dataVal item for calendar block by calendar height
+ * Returns dataVal property for calendar block by calendar height
  */
 async function getCalBlockDataByHeightV1Async (req, res, next) {
   let height = parseInt(req.params.height, 10)
@@ -170,19 +185,27 @@ async function getCalBlockDataByHeightV1Async (req, res, next) {
   } catch (error) {
     return next(new restify.InternalError(error.message))
   }
-  if (!block) return next(new restify.NotFoundError())
+
+  if (!block) {
+    res.status(404)
+    res.noCache()
+    res.send({code: 'NotFoundError', message: ''})
+    return next()
+  }
+
   block = block.get({ plain: true })
   res.contentType = 'text/plain'
+  res.cache('public', {maxAge: 86400})
   res.send(block.dataVal)
   return next()
 }
 
 /**
- * GET /calendar/:height/data handler
+ * GET /calendar/:height/hash handler
  *
  * Expects a path parameter 'height' as an integer
  *
- * Returns dataVal item for calendar block by calendar height
+ * Returns hash property for calendar block by calendar height
  */
 async function getCalBlockHashByHeightV1Async (req, res, next) {
   let height = parseInt(req.params.height, 10)
@@ -197,9 +220,17 @@ async function getCalBlockHashByHeightV1Async (req, res, next) {
   } catch (error) {
     return next(new restify.InternalError(error.message))
   }
-  if (!block) return next(new restify.NotFoundError())
+
+  if (!block) {
+    res.status(404)
+    res.noCache()
+    res.send({code: 'NotFoundError', message: ''})
+    return next()
+  }
+
   block = block.get({ plain: true })
   res.contentType = 'text/plain'
+  res.cache('public', {maxAge: 86400})
   res.send(block.hash)
   return next()
 }

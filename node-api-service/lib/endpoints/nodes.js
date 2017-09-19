@@ -86,7 +86,10 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
   try {
     regNode = await RegisteredNode.findOne({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (!regNode) {
-      return next(new restify.ResourceNotFoundError('not found'))
+      res.status(404)
+      res.noCache()
+      res.send({code: 'NotFoundError', message: ''})
+      return next()
     }
   } catch (error) {
     console.error(`Could not retrieve RegisteredNode: ${error.message}`)
@@ -100,11 +103,7 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     return next(new restify.InternalServerError('server error'))
   }
 
-  // build well formatted result
   let result = {
-    tnt_addr: regNode.tntAddr,
-    credits: regNode.tntCredit,
-    created_at: regNode.created_at,
     recent_audits: recentAudits.map((audit) => {
       return {
         time: parseInt(audit.auditAt),
@@ -116,6 +115,7 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     })
   }
 
+  res.cache('public', {maxAge: 900})
   res.send(result)
   return next()
 }
@@ -144,6 +144,8 @@ async function getNodesRandomV1Async (req, res, next) {
       public_uri: rndNode.public_uri
     }
   })
+
+  res.cache('public', {maxAge: 60})
 
   // randomize results order, limit, and send
   res.send(rndNodes)
@@ -276,7 +278,10 @@ async function putNodeV1Async (req, res, next) {
   try {
     let regNode = await RegisteredNode.find({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (!regNode) {
-      return next(new restify.ResourceNotFoundError('not found'))
+      res.status(404)
+      res.noCache()
+      res.send({code: 'NotFoundError', message: ''})
+      return next()
     }
 
     // HMAC-SHA256(hmac-key, TNT_ADDRESS|IP|YYYYMMDDHHMM)
