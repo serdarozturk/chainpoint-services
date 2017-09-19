@@ -16,8 +16,10 @@
 
 const _ = require('lodash')
 const restify = require('restify')
-const env = require('../parse-env.js')('api')
 const calendarBlock = require('../models/CalendarBlock.js')
+const errors = require('restify-errors')
+
+const BLOCKRANGE_SIZE = 100
 
 // pull in variables defined in shared CalendarBlock module
 let sequelize = calendarBlock.sequelize
@@ -53,6 +55,10 @@ async function getCalBlockByHeightV1Async (req, res, next) {
   return next()
 }
 
+async function getCalBlockRangeV1Async (req, res, next) {
+  return next(new errors.GoneError('the endpoint has been replaced by /blockrange/index'))
+}
+
 /**
  * GET /calendar/:fromHeight/:toHeight handler
  *
@@ -60,25 +66,27 @@ async function getCalBlockByHeightV1Async (req, res, next) {
  *
  * Returns an array of calendar blocks
  */
-async function getCalBlockRangeV1Async (req, res, next) {
-  let fromHeight = parseInt(req.params.fromHeight, 10)
-  let toHeight = parseInt(req.params.toHeight, 10)
+async function getCalBlockRangeV2Async (req, res, next) {
+  let blockRangeIndex = parseInt(req.params.index, 10)
 
-  // ensure that :fromHeight is an integer
-  if (!_.isInteger(fromHeight) || fromHeight < 0) {
-    return next(new restify.InvalidArgumentError('invalid request, fromHeight must be a positive integer'))
+  // ensure that :index is an integer
+  if (!_.isInteger(blockRangeIndex) || blockRangeIndex < 0) {
+    return next(new restify.InvalidArgumentError('invalid request, index must be a positive integer'))
   }
-  // ensure that :toHeight is an integer
-  if (!_.isInteger(toHeight) || toHeight < 0) {
-    return next(new restify.InvalidArgumentError('invalid request, toHeight must be a positive integer'))
+
+  let fromHeight = blockRangeIndex * BLOCKRANGE_SIZE
+  let toHeight = fromHeight + BLOCKRANGE_SIZE - 1
+
+  let topBlock
+  try {
+    topBlock = await CalendarBlock.findOne({ attributes: ['id'], order: [['id', 'DESC']] })
+  } catch (error) {
+    return next(new restify.InternalError(error.message))
   }
-  // ensure that :toHeight is greater or equal to :fromHeight
-  if (toHeight < fromHeight) {
-    return next(new restify.InvalidArgumentError('invalid request, toHeight must be greater or equal to fromHeight'))
-  }
-  // ensure the requested range does not exceed GET_CALENDAR_BLOCKS_MAX
-  if ((toHeight - fromHeight + 1) > env.GET_CALENDAR_BLOCKS_MAX) {
-    return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${env.GET_CALENDAR_BLOCKS_MAX} blocks`))
+
+  let maxBlockRangeReady = Math.floor((parseInt(topBlock.id) + 1) / BLOCKRANGE_SIZE) - 1
+  if (blockRangeIndex > maxBlockRangeReady) {
+    return next(new restify.NotFoundError())
   }
 
   let blocks
@@ -87,10 +95,10 @@ async function getCalBlockRangeV1Async (req, res, next) {
   } catch (error) {
     return next(new restify.InternalError(error.message))
   }
+  if (!blocks || blocks.length === 0) blocks = []
   for (let x = 0; x < blocks.length; x++) {
     blocks[x] = blocks[x].get({ plain: true })
   }
-  if (!blocks || blocks.length === 0) blocks = []
   // convert requisite fields to integers
   for (let x = 0; x < blocks.length; x++) {
     blocks[x].id = parseInt(blocks[x].id, 10)
@@ -161,6 +169,7 @@ module.exports = {
   getCalendarBlockSequelize: () => { return sequelize },
   getCalBlockByHeightV1Async: getCalBlockByHeightV1Async,
   getCalBlockRangeV1Async: getCalBlockRangeV1Async,
+  getCalBlockRangeV2Async: getCalBlockRangeV2Async,
   getCalBlockDataByHeightV1Async: getCalBlockDataByHeightV1Async,
   getCalBlockHashByHeightV1Async: getCalBlockHashByHeightV1Async
 }

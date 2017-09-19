@@ -23,6 +23,7 @@
     "redis": "^2.7.1",
     "restify": "^4.3.0",
     "restify-cors-middleware": "^0.0.8",
+    "restify-errors": "^5.0.0",
     "sequelize-cockroachdb": "^1.0.2",
     "uuid": "^3.1.0",
     "uuid-time": "^1.0.0",

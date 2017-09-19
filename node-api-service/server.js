@@ -131,6 +131,8 @@ server.get({ path: '/proofs/:hash_id', version: '1.0.0' }, proofs.getProofsByIDV
 server.get({ path: '/proofs', version: '1.0.0' }, proofs.getProofsByIDV1Async)
 // verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, verify.postProofsForVerificationV1)
+// get the block objects for the calendar in the specified block range
+server.get({ path: '/calendar/blockrange/:index', version: '1.0.0' }, calendar.getCalBlockRangeV2Async)
 // get the block hash for the calendar at the specified hieght
 server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, calendar.getCalBlockHashByHeightV1Async)
 // get the dataVal item for the calendar at the specified hieght

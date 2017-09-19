@@ -1008,7 +1008,6 @@ describe('Config Controller', () => {
           expect(res.body).to.have.property('get_proofs_max_rest')
           expect(res.body).to.have.property('get_proofs_max_ws')
           expect(res.body).to.have.property('post_verify_proofs_max')
-          expect(res.body).to.have.property('get_calendar_blocks_max')
           expect(res.body).to.have.property('time')
           expect(res.body).to.have.property('public_keys')
           expect(res.body).to.have.property('calendar')

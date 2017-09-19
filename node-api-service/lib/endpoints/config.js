@@ -59,7 +59,6 @@ async function getConfigInfoV1Async (req, res, next) {
       get_proofs_max_rest: env.GET_PROOFS_MAX_REST,
       get_proofs_max_ws: env.GET_PROOFS_MAX_WS,
       post_verify_proofs_max: env.POST_VERIFY_PROOFS_MAX,
-      get_calendar_blocks_max: env.GET_CALENDAR_BLOCKS_MAX,
       time: new Date().toISOString(),
       public_keys: getCorePublicKeyList(),
       calendar: {
