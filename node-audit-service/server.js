@@ -576,7 +576,7 @@ async function start () {
     // ensure at least 1 calendar block exist
     await checkForGenesisBlockAsync()
     // perform initial credit topoff
-    await performCreditTopoffAsync(creditTopoffAmount)
+    // await performCreditTopoffAsync(creditTopoffAmount)
     // start main processing
     await startIntervalsAsync()
     console.log('startup completed successfully')
