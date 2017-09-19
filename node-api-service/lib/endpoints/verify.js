@@ -19,7 +19,11 @@ const chpParse = require('chainpoint-parse')
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
 const async = require('async')
-const cachedCalendarBlock = require('../models/CachedCalendarBlock.js')
+const calendarBlock = require('../models/CalendarBlock.js')
+
+// pull in variables defined in shared CalendarBlock module
+let sequelize = calendarBlock.sequelize
+let CalendarBlock = calendarBlock.CalendarBlock
 
 function ProcessVerifyTasks (verifyTasks, callback) {
   let processedTasks = []
@@ -125,17 +129,20 @@ function confirmExpectedValue (anchorInfo, callback) {
   let expectedValue = anchorInfo.expected_value
   switch (anchorInfo.type) {
     case 'cal':
-      cachedCalendarBlock.getCalBlockConfirmDataByDataId(anchorId, (err, hash) => {
-        if (err) return callback(err)
-        return callback(null, hash === expectedValue)
+      CalendarBlock.findOne({ where: { type: 'cal', data_id: anchorId }, attributes: ['hash'] }).then((block) => {
+        if (!block) return callback(null, null)
+        return callback(null, block.hash === expectedValue)
+      }).catch((err) => {
+        return callback(err)
       })
       break
     case 'btc':
-      cachedCalendarBlock.getBtcCBlockConfirmDataByDataId(anchorId, (err, dataVal) => {
-        if (err) return callback(err)
-        if (!dataVal) return callback(null, null)
-        let blockRoot = dataVal.match(/.{2}/g).reverse().join('')
+      CalendarBlock.findOne({ where: { type: 'btc-c', dataId: anchorId }, attributes: ['dataVal'] }).then((block) => {
+        if (!block) return callback(null, null)
+        let blockRoot = block.dataVal.match(/.{2}/g).reverse().join('')
         return callback(null, blockRoot === expectedValue)
+      }).catch((err) => {
+        return callback(err)
       })
       break
     case 'eth':
@@ -212,6 +219,6 @@ function postProofsForVerificationV1 (req, res, next) {
 }
 
 module.exports = {
-  postProofsForVerificationV1: postProofsForVerificationV1,
-  setRedis: (r) => { cachedCalendarBlock.setRedis = r }
+  getCalendarBlockSequelize: () => { return sequelize },
+  postProofsForVerificationV1: postProofsForVerificationV1
 }

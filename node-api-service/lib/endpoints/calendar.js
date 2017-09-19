@@ -17,7 +17,11 @@
 const _ = require('lodash')
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
-const cachedCalendarBlock = require('../models/CachedCalendarBlock.js')
+const calendarBlock = require('../models/CalendarBlock.js')
+
+// pull in variables defined in shared CalendarBlock module
+let sequelize = calendarBlock.sequelize
+let CalendarBlock = calendarBlock.CalendarBlock
 
 /**
  * GET /calendar/:height handler
@@ -26,23 +30,27 @@ const cachedCalendarBlock = require('../models/CachedCalendarBlock.js')
  *
  * Returns a calendar block by calendar height
  */
-function getCalBlockByHeightV1 (req, res, next) {
+async function getCalBlockByHeightV1Async (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
   if (!_.isInteger(height) || height < 0) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
-  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
-    if (err) return next(new restify.InternalError(err))
-    if (!block) return next(new restify.NotFoundError())
-    res.contentType = 'application/json'
-    block.id = parseInt(block.id, 10)
-    block.time = parseInt(block.time, 10)
-    block.version = parseInt(block.version, 10)
-    res.send(block)
-    return next()
-  })
+  let block
+  try {
+    block = await CalendarBlock.findOne({ where: { id: height } })
+  } catch (error) {
+    return next(new restify.InternalError(error.message))
+  }
+  if (!block) return next(new restify.NotFoundError())
+  block = block.get({ plain: true })
+  res.contentType = 'application/json'
+  block.id = parseInt(block.id, 10)
+  block.time = parseInt(block.time, 10)
+  block.version = parseInt(block.version, 10)
+  res.send(block)
+  return next()
 }
 
 /**
@@ -52,7 +60,7 @@ function getCalBlockByHeightV1 (req, res, next) {
  *
  * Returns an array of calendar blocks
  */
-function getCalBlockRangeV1 (req, res, next) {
+async function getCalBlockRangeV1Async (req, res, next) {
   let fromHeight = parseInt(req.params.fromHeight, 10)
   let toHeight = parseInt(req.params.toHeight, 10)
 
@@ -73,23 +81,26 @@ function getCalBlockRangeV1 (req, res, next) {
     return next(new restify.InvalidArgumentError(`invalid request, requested range may not exceed ${env.GET_CALENDAR_BLOCKS_MAX} blocks`))
   }
 
-  cachedCalendarBlock.getBlockRange(fromHeight, toHeight, (err, blocks) => {
-    if (err) {
-      console.error(err)
-      return next(new restify.InternalError(err))
-    }
-    if (!blocks || blocks.length === 0) blocks = []
-    // convert requisite fields to integers
-    for (let x = 0; x < blocks.length; x++) {
-      blocks[x].id = parseInt(blocks[x].id, 10)
-      blocks[x].time = parseInt(blocks[x].time, 10)
-      blocks[x].version = parseInt(blocks[x].version, 10)
-    }
-    let results = {}
-    results.blocks = blocks
-    res.send(results)
-    return next()
-  })
+  let blocks
+  try {
+    blocks = await CalendarBlock.findAll({ where: { id: { $between: [fromHeight, toHeight] } }, order: [['id', 'ASC']] })
+  } catch (error) {
+    return next(new restify.InternalError(error.message))
+  }
+  for (let x = 0; x < blocks.length; x++) {
+    blocks[x] = blocks[x].get({ plain: true })
+  }
+  if (!blocks || blocks.length === 0) blocks = []
+  // convert requisite fields to integers
+  for (let x = 0; x < blocks.length; x++) {
+    blocks[x].id = parseInt(blocks[x].id, 10)
+    blocks[x].time = parseInt(blocks[x].time, 10)
+    blocks[x].version = parseInt(blocks[x].version, 10)
+  }
+  let results = {}
+  results.blocks = blocks
+  res.send(results)
+  return next()
 }
 
 /**
@@ -99,20 +110,24 @@ function getCalBlockRangeV1 (req, res, next) {
  *
  * Returns dataVal item for calendar block by calendar height
  */
-function getCalBlockDataByHeightV1 (req, res, next) {
+async function getCalBlockDataByHeightV1Async (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
   if (!_.isInteger(height) || height < 0) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
-  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
-    if (err) return next(new restify.InternalError(err))
-    if (!block) return next(new restify.NotFoundError())
-    res.contentType = 'text/plain'
-    res.send(block.dataVal)
-    return next()
-  })
+  let block
+  try {
+    block = await CalendarBlock.findOne({ where: { id: height } })
+  } catch (error) {
+    return next(new restify.InternalError(error.message))
+  }
+  if (!block) return next(new restify.NotFoundError())
+  block = block.get({ plain: true })
+  res.contentType = 'text/plain'
+  res.send(block.dataVal)
+  return next()
 }
 
 /**
@@ -122,27 +137,30 @@ function getCalBlockDataByHeightV1 (req, res, next) {
  *
  * Returns dataVal item for calendar block by calendar height
  */
-function getCalBlockHashByHeightV1 (req, res, next) {
+async function getCalBlockHashByHeightV1Async (req, res, next) {
   let height = parseInt(req.params.height, 10)
 
   // ensure that :height is an integer
   if (!_.isInteger(height) || height < 0) {
     return next(new restify.InvalidArgumentError('invalid request, height must be a positive integer'))
   }
-
-  cachedCalendarBlock.getBlockByHeight(height, (err, block) => {
-    if (err) return next(new restify.InternalError(err))
-    if (!block) return next(new restify.NotFoundError())
-    res.contentType = 'text/plain'
-    res.send(block.hash)
-    return next()
-  })
+  let block
+  try {
+    block = await CalendarBlock.findOne({ where: { id: height } })
+  } catch (error) {
+    return next(new restify.InternalError(error.message))
+  }
+  if (!block) return next(new restify.NotFoundError())
+  block = block.get({ plain: true })
+  res.contentType = 'text/plain'
+  res.send(block.hash)
+  return next()
 }
 
 module.exports = {
-  getCalBlockByHeightV1: getCalBlockByHeightV1,
-  getCalBlockRangeV1: getCalBlockRangeV1,
-  getCalBlockDataByHeightV1: getCalBlockDataByHeightV1,
-  getCalBlockHashByHeightV1: getCalBlockHashByHeightV1,
-  setRedis: (r) => { cachedCalendarBlock.setRedis = r }
+  getCalendarBlockSequelize: () => { return sequelize },
+  getCalBlockByHeightV1Async: getCalBlockByHeightV1Async,
+  getCalBlockRangeV1Async: getCalBlockRangeV1Async,
+  getCalBlockDataByHeightV1Async: getCalBlockDataByHeightV1Async,
+  getCalBlockHashByHeightV1Async: getCalBlockHashByHeightV1Async
 }

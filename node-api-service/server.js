@@ -21,7 +21,6 @@ const { promisify } = require('util')
 const utils = require('./lib/utils.js')
 const amqp = require('amqplib')
 const async = require('async')
-const cachedCalendarBlock = require('./lib/models/CachedCalendarBlock.js')
 const restify = require('restify')
 const corsMiddleware = require('restify-cors-middleware')
 const webSocket = require('ws')
@@ -133,13 +132,13 @@ server.get({ path: '/proofs', version: '1.0.0' }, proofs.getProofsByIDV1Async)
 // verify one or more proofs
 server.post({ path: '/verify', version: '1.0.0' }, verify.postProofsForVerificationV1)
 // get the block hash for the calendar at the specified hieght
-server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, calendar.getCalBlockHashByHeightV1)
+server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, calendar.getCalBlockHashByHeightV1Async)
 // get the dataVal item for the calendar at the specified hieght
-server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCalBlockDataByHeightV1)
+server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCalBlockDataByHeightV1Async)
 // get the block object for the calendar at the specified hieght
-server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1)
+server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1Async)
 // get the block objects for the calendar in the specified range, incusive
-server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1)
+server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1Async)
 // get random subset of nodes list
 server.get({ path: '/nodes/random', version: '1.0.0' }, nodes.getNodesRandomV1Async)
 // get nodes list
@@ -209,9 +208,10 @@ async function openStorageConnectionAsync () {
   let dbConnected = false
   while (!dbConnected) {
     try {
-      await cachedCalendarBlock.getSequelize().sync({ logging: false })
       await hashes.getSequelize().sync({ logging: false })
       await nodes.getRegisteredNodeSequelize().sync({ logging: false })
+      await calendar.getCalendarBlockSequelize().sync({ logging: false })
+      await verify.getCalendarBlockSequelize().sync({ logging: false })
       await nodes.getNodeAuditLogSequelize().sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
@@ -280,9 +280,6 @@ function openRedisConnection (redisURI) {
     bluebird.promisifyAll(redis)
     proofs.setRedis(redis)
     subscribe.setRedis(redis)
-    cachedCalendarBlock.setRedis(redis)
-    verify.setRedis(redis)
-    calendar.setRedis(redis)
     console.log('Redis connection established')
   })
   redis.on('error', async (err) => {
@@ -291,9 +288,6 @@ function openRedisConnection (redisURI) {
     redis = null
     proofs.setRedis(null)
     subscribe.setRedis(null)
-    cachedCalendarBlock.setRedis(null)
-    verify.setRedis(null)
-    calendar.setRedis(null)
     console.error('Cannot establish Redis connection. Attempting in 5 seconds...')
     await utils.sleep(5000)
     openRedisConnection(redisURI)
