@@ -97,7 +97,7 @@ function generateCALProof (msg) {
             return callback(err)
           } else {
             // New message has been published
-            console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
+            // console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -110,7 +110,7 @@ function generateCALProof (msg) {
         console.error(env.RMQ_WORK_IN_GEN_QUEUE, '[cal] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[cal] consume message acked')
+        // console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[cal] consume message acked')
       }
     })
 }
@@ -179,7 +179,7 @@ function generateBTCProof (msg) {
             return callback(err)
           } else {
             // New message has been published
-            console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
+            // console.log(env.RMQ_WORK_OUT_API_QUEUE, 'publish message acked')
             return callback(null)
           }
         })
@@ -192,7 +192,7 @@ function generateBTCProof (msg) {
         console.error(env.RMQ_WORK_IN_GEN_QUEUE, '[btc] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[btc] consume message acked')
+        // console.log(env.RMQ_WORK_IN_GEN_QUEUE, '[btc] consume message acked')
       }
     })
 }

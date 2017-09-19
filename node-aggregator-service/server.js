@@ -159,11 +159,11 @@ let finalize = () => {
             (err) => {
               if (err !== null) {
                 // An error as occurred publishing a message
-                console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
+                // console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message nacked')
                 return eachCallback(err || 'write buffer full')
               } else {
                 // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message acked')
+                // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[aggregator] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -194,7 +194,7 @@ let finalize = () => {
               return callback(err || 'write buffer full')
             } else {
               // New message has been published
-              console.log(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message acked')
+              // console.log(env.RMQ_WORK_OUT_CAL_QUEUE, 'publish message acked')
               return callback(null)
             }
           })
@@ -214,7 +214,7 @@ let finalize = () => {
           if (message !== null) {
             // ack consumption of all original hash messages part of this aggregation event
             amqpChannel.ack(message)
-            console.log(env.RMQ_WORK_IN_AGG_QUEUE, 'consume message acked')
+            // console.log(env.RMQ_WORK_IN_AGG_QUEUE, 'consume message acked')
           }
         })
       }

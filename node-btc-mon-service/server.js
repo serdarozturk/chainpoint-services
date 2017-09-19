@@ -106,7 +106,7 @@ let monitorTransactionsAsync = async () => {
       messageObj.path = proofPath
       try {
         await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'btcmon' })
-        console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message acked')
+        // console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message acked')
       } catch (error) {
         console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[btcmon] publish message nacked')
         throw new Error(error.message)
@@ -114,7 +114,7 @@ let monitorTransactionsAsync = async () => {
       // if minimim confirms have been achieved and return message to calendar published, ack consumption of this message
       amqpChannel.ack(btcTxIdObj.msg)
       console.log(btcTxIdObj.tx_id + ' confirmed and processed')
-      console.log(env.RMQ_WORK_IN_BTCMON_QUEUE, 'consume message acked')
+      // console.log(env.RMQ_WORK_IN_BTCMON_QUEUE, 'consume message acked')
     } catch (error) {
       console.error(error.message)
       // nack consumption of this message

@@ -310,7 +310,7 @@ async function consumeBtcTxMessageAsync (msg) {
               return callback(err)
             } else {
               // New message has been published
-              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message acked')
+              // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btctx] publish message acked')
               return callback(null)
             }
           })
@@ -325,7 +325,7 @@ async function consumeBtcTxMessageAsync (msg) {
               return callback(err)
             } else {
               // New message has been published
-              console.log(env.RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message acked')
+              // console.log(env.RMQ_WORK_OUT_BTCMON_QUEUE, 'publish message acked')
               return callback(null)
             }
           })
@@ -336,7 +336,7 @@ async function consumeBtcTxMessageAsync (msg) {
         console.error(env.RMQ_WORK_IN_CAL_QUEUE, '[btctx] consume message nacked')
       } else {
         amqpChannel.ack(msg)
-        console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btctx] consume message acked')
+        // console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btctx] consume message acked')
       }
     })
   }
@@ -470,7 +470,7 @@ let persistCalendarTreeAsync = async (treeDataObj) => {
               return eachCallback(err)
             } else {
               // New message has been published
-              console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
+              // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[cal] publish message acked')
               return eachCallback(null)
             }
           })
@@ -501,7 +501,7 @@ let persistCalendarTreeAsync = async (treeDataObj) => {
         if (message !== null) {
           // ack consumption of all original hash messages part of this aggregation event
           amqpChannel.ack(message)
-          console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
+          // console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[aggregator] consume message acked')
         }
       })
     }
@@ -579,7 +579,7 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message acked')
+                // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[anchor_btc_agg] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -607,7 +607,7 @@ let aggregateAndAnchorBTCAsync = async (lastBtcAnchorBlockId) => {
               console.error(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message nacked')
               return seriesCallback(err)
             } else {
-              console.log(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
+              // console.log(env.RMQ_WORK_OUT_BTCTX_QUEUE, 'publish message acked')
               return seriesCallback(null)
             }
           })
@@ -834,7 +834,7 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', async () => {
       try {
         await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_STATE_QUEUE, Buffer.from(JSON.stringify(stateObj)), { persistent: true, type: 'btcmon' })
         // New message has been published
-        console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
+        // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message acked')
       } catch (error) {
         // An error as occurred publishing a message
         console.error(env.RMQ_WORK_OUT_STATE_QUEUE, '[btcmon] publish message nacked')
@@ -845,7 +845,7 @@ registerLockEvents(btcConfirmLock, 'btcConfirmLock', async () => {
 
       // ack consumption of all original hash messages part of this aggregation event
       amqpChannel.ack(msg)
-      console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message acked')
+      // console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[btcmon] consume message acked')
     }
   } catch (error) {
     console.error(error.message)
@@ -1018,7 +1018,7 @@ registerLockEvents(rewardLock, 'rewardLock', async () => {
       await createRewardBlockAsync(dataId, dataVal)
       // ack consumption of all original hash messages part of this aggregation event
       amqpChannel.ack(msg)
-      console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
+      // console.log(env.RMQ_WORK_IN_CAL_QUEUE, '[reward] consume message acked')
     } catch (error) {
       // ack consumption of all original message
       // this message must be acked to avoid reward distribution to node from occuring again

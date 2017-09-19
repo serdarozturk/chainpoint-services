@@ -185,7 +185,7 @@ async function performRewardAsync () {
 
   try {
     await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_CAL_QUEUE, Buffer.from(JSON.stringify(messageObj)), { persistent: true, type: 'reward' })
-    console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message acked')
+    // console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message acked')
   } catch (error) {
     console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[reward] publish message nacked')
     throw new Error(error.message)

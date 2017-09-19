@@ -137,7 +137,7 @@ async function processIncomingAnchorBTCJobAsync (msg) {
         console.error(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message nacked')
         throw new Error(`Unable to publish to RMQ_WORK_OUT_CAL_QUEUE: ${error.message}`)
       }
-      console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
+      // console.log(env.RMQ_WORK_OUT_CAL_QUEUE, '[calendar] publish message acked')
       amqpChannel.ack(msg)
     } catch (error) {
       // An error has occurred publishing the transaction, nack consumption of message

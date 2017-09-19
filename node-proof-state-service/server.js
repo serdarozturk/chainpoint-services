@@ -90,7 +90,7 @@ async function ConsumeCalendarMessageAsync (msg) {
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+                // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -204,7 +204,7 @@ async function ConsumeBtcMonMessageAsync (msg) {
                 return eachCallback(err)
               } else {
                 // New message has been published
-                console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
+                // console.log(env.RMQ_WORK_OUT_STATE_QUEUE, '[state] publish message acked')
                 return eachCallback(null)
               }
             })
@@ -262,7 +262,7 @@ async function ConsumeProofReadyMessageAsync (msg) {
           throw new Error(`Unable tp publish message to RMQ_WORK_OUT_GEN_QUEUE: ${error.message}`)
         }
         // New message has been published
-        console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
+        // console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message acked')
         // logs the calendar proof event
         await storageClient.logCalendarEventForHashIdAsync(aggStateRow.hash_id)
         // Proof ready message has been consumed, ack consumption of original message
@@ -312,7 +312,7 @@ async function ConsumeProofReadyMessageAsync (msg) {
           throw new Error(`Unable tp publish message to RMQ_WORK_OUT_GEN_QUEUE: ${error.message}`)
         }
         // New message has been published
-        console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
+        // console.log(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message acked')
         // logs the btc proof event
         await storageClient.logBtcEventForHashIdAsync(aggStateRow.hash_id)
         // Proof ready message has been consumed, ack consumption of original message

@@ -190,7 +190,7 @@ function processProofMessage (msg) {
           console.error(env.RMQ_WORK_IN_API_QUEUE, 'consume message nacked')
         } else {
           amqpChannel.ack(msg)
-          console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message acked')
+          // console.log(env.RMQ_WORK_IN_API_QUEUE, 'consume message acked')
         }
       })
     } else {
