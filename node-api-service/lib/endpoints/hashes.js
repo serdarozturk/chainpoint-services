@@ -216,7 +216,7 @@ async function postHashV1Async (req, res, next) {
       return next(new restify.NotAuthorizedError(`insufficient tntCredit remaining: ${regNode.tntCredit}`))
     }
     // decrement tntCredit by TNT_CREDIT_COST_POST_HASH
-    await regNode.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
+    // await regNode.decrement({ tntCredit: TNT_CREDIT_COST_POST_HASH })
   } catch (error) {
     return next(new restify.InvalidCredentialsError(`authorization denied: ${error.message}`))
   }
