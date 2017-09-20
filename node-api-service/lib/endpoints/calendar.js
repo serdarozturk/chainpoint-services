@@ -58,7 +58,7 @@ async function getCalBlockByHeightV1Async (req, res, next) {
   block.id = parseInt(block.id, 10)
   block.time = parseInt(block.time, 10)
   block.version = parseInt(block.version, 10)
-  res.cache('public', {maxAge: 86400})
+  res.cache('public', {maxAge: 2592000})
   res.send(block)
   return next()
 }
@@ -158,7 +158,7 @@ async function getCalBlockRangeV2Async (req, res, next) {
   }
   let results = {}
   results.blocks = blocks
-  res.cache('public', {maxAge: 86400})
+  res.cache('public', {maxAge: 2592000})
   res.send(results)
   return next()
 }
@@ -193,7 +193,7 @@ async function getCalBlockDataByHeightV1Async (req, res, next) {
 
   block = block.get({ plain: true })
   res.contentType = 'text/plain'
-  res.cache('public', {maxAge: 86400})
+  res.cache('public', {maxAge: 2592000})
   res.send(block.dataVal)
   return next()
 }
@@ -228,7 +228,7 @@ async function getCalBlockHashByHeightV1Async (req, res, next) {
 
   block = block.get({ plain: true })
   res.contentType = 'text/plain'
-  res.cache('public', {maxAge: 86400})
+  res.cache('public', {maxAge: 2592000})
   res.send(block.hash)
   return next()
 }
