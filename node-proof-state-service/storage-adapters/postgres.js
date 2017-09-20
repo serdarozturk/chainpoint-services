@@ -40,10 +40,19 @@ let AggStates = sequelize.define('agg_states', {
 }, {
   indexes: [
     {
+      unique: false,
       fields: ['agg_id']
+    },
+    {
+      unique: false,
+      fields: ['updated_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 // table for state data connecting aggregation roots to calendar block hashes
@@ -54,10 +63,19 @@ let CalStates = sequelize.define('cal_states', {
 }, {
   indexes: [
     {
+      unique: false,
       fields: ['cal_id']
+    },
+    {
+      unique: false,
+      fields: ['created_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 // table for state data connecting calendar block hashes to anchor_btc_agg_root
@@ -68,10 +86,19 @@ let AnchorBTCAggStates = sequelize.define('anchor_btc_agg_states', {
 }, {
   indexes: [
     {
+      unique: false,
       fields: ['anchor_btc_agg_id']
+    },
+    {
+      unique: false,
+      fields: ['created_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 // table for state data connecting one anchor_btc_agg_root to one btctx_id
@@ -82,10 +109,19 @@ let BtcTxStates = sequelize.define('btctx_states', {
 }, {
   indexes: [
     {
+      unique: false,
       fields: ['btctx_id']
+    },
+    {
+      unique: false,
+      fields: ['created_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 // table for state data connecting one one btctx_id to one btchead root value at height btchead_height
@@ -96,10 +132,19 @@ let BtcHeadStates = sequelize.define('btchead_states', {
 }, {
   indexes: [
     {
+      unique: false,
       fields: ['btchead_height']
+    },
+    {
+      unique: false,
+      fields: ['created_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 sequelize.define('hash_tracker_log', {
@@ -118,9 +163,17 @@ sequelize.define('hash_tracker_log', {
     {
       name: 'hash_id_and_steps_complete',
       fields: ['hash_id', 'steps_complete']
+    },
+    {
+      unique: false,
+      fields: ['created_at']
     }
   ],
-  timestamps: false
+    // enable timestamps
+  timestamps: true,
+    // don't use camelcase for automatically added attributes but underscore style
+    // so updatedAt will be updated_at
+  underscored: true
 })
 
 async function openConnectionAsync () {

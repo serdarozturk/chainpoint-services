@@ -123,7 +123,7 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
     // if you don't want that, set the following
     freezeTableName: true,
     indexes: [
-      // Create a unique index on audit_at
+      // Create an index on audit_at
       {
         unique: false,
         fields: ['audit_at']
