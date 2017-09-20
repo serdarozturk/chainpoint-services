@@ -139,8 +139,6 @@ server.get({ path: '/calendar/:height/hash', version: '1.0.0' }, calendar.getCal
 server.get({ path: '/calendar/:height/data', version: '1.0.0' }, calendar.getCalBlockDataByHeightV1Async)
 // get the block object for the calendar at the specified hieght
 server.get({ path: '/calendar/:height', version: '1.0.0' }, calendar.getCalBlockByHeightV1Async)
-// get the block objects for the calendar in the specified range, incusive
-// server.get({ path: '/calendar/:fromHeight/:toHeight', version: '1.0.0' }, calendar.getCalBlockRangeV1Async)
 // get random subset of nodes list
 server.get({ path: '/nodes/random', version: '1.0.0' }, nodes.getNodesRandomV1Async)
 // get nodes list
