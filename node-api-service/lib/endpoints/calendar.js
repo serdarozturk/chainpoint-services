@@ -115,8 +115,6 @@ async function getCalBlockRangeV1Async (req, res, next) {
  * Returns an array of calendar blocks
  */
 async function getCalBlockRangeV2Async (req, res, next) {
-  console.log('AAAAa')
-
   let blockRangeIndex = parseInt(req.params.index, 10)
 
   // ensure that :index is an integer
