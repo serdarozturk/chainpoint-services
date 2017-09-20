@@ -88,7 +88,7 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     if (!regNode) {
       res.status(404)
       res.noCache()
-      res.send({code: 'NotFoundError', message: ''})
+      res.send({ code: 'NotFoundError', message: '' })
       return next()
     }
   } catch (error) {
@@ -115,7 +115,7 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     })
   }
 
-  res.cache('public', {maxAge: 900})
+  res.cache('public', { maxAge: 900 })
   res.send(result)
   return next()
 }
@@ -145,7 +145,7 @@ async function getNodesRandomV1Async (req, res, next) {
     }
   })
 
-  res.cache('public', {maxAge: 60})
+  res.cache('public', { maxAge: 60 })
 
   // randomize results order, limit, and send
   res.send(rndNodes)
@@ -215,7 +215,8 @@ async function postNodeV1Async (req, res, next) {
     newNode = await RegisteredNode.create({
       tntAddr: lowerCasedTntAddrParam,
       publicUri: lowerCasedPublicUri,
-      hmacKey: randHMACKey
+      hmacKey: randHMACKey,
+      tntCredit: 86400
     })
   } catch (error) {
     console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${lowerCasedPublicUri}: ${error.message}`)
@@ -280,7 +281,7 @@ async function putNodeV1Async (req, res, next) {
     if (!regNode) {
       res.status(404)
       res.noCache()
-      res.send({code: 'NotFoundError', message: ''})
+      res.send({ code: 'NotFoundError', message: '' })
       return next()
     }
 

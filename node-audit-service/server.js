@@ -575,8 +575,6 @@ async function start () {
     await openStorageConnectionAsync()
     // ensure at least 1 calendar block exist
     await checkForGenesisBlockAsync()
-    // perform initial credit topoff
-    // await performCreditTopoffAsync(creditTopoffAmount)
     // start main processing
     await startIntervalsAsync()
     console.log('startup completed successfully')

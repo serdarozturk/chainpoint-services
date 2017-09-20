@@ -17,7 +17,6 @@
 const _ = require('lodash')
 const restify = require('restify')
 const calendarBlock = require('../models/CalendarBlock.js')
-const errors = require('restify-errors')
 
 const BLOCKRANGE_SIZE = 100
 
