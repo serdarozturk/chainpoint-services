@@ -245,7 +245,7 @@ async function openRMQConnectionAsync (connectionString) {
       hashes.setAMQPChannel(chan)
       // assert headers exchange for receiving proofs
       chan.assertExchange(env.RMQ_INCOMING_EXCHANGE, 'headers', { durable: true })
-      let q = chan.assertQueue('', { durable: true })
+      let q = chan.assertQueue(env.RMQ_WORK_IN_API_QUEUE, { durable: true })
       let opts = { 'api_id': APIServiceInstanceId, 'x-match': 'all' }
       chan.bindQueue(q.queue, env.RMQ_INCOMING_EXCHANGE, '', opts)
       chan.consume(q.queue, (msg) => {
