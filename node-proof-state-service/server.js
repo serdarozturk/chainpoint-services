@@ -339,25 +339,24 @@ async function ConsumeProofReadyMessageAsync (msg) {
 */
 async function PruneStateDataAsync () {
   try {
-    // remove all rows from agg_states that have been processed and from which proofs have been generated
-    let rowCount = await storageClient.deleteProcessedHashesFromAggStatesAsync()
+    // remove all rows from agg_states that are older than the expiration age
+    let rowCount = await storageClient.pruneAggStatesAsync()
     if (rowCount) console.log(`Pruned agg_states - ${rowCount} row(s) deleted`)
-    // remove all rows from hash_tracker_logs for the hashes that have been processed and from which proofs have been generated
-    rowCount = await storageClient.deleteHashTrackerLogEntriesAsync()
+    // remove all rows from hash_tracker_logs that are older than the expiration age
+    rowCount = await storageClient.pruneHashTrackerLogsAsync()
     if (rowCount) console.log(`Pruned hash_tracker_logs - ${rowCount} row(s) deleted`)
-    // remove all rows from cal_states whose agg_states children have all been deleted
-    rowCount = await storageClient.deleteCalStatesWithNoRemainingAggStatesAsync()
+    // remove all rows from cal_states that are older than the expiration age
+    rowCount = await storageClient.pruneCalStatesAsync()
     if (rowCount) console.log(`Pruned cal_states - ${rowCount} row(s) deleted`)
-    // remove all rows from anchor_btc_agg_states whose cal_states children have all been deleted
-    rowCount = await storageClient.deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync()
+    // remove all rows from anchor_btc_agg_states that are older than the expiration age
+    rowCount = await storageClient.pruneAnchorBTCAggStatesAsync()
     if (rowCount) console.log(`Pruned anchor_btc_agg_states - ${rowCount} row(s) deleted`)
-    // remove all rows from btctx_states whose anchor_btc_agg_states children have all been deleted
-    rowCount = await storageClient.deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync()
+    // remove all rows from btctx_states that are older than the expiration age
+    rowCount = await storageClient.pruneBtcTxStatesAsync()
     if (rowCount) console.log(`Pruned btctx_states - ${rowCount} row(s) deleted`)
-    // remove all rows from btchead_states whose btctx_states children have all been deleted
-    rowCount = await storageClient.deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()
+    // remove all rows from btchead_states that are older than the expiration age
+    rowCount = await storageClient.pruneBtcHeadStatesAsync()
     if (rowCount) console.log(`Pruned btcheadstates - ${rowCount} row(s) deleted`)
-    // console.log('Pruning process completed')
   } catch (error) {
     console.error(`Unable to complete pruning process: ${error.message}`)
   }

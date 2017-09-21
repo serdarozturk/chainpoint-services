@@ -20,14 +20,11 @@ const env = require('../lib/parse-env.js')('postgres-adapter')
 // PostgreSQL DB storage adapter
 let Sequelize = require('sequelize')
 
+// How many hours any piece of proof state data is retained until pruned
+const PROOF_STATE_EXPIRE_HOURS = 1
+
 // Connection URI for Postgres
 const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_CONNECT_USER}:${env.POSTGRES_CONNECT_PW}@${env.POSTGRES_CONNECT_HOST}:${env.POSTGRES_CONNECT_PORT}/${env.POSTGRES_CONNECT_DB}`
-
-// Set the number of tracking log events to complete in order for the hash to be considered fully processed
-// The value is determined by the number of anchoring services enabled
-// The base of 2 represents the aggregator and calendar events
-// This number will increase as additional anchor services are enabled
-const PROOF_STEP_COUNT = 2 + (env.ANCHOR_BTC === 'enabled' ? 1 : 0) + (env.ANCHOR_ETH === 'enabled' ? 1 : 0)
 
 const sequelize = new Sequelize(POSTGRES_CONNECT_URI, { logging: null })
 
@@ -147,7 +144,7 @@ let BtcHeadStates = sequelize.define('btchead_states', {
   underscored: true
 })
 
-sequelize.define('hash_tracker_log', {
+let HashTrackerLog = sequelize.define('hash_tracker_log', {
   hash_id: { type: Sequelize.UUID, primaryKey: true },
   hash: { type: Sequelize.STRING },
   aggregator_at: { type: Sequelize.DATE },
@@ -302,138 +299,124 @@ async function getBTCHeadStateObjectsByBTCHeadIdAsync (btcHeadId) {
 
 async function writeAggStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.agg_state)
-  await sequelize.query(`INSERT INTO agg_states (hash_id, hash, agg_id, agg_state)
-    VALUES ('${stateObject.hash_id}', '${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
+  await sequelize.query(`INSERT INTO agg_states (hash_id, hash, agg_id, agg_state, created_at, updated_at)
+    VALUES ('${stateObject.hash_id}', '${stateObject.hash}', '${stateObject.agg_id}', '${stateString}', clock_timestamp(), clock_timestamp())
     ON CONFLICT (hash_id)
-    DO UPDATE SET (hash, agg_id, agg_state) = ('${stateObject.hash}', '${stateObject.agg_id}', '${stateString}')
+    DO UPDATE SET (hash, agg_id, agg_state, updated_at) = ('${stateObject.hash}', '${stateObject.agg_id}', '${stateString}', clock_timestamp())
     WHERE agg_states.hash_id = '${stateObject.hash_id}'`)
   return true
 }
 
 async function writeCalStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.cal_state)
-  await sequelize.query(`INSERT INTO cal_states (agg_id, cal_id, cal_state)
-    VALUES ('${stateObject.agg_id}', '${stateObject.cal_id}', '${stateString}')
+  await sequelize.query(`INSERT INTO cal_states (agg_id, cal_id, cal_state, created_at, updated_at)
+    VALUES ('${stateObject.agg_id}', '${stateObject.cal_id}', '${stateString}', clock_timestamp(), clock_timestamp())
     ON CONFLICT (agg_id)
-    DO UPDATE SET (cal_id, cal_state) = ('${stateObject.cal_id}', '${stateString}')
+    DO UPDATE SET (cal_id, cal_state, updated_at) = ('${stateObject.cal_id}', '${stateString}', clock_timestamp())
     WHERE cal_states.agg_id = '${stateObject.agg_id}'`)
   return true
 }
 
 async function writeAnchorBTCAggStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.anchor_btc_agg_state)
-  await sequelize.query(`INSERT INTO anchor_btc_agg_states (cal_id, anchor_btc_agg_id, anchor_btc_agg_state)
-    VALUES ('${stateObject.cal_id}', '${stateObject.anchor_btc_agg_id}', '${stateString}')
+  await sequelize.query(`INSERT INTO anchor_btc_agg_states (cal_id, anchor_btc_agg_id, anchor_btc_agg_state, created_at, updated_at)
+    VALUES ('${stateObject.cal_id}', '${stateObject.anchor_btc_agg_id}', '${stateString}', clock_timestamp(), clock_timestamp())
     ON CONFLICT (cal_id)
-    DO UPDATE SET (anchor_btc_agg_id, anchor_btc_agg_state) = ('${stateObject.anchor_btc_agg_id}', '${stateString}')
+    DO UPDATE SET (anchor_btc_agg_id, anchor_btc_agg_state, updated_at) = ('${stateObject.anchor_btc_agg_id}', '${stateString}', clock_timestamp())
     WHERE anchor_btc_agg_states.cal_id = '${stateObject.cal_id}'`)
   return true
 }
 
 async function writeBTCTxStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.btctx_state)
-  await sequelize.query(`INSERT INTO btctx_states (anchor_btc_agg_id, btctx_id, btctx_state)
-    VALUES ('${stateObject.anchor_btc_agg_id}', '${stateObject.btctx_id}', '${stateString}')
+  await sequelize.query(`INSERT INTO btctx_states (anchor_btc_agg_id, btctx_id, btctx_state, created_at, updated_at)
+    VALUES ('${stateObject.anchor_btc_agg_id}', '${stateObject.btctx_id}', '${stateString}', clock_timestamp(), clock_timestamp())
     ON CONFLICT (anchor_btc_agg_id)
-    DO UPDATE SET (btctx_id, btctx_state) = ('${stateObject.btctx_id}', '${stateString}')
+    DO UPDATE SET (btctx_id, btctx_state, updated_at) = ('${stateObject.btctx_id}', '${stateString}', clock_timestamp())
     WHERE btctx_states.anchor_btc_agg_id = '${stateObject.anchor_btc_agg_id}'`)
   return true
 }
 
 async function writeBTCHeadStateObjectAsync (stateObject) {
   let stateString = JSON.stringify(stateObject.btchead_state)
-  await sequelize.query(`INSERT INTO btchead_states (btctx_id, btchead_height, btchead_state)
-    VALUES ('${stateObject.btctx_id}', '${stateObject.btchead_height}', '${stateString}')
+  await sequelize.query(`INSERT INTO btchead_states (btctx_id, btchead_height, btchead_state, created_at, updated_at)
+    VALUES ('${stateObject.btctx_id}', '${stateObject.btchead_height}', '${stateString}', clock_timestamp(), clock_timestamp())
     ON CONFLICT (btctx_id)
-    DO UPDATE SET (btchead_height, btchead_state) = ('${stateObject.btchead_height}', '${stateString}')
+    DO UPDATE SET (btchead_height, btchead_state, updated_at) = ('${stateObject.btchead_height}', '${stateString}', clock_timestamp())
     WHERE btchead_states.btctx_id = '${stateObject.btctx_id}'`)
   return true
 }
 
 async function logAggregatorEventForHashIdAsync (hashId, hash) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, aggregator_at, steps_complete)
-    VALUES ('${hashId}', '${hash}', clock_timestamp(), 1)
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, hash, aggregator_at, steps_complete, created_at, updated_at)
+    VALUES ('${hashId}', '${hash}', clock_timestamp(), 1, clock_timestamp(), clock_timestamp())
     ON CONFLICT (hash_id)
-    DO UPDATE SET (hash, aggregator_at, steps_complete) = ('${hash}', clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (hash, aggregator_at, steps_complete, updated_at) = ('${hash}', clock_timestamp(), hash_tracker_logs.steps_complete + 1, clock_timestamp())
     WHERE hash_tracker_logs.hash_id = '${hashId}'`)
   return true
 }
 
 async function logCalendarEventForHashIdAsync (hashId) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, calendar_at, steps_complete)
-    VALUES ('${hashId}', clock_timestamp(), 1)
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, calendar_at, steps_complete, created_at, updated_at)
+    VALUES ('${hashId}', clock_timestamp(), 1, clock_timestamp(), clock_timestamp())
     ON CONFLICT (hash_id)
-    DO UPDATE SET (calendar_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (calendar_at, steps_complete, updated_at) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1, clock_timestamp())
     WHERE hash_tracker_logs.hash_id = '${hashId}'`)
   return true
 }
 
 async function logBtcEventForHashIdAsync (hashId) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_at, steps_complete)
-    VALUES ('${hashId}', clock_timestamp(), 1)
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, btc_at, steps_complete, created_at, updated_at)
+    VALUES ('${hashId}', clock_timestamp(), 1, clock_timestamp(), clock_timestamp())
     ON CONFLICT (hash_id)
-    DO UPDATE SET (btc_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (btc_at, steps_complete, updated_at) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1, clock_timestamp())
     WHERE hash_tracker_logs.hash_id = '${hashId}'`)
   return true
 }
 
 async function logEthEventForHashIdAsync (hashId) {
-  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, eth_at, steps_complete)
-    VALUES ('${hashId}', clock_timestamp(), 1)
+  await sequelize.query(`INSERT INTO hash_tracker_logs (hash_id, eth_at, steps_complete, created_at, updated_at)
+    VALUES ('${hashId}', clock_timestamp(), 1, clock_timestamp(), clock_timestamp())
     ON CONFLICT (hash_id)
-    DO UPDATE SET (eth_at, steps_complete) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1)
+    DO UPDATE SET (eth_at, steps_complete, updated_at) = (clock_timestamp(), hash_tracker_logs.steps_complete + 1, clock_timestamp())
     WHERE hash_tracker_logs.hash_id = '${hashId}'`)
   return true
 }
 
-async function deleteProcessedHashesFromAggStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM agg_states WHERE hash_id IN
-    (SELECT hash_id FROM hash_tracker_logs 
-    WHERE steps_complete >= ${PROOF_STEP_COUNT})`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneAggStatesAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await AggStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
-async function deleteHashTrackerLogEntriesAsync () {
-  let results = await sequelize.query(`DELETE FROM hash_tracker_logs WHERE steps_complete >= ${PROOF_STEP_COUNT}`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneHashTrackerLogsAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await HashTrackerLog.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
-async function deleteCalStatesWithNoRemainingAggStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM cal_states WHERE agg_id IN
-    (SELECT c.agg_id FROM cal_states c
-    LEFT JOIN agg_states a ON c.agg_id = a.agg_id
-    GROUP BY c.agg_id HAVING COUNT(a.agg_id) = 0)`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneCalStatesAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await CalStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
-async function deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM anchor_btc_agg_states WHERE cal_id IN
-    (SELECT a.cal_id FROM anchor_btc_agg_states a
-    LEFT JOIN cal_states c ON a.cal_id = c.cal_id
-    GROUP BY a.cal_id HAVING COUNT(c.cal_id) = 0)`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneAnchorBTCAggStatesAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await AnchorBTCAggStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
-async function deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM btctx_states WHERE anchor_btc_agg_id IN
-    (SELECT b.anchor_btc_agg_id FROM btctx_states b
-    LEFT JOIN anchor_btc_agg_states a ON b.anchor_btc_agg_id = a.anchor_btc_agg_id
-    GROUP BY b.anchor_btc_agg_id HAVING COUNT(a.anchor_btc_agg_id) = 0)`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneBtcTxStatesAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await BtcTxStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
-async function deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync () {
-  let results = await sequelize.query(`DELETE FROM btchead_states WHERE btctx_id IN
-    (SELECT btchead.btctx_id FROM btchead_states btchead
-    LEFT JOIN btctx_states btctx ON btchead.btctx_id = btctx.btctx_id
-    GROUP BY btchead.btctx_id HAVING COUNT(btctx.btctx_id) = 0)`)
-  let meta = results[1]
-  return meta.rowCount
+async function pruneBtcHeadStatesAsync () {
+  let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
+  let resultCount = await BtcHeadStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  return resultCount
 }
 
 module.exports = {
@@ -460,10 +443,10 @@ module.exports = {
   logCalendarEventForHashIdAsync: logCalendarEventForHashIdAsync,
   logBtcEventForHashIdAsync: logBtcEventForHashIdAsync,
   logEthEventForHashIdAsync: logEthEventForHashIdAsync,
-  deleteProcessedHashesFromAggStatesAsync: deleteProcessedHashesFromAggStatesAsync,
-  deleteHashTrackerLogEntriesAsync: deleteHashTrackerLogEntriesAsync,
-  deleteCalStatesWithNoRemainingAggStatesAsync: deleteCalStatesWithNoRemainingAggStatesAsync,
-  deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync: deleteAnchorBTCAggStatesWithNoRemainingCalStatesAsync,
-  deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync: deleteBtcTxStatesWithNoRemainingAnchorBTCAggStatesAsync,
-  deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync: deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync
+  pruneAggStatesAsync: pruneAggStatesAsync,
+  pruneHashTrackerLogsAsync: pruneHashTrackerLogsAsync,
+  pruneCalStatesAsync: pruneCalStatesAsync,
+  pruneAnchorBTCAggStatesAsync: pruneAnchorBTCAggStatesAsync,
+  pruneBtcTxStatesAsync: pruneBtcTxStatesAsync,
+  pruneBtcHeadStatesAsync: pruneBtcHeadStatesAsync
 }
