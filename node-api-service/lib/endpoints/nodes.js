@@ -22,6 +22,7 @@ var validUrl = require('valid-url')
 const registeredNode = require('../models/RegisteredNode.js')
 const nodeAuditLog = require('../models/NodeAuditLog.js')
 const url = require('url')
+const ip = require('ip')
 
 let registeredNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
@@ -189,19 +190,27 @@ async function postNodeV1Async (req, res, next) {
   }
 
   let parsedPublicUri = url.parse(lowerCasedPublicUri)
-  // disallow localhost
-  if (parsedPublicUri.hostname === 'localhost') {
-    return next(new restify.InvalidArgumentError('localhost not allowed in CHAINPOINT_NODE_PUBLIC_URI'))
-  }
+  // ensure that hostname is an IP
+  if (!ip.isV4Format(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
+  // ensure that it is not a private IP
+  if (ip.isPrivate(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must not be a private IP'))
   // disallow 0.0.0.0
-  if (parsedPublicUri.hostname === '0.0.0.0') {
-    return next(new restify.InvalidArgumentError('0.0.0.0 not allowed in CHAINPOINT_NODE_PUBLIC_URI'))
-  }
+  if (parsedPublicUri.hostname === '0.0.0.0') return next(new restify.InvalidArgumentError('0.0.0.0 not allowed in public_uri'))
 
   try {
     let count = await RegisteredNode.count({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (count >= 1) {
-      return next(new restify.ConflictError('tnt_addr address already exists'))
+      return next(new restify.ConflictError('tnt_addr'))
+    }
+  } catch (error) {
+    console.error(`Unable to count registered Nodes: ${error.message}`)
+    return next(new restify.InternalServerError('server error'))
+  }
+
+  try {
+    let count = await RegisteredNode.count({ where: { publicUri: lowerCasedPublicUri } })
+    if (count >= 1) {
+      return next(new restify.ConflictError('public_uri'))
     }
   } catch (error) {
     console.error(`Unable to count registered Nodes: ${error.message}`)
@@ -261,6 +270,23 @@ async function putNodeV1Async (req, res, next) {
   if (lowerCasedPublicUri && !_.isEmpty(lowerCasedPublicUri)) {
     if (!validUrl.isWebUri(lowerCasedPublicUri)) {
       return next(new restify.InvalidArgumentError('invalid JSON body, invalid public_uri'))
+    }
+    let parsedPublicUri = url.parse(lowerCasedPublicUri)
+    // ensure that hostname is an IP
+    if (!ip.isV4Format(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
+    // ensure that it is not a private IP
+    if (ip.isPrivate(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must not be a private IP'))
+    // disallow 0.0.0.0
+    if (parsedPublicUri.hostname === '0.0.0.0') return next(new restify.InvalidArgumentError('0.0.0.0 not allowed in public_uri'))
+
+    try {
+      let count = await RegisteredNode.count({ where: { publicUri: lowerCasedPublicUri, tntAddr: { $ne: lowerCasedTntAddrParam } } })
+      if (count >= 1) {
+        return next(new restify.ConflictError('public_uri'))
+      }
+    } catch (error) {
+      console.error(`Unable to count registered Nodes: ${error.message}`)
+      return next(new restify.InternalServerError('server error'))
     }
   }
 
