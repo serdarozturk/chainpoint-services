@@ -23,6 +23,7 @@ const registeredNode = require('../models/RegisteredNode.js')
 const nodeAuditLog = require('../models/NodeAuditLog.js')
 const url = require('url')
 const ip = require('ip')
+const utils = require('../utils.js')
 
 let registeredNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
@@ -191,7 +192,7 @@ async function postNodeV1Async (req, res, next) {
 
   let parsedPublicUri = url.parse(lowerCasedPublicUri)
   // ensure that hostname is an IP
-  if (!ip.isV4Format(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
+  if (!utils.isIP(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
   // ensure that it is not a private IP
   if (ip.isPrivate(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must not be a private IP'))
   // disallow 0.0.0.0
@@ -273,7 +274,7 @@ async function putNodeV1Async (req, res, next) {
     }
     let parsedPublicUri = url.parse(lowerCasedPublicUri)
     // ensure that hostname is an IP
-    if (!ip.isV4Format(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
+    if (!utils.isIP(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must be an IP'))
     // ensure that it is not a private IP
     if (ip.isPrivate(parsedPublicUri.hostname)) return next(new restify.InvalidArgumentError('public_uri hostname must not be a private IP'))
     // disallow 0.0.0.0
