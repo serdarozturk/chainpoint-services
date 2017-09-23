@@ -123,15 +123,17 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
     // if you don't want that, set the following
     freezeTableName: true,
     indexes: [
-      { unique: true, fields: ['tnt_addr', { attribute: 'audit_at', order: 'DESC' }, 'public_ip_pass', 'time_pass', 'cal_state_pass', 'min_credits_pass'] },
-      { unique: false, fields: ['tnt_addr'] },
-      { unique: false, fields: ['public_uri'] },
-      { unique: false, fields: ['audit_at'] },
-      { unique: false, fields: ['public_ip_pass'] },
-      { unique: false, fields: ['node_ms_delta'] },
-      { unique: false, fields: ['time_pass'] },
-      { unique: false, fields: ['cal_state_pass'] },
-      { unique: false, fields: ['min_credits_pass'] }
+      {
+        unique: false,
+        fields: [
+          'tnt_addr',
+          { attribute: 'audit_at', order: 'DESC' },
+          'public_ip_pass',
+          'time_pass',
+          'cal_state_pass',
+          'min_credits_pass'
+        ]
+      }
     ]
   }
 )
