@@ -443,17 +443,12 @@ async function openStorageConnectionAsync () {
   while (!dbConnected) {
     try {
       await regNodeSequelize.sync({ logging: false })
-      console.log('regNodeSequelize ok')
       await nodeAuditSequelize.sync({ logging: false })
-      console.log('nodeAuditSequelize ok')
       await calBlockSequelize.sync({ logging: false })
-      console.log('calBlockSequelize ok')
       await auditChallengeSequelize.sync({ logging: false })
-      console.log('auditChallengeSequelize ok')
       console.log('Sequelize connection established')
       dbConnected = true
     } catch (error) {
-      console.log(error)
       console.log(error.message)
       // catch errors when attempting to establish connection
       console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
