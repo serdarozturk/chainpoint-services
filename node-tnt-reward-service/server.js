@@ -74,7 +74,7 @@ async function performRewardAsync () {
     // SELECT all tnt addresses in the audit log that have minAuditPasses full pass entries since auditsFromDateMS
     qualifiedNodes = await NodeAuditLog.findAll({
       attributes: ['tntAddr'],
-      where: { auditAt: { $gte: auditsFromDateMS }, tntAddr: { $notIn: NODE_REWARD_TNT_ADDR_BLACKLIST }, publicIPPass: true, timePass: true, calStatePass: true, minCreditsPass: true },
+      where: { tntAddr: { $notIn: NODE_REWARD_TNT_ADDR_BLACKLIST }, auditAt: { $gte: auditsFromDateMS }, publicIPPass: true, timePass: true, calStatePass: true, minCreditsPass: true },
       group: 'tnt_addr',
       having: nodeAuditSequelize.literal(`COUNT(tnt_addr) >= ${minAuditPasses}`),
       raw: true
