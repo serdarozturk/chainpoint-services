@@ -311,13 +311,13 @@ async function auditNodesAsync () {
       // audit. If audit_response is not null, verify the cal state for the Node
       if (nodeResponse.body.calendar.audit_response && nodeResponse.body.calendar.audit_response !== 'null') {
         let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
-        let nodeAuditResponseTimestamp = nodeAuditResponse[0]
+        let nodeAuditResponseTimestamp = parseInt(nodeAuditResponse[0])
         let nodeAuditResponseSolution = nodeAuditResponse[1]
 
         // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
         let coreAuditChallenge
         let minTimestamp = coreAuditTimestamp - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
-        if (parseInt(nodeAuditResponseTimestamp) >= minTimestamp) {
+        if (nodeAuditResponseTimestamp >= minTimestamp) {
           coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
         }
 
