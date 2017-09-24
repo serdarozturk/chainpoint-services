@@ -1,7 +1,7 @@
 {
-  "name": "chainpoint-node-audit-service",
+  "name": "chainpoint-node-audit-producer-service",
   "version": "0.0.1",
-  "description": "Chainpoint audit service.",
+  "description": "Chainpoint audit producer service.",
   "author": "Glenn Rempe <glenn@tierion.com>",
   "license": "AGPL-3.0",
   "main": "server.js",

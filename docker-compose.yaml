@@ -248,13 +248,27 @@ services:
   # Responsible for auditing the availability, time, and calendar state
   # of public Tierion Network Nodes
   #
-  audit:
+  audit-consumer:
     restart: always
-    image: quay.io/chainpoint/node-audit-service:${DOCKER_TAG}
+    image: quay.io/chainpoint/node-audit-consumer-service:${DOCKER_TAG}
     build:
-      context: ./node-audit-service
+      context: ./node-audit-consumer-service
     depends_on:
       - roach1
+      - rabbitmq
+    networks:
+      - chainpoint
+    environment:
+      NODE_ENV: development
+
+  audit-producer:
+    restart: always
+    image: quay.io/chainpoint/node-audit-producer-service:${DOCKER_TAG}
+    build:
+      context: ./node-audit-producer-service
+    depends_on:
+      - roach1
+      - rabbitmq
     networks:
       - chainpoint
     environment:
