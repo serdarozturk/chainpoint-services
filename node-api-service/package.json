@@ -14,6 +14,7 @@
     "async": "^2.4.1",
     "blake2s-js": "^1.2.2",
     "bluebird": "^3.5.0",
+    "bunyan": "^1.8.12",
     "chainpoint-binary": "^4.0.0",
     "chainpoint-parse": "^2.0.2",
     "consul": "^0.29.0",

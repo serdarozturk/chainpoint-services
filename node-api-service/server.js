@@ -55,11 +55,24 @@ const APIServiceInstanceId = uuidv1()
 // Initial an object that will hold all open websocket connections
 let WebSocketConnections = {}
 
+const bunyan = require('bunyan')
+
+var logger = bunyan.createLogger({
+  name: 'audit',
+  stream: process.stdout
+})
+
 // RESTIFY SETUP
 // 'version' : all routes will default to this version
 let server = restify.createServer({
   name: 'chainpoint',
-  version: '1.0.0'
+  version: '1.0.0',
+  log: logger
+})
+
+server.pre(function (request, response, next) {
+  request.log.info({ req: [request.url, request.method, request.rawHeaders] }, 'API-REQUEST')
+  next()
 })
 
 let consul = null
