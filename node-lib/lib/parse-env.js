@@ -85,6 +85,7 @@ let envDefinitions = {
   NIST_KEY: envalid.str({ default: 'service/nist/latest', desc: 'The consul key to write to, watch to receive updated NIST object' }),
   CALENDAR_LOCK_KEY: envalid.str({ default: 'service/calendar/blockchain/lock', desc: 'Key used for acquiring calendar write locks' }),
   CHALLENGE_LOCK_KEY: envalid.str({ default: 'service/audit/challenge/lock', desc: 'Key used for acquiring challenge generation locks' }),
+  LAST_AUDIT_KEY: envalid.str({ default: 'service/audit/last', desc: 'The consul key to write to, watch to receive updated last audit performed time' }),
   AUDIT_LOCK_KEY: envalid.str({ default: 'service/audit/audit/lock', desc: 'Key used for acquiring audit processing locks' }),
 
   // RabbitMQ related variables
@@ -96,6 +97,7 @@ let envDefinitions = {
   RMQ_WORK_OUT_BTCMON_QUEUE: envalid.str({ default: 'work.btcmon', desc: 'The queue name for outgoing message to the btc mon service' }),
   RMQ_WORK_OUT_GEN_QUEUE: envalid.str({ default: 'work.gen', desc: 'The queue name for outgoing message to the proof gen service' }),
   RMQ_WORK_OUT_API_QUEUE: envalid.str({ default: 'work.api', desc: 'The queue name for outgoing message to the api service' }),
+  RMQ_WORK_OUT_AUDIT_QUEUE: envalid.str({ default: 'work.audit', desc: 'The queue name for outgoing message to the audit consumer service' }),
 
   // Redis related variables
   REDIS_CONNECT_URI: envalid.url({ default: 'redis://redis:6379', desc: 'The Redis server connection URI' }),
@@ -178,9 +180,10 @@ let envDefinitions = {
   MIN_CONSECUTIVE_AUDIT_PASSES_FOR_REWARD: envalid.num({ default: 4, desc: 'The minimum number of consecutive audits, where all tests pass, that must occur to be eligible for a reward' }),
   MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' }),
 
-  // Audit service specific variables
+  // Audit services specific variables
   NEW_AUDIT_CHALLENGES_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new audit challenges, defaults to 2, must be a factor of 60, no greater than 20' }),
-  NODE_AUDIT_ROUNDS_PER_HOUR: validateFactorOfSixtyUpToSixty({ default: 60, desc: 'The number of times per hour to perform Node audit rounds, defaults to 60, must be a factor of 60' })
+  NODE_AUDIT_ROUNDS_PER_HOUR: validateFactorOfSixtyUpToSixty({ default: 2, desc: 'The number of times per hour to perform Node audit rounds, defaults to 60, must be a factor of 60' }),
+  RMQ_WORK_IN_AUDIT_QUEUE: envalid.str({ default: 'work.audit', desc: 'The queue name for message consumption originating from the audit producer service' })
 }
 
 module.exports = (service) => {
