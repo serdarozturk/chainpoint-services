@@ -33,12 +33,6 @@ const amqp = require('amqplib')
 // This value is set once the connection has been established
 let amqpChannel = null
 
-// TweetNaCl.js
-// see: http://ed25519.cr.yp.to
-// see: https://github.com/dchest/tweetnacl-js#signatures
-const nacl = require('tweetnacl')
-nacl.util = require('tweetnacl-util')
-
 // Time of the last performed round of auditing
 // This value is updated from consul events as changes are detected
 let auditLatest = null
