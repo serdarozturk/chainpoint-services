@@ -16,21 +16,21 @@
 
 const restify = require('restify')
 const env = require('../parse-env.js')('api')
-const async = require('async')
-const uuidValidate = require('uuid-validate')
-const uuidTime = require('uuid-time')
-const chpBinary = require('chainpoint-binary')
-const _ = require('lodash')
+// const async = require('async')
+// const uuidValidate = require('uuid-validate')
+// const uuidTime = require('uuid-time')
+// const chpBinary = require('chainpoint-binary')
+// const _ = require('lodash')
 
 // The redis connection used for all redis communication
 // This value is set once the connection has been established
-let redis = null
+// let redis = null
 
 // The custom MIME type for JSON proof array results containing Base64 encoded proof data
-const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
+// const BASE64_MIME_TYPE = 'application/vnd.chainpoint.json+base64'
 
 // The custom MIME type for JSON proof array results containing Base64 encoded proof data
-const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
+// const JSONLD_MIME_TYPE = 'application/vnd.chainpoint.ld+json'
 
 /**
  * GET /proofs/:hash_id handler
@@ -45,10 +45,11 @@ async function getProofsByIDV1Async (req, res, next) {
   // check if hash_id parameter was included
   if (req.params && req.params.hash_id) {
     // a hash_id was specified in the url, so use that hash_id only
-
+/*
     if (!uuidValidate(req.params.hash_id, 1)) {
       return next(new restify.InvalidArgumentError('invalid request: bad hash_id'))
     }
+    */
 
     hashIdResults.push(req.params.hash_id)
   } else if (req.headers && req.headers.hashids) {
@@ -308,5 +309,5 @@ async function getProofsByIDV1Async (req, res, next) {
 
 module.exports = {
   getProofsByIDV1Async: getProofsByIDV1Async,
-  setRedis: (redisClient) => { redis = redisClient }
+  setRedis: (redisClient) => { } // redis = redisClient }
 }
