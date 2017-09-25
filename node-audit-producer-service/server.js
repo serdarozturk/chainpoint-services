@@ -157,7 +157,7 @@ async function auditNodesAsync () {
   let readyForNextAuditRound = parseInt(auditLatest || 0) < maxPreviousAuditDate
   if (readyForNextAuditRound) {
     // update auditLatest
-    consul.kv.set(env.LAST_AUDIT_KEY, auditDate, async function (err, result) {
+    consul.kv.set(env.LAST_AUDIT_KEY, auditDate.toString(), async function (err, result) {
       if (err) {
         console.error(err)
         return

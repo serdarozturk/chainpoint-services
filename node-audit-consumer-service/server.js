@@ -23,6 +23,10 @@ const auditChallenge = require('./lib/models/AuditChallenge.js')
 const utils = require('./lib/utils.js')
 const amqp = require('amqplib')
 
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+let amqpChannel = null
+
 // TweetNaCl.js
 // see: http://ed25519.cr.yp.to
 // see: https://github.com/dchest/tweetnacl-js#signatures
@@ -61,6 +65,7 @@ async function processIncomingAuditJobAsync (msg) {
     // if there is no public_uri set for this Node, fail all remaining audit tests and continue to the next
     if (!auditTaskObj.publicUri) {
       await addAuditToLogAsync(auditTaskObj.tntAddr, null, Date.now(), false, null, false, false, minCreditsPass)
+      amqpChannel.ack(msg)
       return
     }
 
@@ -75,16 +80,22 @@ async function processIncomingAuditJobAsync (msg) {
       } else {
         console.log(`NodeAudit: GET failed for ${auditTaskObj.publicUri}: ${error.message}`)
       }
-      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, Date.now(), false, null, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, Date.now(), true, 234, false, false, minCreditsPass)
+      amqpChannel.ack(msg)
+      return
     }
 
     if (!configResultsBody.calendar) {
       console.log(`NodeAudit: GET failed with missing calendar data for ${auditTaskObj.publicUri}`)
       await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      amqpChannel.ack(msg)
+      return
     }
     if (!configResultsBody.time) {
       console.log(`NodeAudit: GET failed with missing time for ${auditTaskObj.publicUri}`)
       await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      amqpChannel.ack(msg)
+      return
     }
 
     // We've gotten this far, so at least auditedPublicIPAt has passed
@@ -110,7 +121,11 @@ async function processIncomingAuditJobAsync (msg) {
       let coreAuditChallenge = null
       let minTimestamp = configResultTime - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
       if (nodeAuditResponseTimestamp >= minTimestamp) {
-        coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
+        try {
+          coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
+        } catch (error) {
+          console.error(`NodeAudit: Could not query for audit challenge: ${nodeAuditResponseTimestamp}`)
+        }
       }
 
       // check if the Node challenge solution is correct
@@ -126,16 +141,19 @@ async function processIncomingAuditJobAsync (msg) {
       }
     }
 
-    await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass)
+    let success = await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass)
 
-    let results = {}
-    results.auditAt = configResultTime
-    results.publicIPPass = publicIPPass
-    results.timePass = timePass
-    results.calStatePass = calStatePass
-    results.minCreditsPass = minCreditsPass
+    if (success) {
+      let results = {}
+      results.auditAt = configResultTime
+      results.publicIPPass = publicIPPass
+      results.timePass = timePass
+      results.calStatePass = calStatePass
+      results.minCreditsPass = minCreditsPass
 
-    console.log(`Audit complete for ${auditTaskObj.tntAddr} at ${auditTaskObj.publicUri}: ${JSON.stringify(results)}`)
+      console.log(`Audit complete for ${auditTaskObj.tntAddr} at ${auditTaskObj.publicUri}: ${JSON.stringify(results)}`)
+    }
+    amqpChannel.ack(msg)
   }
 
   async function addAuditToLogAsync (tntAddr, publicUri, auditTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass) {
@@ -152,7 +170,9 @@ async function processIncomingAuditJobAsync (msg) {
       })
     } catch (error) {
       console.error(`Audit logging error: ${tntAddr}: ${error.message} `)
+      return false
     }
+    return true
   }
 
   async function getNodeConfigObjectAsync (auditTaskObj) {
@@ -215,6 +235,7 @@ async function openRMQConnectionAsync (connectionString) {
       // the connection and channel have been established
       chan.assertQueue(env.RMQ_WORK_IN_AUDIT_QUEUE, { durable: true })
       chan.prefetch(env.RMQ_PREFETCH_COUNT_AUDIT)
+      amqpChannel = chan
       // Receive and process audit task messages
       chan.consume(env.RMQ_WORK_IN_AUDIT_QUEUE, (msg) => {
         processIncomingAuditJobAsync(msg)
@@ -222,6 +243,7 @@ async function openRMQConnectionAsync (connectionString) {
       // if the channel closes for any reason, attempt to reconnect
       conn.on('close', async () => {
         console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
         await utils.sleep(5000)
         await openRMQConnectionAsync(connectionString)
       })
