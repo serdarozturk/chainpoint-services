@@ -181,6 +181,7 @@ let envDefinitions = {
   MIN_TNT_GRAINS_BALANCE_FOR_REWARD: envalid.num({ default: 250000000000, desc: 'The minimum balance of TNT, in Grains, that an address must contain in order to be eligible for a reward' }),
 
   // Audit services specific variables
+  RMQ_PREFETCH_COUNT_AUDIT: envalid.num({ default: 0, desc: 'The maximum number of messages sent over the channel that can be awaiting acknowledgement, 0 = no limit' }),
   NEW_AUDIT_CHALLENGES_PER_HOUR: validateFactorOfSixty({ default: 2, desc: 'The number of times per hour to generate new audit challenges, defaults to 2, must be a factor of 60, no greater than 20' }),
   NODE_AUDIT_ROUNDS_PER_HOUR: validateFactorOfSixtyUpToSixty({ default: 2, desc: 'The number of times per hour to perform Node audit rounds, defaults to 60, must be a factor of 60' }),
   RMQ_WORK_IN_AUDIT_QUEUE: envalid.str({ default: 'work.audit', desc: 'The queue name for message consumption originating from the audit producer service' })
