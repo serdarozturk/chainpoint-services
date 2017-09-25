@@ -21,6 +21,7 @@ const registeredNode = require('./lib/models/RegisteredNode.js')
 const utils = require('./lib/utils.js')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 const auditChallenge = require('./lib/models/AuditChallenge.js')
+const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const crypto = require('crypto')
 const rnd = require('random-number-csprng')
 const MerkleTools = require('merkle-tools')
@@ -61,6 +62,8 @@ let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let auditChallengeSequelize = auditChallenge.sequelize
 let AuditChallenge = auditChallenge.AuditChallenge
+let nodeAuditSequelize = nodeAuditLog.sequelize
+let NodeAuditLog = nodeAuditLog.NodeAuditLog
 
 let challengeLockOpts = {
   key: env.CHALLENGE_LOCK_KEY,
@@ -262,6 +265,14 @@ async function performCreditTopoffAsync (creditAmount) {
   }
 }
 
+async function pruneAuditDataAsync () {
+  let cutoffTimestamp = Date.now() - 360 * 60 * 1000 // 6 hours ago
+  let resultCount = await NodeAuditLog.destroy({ where: { audit_at: { $lt: cutoffTimestamp } } })
+  if (resultCount > 0) {
+    console.log(`Pruned ${resultCount} records from the Audit log older than 6 hours`)
+  }
+}
+
 /**
  * Opens a storage connection
  **/
@@ -271,6 +282,7 @@ async function openStorageConnectionAsync () {
     try {
       await regNodeSequelize.sync({ logging: false })
       await calBlockSequelize.sync({ logging: false })
+      await nodeAuditSequelize.sync({ logging: false })
       await auditChallengeSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
       dbConnected = true
@@ -413,6 +425,20 @@ function setPerformCreditTopoffInterval () {
   })
 }
 
+function setPruneAuditDataInterval () {
+  let currentHour = new Date().getUTCHours()
+
+  heart.createEvent(300, async function (count, last) {
+    let nowUTCHour = new Date().getUTCHours()
+
+    // if we are on a new hour
+    if (nowUTCHour !== currentHour) {
+      currentHour = nowUTCHour
+      await pruneAuditDataAsync()
+    }
+  })
+}
+
 async function startWatchesAndIntervalsAsync () {
   // Continuous watch on the consul key holding the NIST object.
   var lastAuditWatch = consul.watch({ method: consul.kv.get, options: { key: env.LAST_AUDIT_KEY } })
@@ -442,6 +468,7 @@ async function startWatchesAndIntervalsAsync () {
   setGenerateNewChallengeInterval()
   setPerformNodeAuditInterval()
   setPerformCreditTopoffInterval()
+  setPruneAuditDataInterval()
 }
 
 // process all steps need to start the application
