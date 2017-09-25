@@ -17,9 +17,7 @@
 // load all environment variables into env object
 const env = require('./lib/parse-env.js')('audit')
 
-const rp = require('request-promise-native')
 const registeredNode = require('./lib/models/RegisteredNode.js')
-const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const utils = require('./lib/utils.js')
 const calendarBlock = require('./lib/models/CalendarBlock.js')
 const auditChallenge = require('./lib/models/AuditChallenge.js')
@@ -29,12 +27,15 @@ const MerkleTools = require('merkle-tools')
 const cnsl = require('consul')
 const _ = require('lodash')
 const heartbeats = require('heartbeats')
+const amqp = require('amqplib')
 
-// TweetNaCl.js
-// see: http://ed25519.cr.yp.to
-// see: https://github.com/dchest/tweetnacl-js#signatures
-const nacl = require('tweetnacl')
-nacl.util = require('tweetnacl-util')
+// The channel used for all amqp communication
+// This value is set once the connection has been established
+let amqpChannel = null
+
+// Time of the last performed round of auditing
+// This value is updated from consul events as changes are detected
+let auditLatest = null
 
 // the fuzz factor for anchor interval meant to give each core instance a random chance of being first
 const maxFuzzyMS = 1000
@@ -56,24 +57,10 @@ const merkleTools = new MerkleTools()
 // pull in variables defined in shared database models
 let regNodeSequelize = registeredNode.sequelize
 let RegisteredNode = registeredNode.RegisteredNode
-let nodeAuditSequelize = nodeAuditLog.sequelize
-let NodeAuditLog = nodeAuditLog.NodeAuditLog
 let calBlockSequelize = calendarBlock.sequelize
 let CalendarBlock = calendarBlock.CalendarBlock
 let auditChallengeSequelize = auditChallenge.sequelize
 let AuditChallenge = auditChallenge.AuditChallenge
-
-// The age of the last successful audit before a new audit should be performed for a Node
-const NODE_NEW_AUDIT_INTERVAL_MIN = 30 // 30 minutes
-
-// The acceptable time difference between Node and Core for a timestamp to be considered valid, in milliseconds
-const ACCEPTABLE_DELTA_MS = 5000 // 5 seconds
-
-// The maximum age of a node audit response to accept
-const MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN = 75
-
-// The minimum credit balance to receive awards and be publicly advertised
-const MIN_PASSING_CREDIT_BALANCE = 10800
 
 let challengeLockOpts = {
   key: env.CHALLENGE_LOCK_KEY,
@@ -163,205 +150,45 @@ registerLockEvents(auditLock, 'auditLock', async () => {
 
 // Retrieve all registered Nodes with public_uris for auditing.
 async function auditNodesAsync () {
-  let nodesReadyForAudit = []
-  try {
-    let lastAuditCutoff = Date.now() - (NODE_NEW_AUDIT_INTERVAL_MIN * 60 * 1000)
-    nodesReadyForAudit = await RegisteredNode.findAll(
-      {
-        where: {
-          $or: [
-            { lastAuditAt: null },
-            { lastAuditAt: { $lte: lastAuditCutoff } }
-          ]
-        }
-      })
+  // only perform these steps if the lastest audit round was at least 10 minutes ago
+  // to account for multiple Cores trying to process this interval at once
+  let auditDate = Date.now()
+  let maxPreviousAuditDate = auditDate - (10 * 60 * 1000)
+  let readyForNextAuditRound = parseInt(auditLatest || 0) < maxPreviousAuditDate
+  if (readyForNextAuditRound) {
+    // update auditLatest
+    consul.kv.set(env.LAST_AUDIT_KEY, auditDate.toString(), async function (err, result) {
+      if (err) {
+        console.error(err)
+        return
+      }
 
-    console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
-  } catch (error) {
-    console.error(`Could not retrieve public Node list: ${error.message}`)
-  }
-
-  // iterate through each Node, requesting an answer to the challenge
-  for (let x = 0; x < nodesReadyForAudit.length; x++) {
-    // perform the minimum credit check
-    let currentCreditBalance = nodesReadyForAudit[x].tntCredit
-    let minCreditsPass = (currentCreditBalance >= MIN_PASSING_CREDIT_BALANCE)
-
-    // if there is no public_uri set for this Node, fail all remaining audit tests and continue to the next
-    if (!nodesReadyForAudit[x].publicUri) {
-      let coreAuditTimestamp = Date.now()
+      // get list of all Registered Nodes to audit
+      let nodesReadyForAudit = []
       try {
-        await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr,
-          publicUri: null,
-          auditAt: coreAuditTimestamp,
-          publicIPPass: false,
-          nodeMSDelta: null,
-          timePass: false,
-          calStatePass: false,
-          minCreditsPass: minCreditsPass
-        })
-        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
+        nodesReadyForAudit = await RegisteredNode.findAll({ attributes: ['tntAddr', 'publicUri', 'tntCredit'] })
+        console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
       } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
+        console.error(`Could not retrieve public Node list: ${error.message}`)
       }
-      continue
-    }
 
-    // perform the /config checks for the Node
-    let coreAuditTimestamp = Date.now()
-    let nodeResponse
-    let options = {
-      headers: [
-        {
-          name: 'Content-Type',
-          value: 'application/json'
-        }
-      ],
-      method: 'GET',
-      uri: `${nodesReadyForAudit[x].publicUri}/config`,
-      json: true,
-      gzip: true,
-      timeout: 2500,
-      resolveWithFullResponse: true
-    }
-
-    try {
-      nodeResponse = await rp(options)
-      coreAuditTimestamp = Date.now()
-    } catch (error) {
-      if (error.statusCode) {
-        console.log(`NodeAudit: GET failed with status code ${error.statusCode} for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
-      } else {
-        console.log(`NodeAudit: GET failed for ${nodesReadyForAudit[x].publicUri}: ${error.message}`)
-      }
-      try {
-        await NodeAuditLog.create({
+      // iterate through each Registered Node, queue up an audit task for audit consumer
+      for (let x = 0; x < nodesReadyForAudit.length; x++) {
+        let auditTaskObj = {
           tntAddr: nodesReadyForAudit[x].tntAddr,
           publicUri: nodesReadyForAudit[x].publicUri,
-          auditAt: coreAuditTimestamp,
-          publicIPPass: false,
-          nodeMSDelta: null,
-          timePass: false,
-          calStatePass: false,
-          minCreditsPass: minCreditsPass
-        })
-        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-      } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
-      }
-      continue
-    }
-
-    if (!nodeResponse.body.calendar) {
-      console.log(`NodeAudit: GET failed with missing calendar data for ${nodesReadyForAudit[x].publicUri}`)
-      try {
-        await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr,
-          publicUri: nodesReadyForAudit[x].publicUri,
-          auditAt: coreAuditTimestamp,
-          publicIPPass: false,
-          nodeMSDelta: null,
-          timePass: false,
-          calStatePass: false,
-          minCreditsPass: minCreditsPass
-        })
-        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-      } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
-      }
-      continue
-    }
-    if (!nodeResponse.body.time) {
-      console.log(`NodeAudit: GET failed with missing time for ${nodesReadyForAudit[x].publicUri}`)
-      try {
-        await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr,
-          publicUri: nodesReadyForAudit[x].publicUri,
-          auditAt: coreAuditTimestamp,
-          publicIPPass: false,
-          nodeMSDelta: null,
-          timePass: false,
-          calStatePass: false,
-          minCreditsPass: minCreditsPass
-        })
-        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-      } catch (error) {
-        console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
-      }
-      continue
-    }
-
-    try {
-      // We've gotten this far, so at least auditedPublicIPAt has passed
-      let publicIPPass = true
-
-      // check if the Node timestamp is withing the acceptable range
-      let nodeAuditTimestamp = Date.parse(nodeResponse.body.time)
-      let timePass = false
-      let nodeMSDelta = (nodeAuditTimestamp - coreAuditTimestamp)
-      if (Math.abs(nodeMSDelta) <= ACCEPTABLE_DELTA_MS) {
-        timePass = true
-      }
-
-      let calStatePass = false
-      // When a node first comes online, and is still syncing the calendar
-      // data, it will not have yet generated the challenge response, and
-      // audit_response will be null. In these cases, simply fail the calStatePass
-      // audit. If audit_response is not null, verify the cal state for the Node
-      if (nodeResponse.body.calendar.audit_response && nodeResponse.body.calendar.audit_response !== 'null') {
-        let nodeAuditResponse = nodeResponse.body.calendar.audit_response.split(':')
-        let nodeAuditResponseTimestamp = parseInt(nodeAuditResponse[0])
-        let nodeAuditResponseSolution = nodeAuditResponse[1]
-
-        // make sure the audit reponse is newer than MAX_CHALLENGE_AGE_MINUTES
-        let coreAuditChallenge
-        let minTimestamp = coreAuditTimestamp - (MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN * 60 * 1000)
-        if (nodeAuditResponseTimestamp >= minTimestamp) {
-          coreAuditChallenge = await AuditChallenge.findOne({ where: { time: nodeAuditResponseTimestamp } })
+          tntCredit: nodesReadyForAudit[x].tntCredit
         }
-
-        // check if the Node challenge solution is correct
-        if (coreAuditChallenge) {
-          let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
-          nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
-
-          if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-            calStatePass = true
-          }
-        } else {
-          console.error(`NodeAudit: No audit challenge record found for time ${nodeAuditResponseTimestamp} in ${nodeResponse.body.calendar.audit_response}`)
+        try {
+          await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AUDIT_QUEUE, Buffer.from(JSON.stringify(auditTaskObj)), { persistent: true })
+        } catch (error) {
+          console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
         }
       }
-
-      // update the Node audit results in RegisteredNode
-      try {
-        await NodeAuditLog.create({
-          tntAddr: nodesReadyForAudit[x].tntAddr,
-          publicUri: nodesReadyForAudit[x].publicUri,
-          auditAt: coreAuditTimestamp,
-          publicIPPass: publicIPPass,
-          nodeMSDelta: nodeMSDelta,
-          timePass: timePass,
-          calStatePass: calStatePass,
-          minCreditsPass: minCreditsPass
-        })
-        await RegisteredNode.update({ lastAuditAt: coreAuditTimestamp }, { where: { tntAddr: nodesReadyForAudit[x].tntAddr } })
-      } catch (error) {
-        throw new Error(`Could not update Node Audit results: ${error.message}`)
-      }
-
-      let results = {}
-      results.auditAt = coreAuditTimestamp
-      results.publicIPPass = publicIPPass
-      results.timePass = timePass
-      results.calStatePass = calStatePass
-      results.minCreditsPass = minCreditsPass
-
-      console.log(`Audit complete for ${nodesReadyForAudit[x].tntAddr} at ${nodesReadyForAudit[x].publicUri}: ${JSON.stringify(results)}`)
-    } catch (error) {
-      console.error(`NodeAudit error: ${nodesReadyForAudit[x].tntAddr}: ${error.message} `)
-    }
+      console.log(`Audit tasks queued for audit-consumer`)
+    })
+  } else {
+    console.log(`Audit tasks have already been queued for this audit interval`)
   }
 }
 
@@ -443,7 +270,6 @@ async function openStorageConnectionAsync () {
   while (!dbConnected) {
     try {
       await regNodeSequelize.sync({ logging: false })
-      await nodeAuditSequelize.sync({ logging: false })
       await calBlockSequelize.sync({ logging: false })
       await auditChallengeSequelize.sync({ logging: false })
       console.log('Sequelize connection established')
@@ -452,6 +278,41 @@ async function openStorageConnectionAsync () {
       console.log(error.message)
       // catch errors when attempting to establish connection
       console.error('Cannot establish Sequelize connection. Attempting in 5 seconds...')
+      await utils.sleep(5000)
+    }
+  }
+}
+
+/**
+ * Opens an AMPQ connection and channel
+ * Retry logic is included to handle losses of connection
+ *
+ * @param {string} connectionString - The connection string for the RabbitMQ instance, an AMQP URI
+ */
+async function openRMQConnectionAsync (connectionString) {
+  let rmqConnected = false
+  while (!rmqConnected) {
+    try {
+      // connect to rabbitmq server
+      let conn = await amqp.connect(connectionString)
+      // create communication channel
+      let chan = await conn.createConfirmChannel()
+      // the connection and channel have been established
+      chan.assertQueue(env.RMQ_WORK_OUT_AUDIT_QUEUE, { durable: true })
+      // set 'amqpChannel' so that publishers have access to the channel
+      amqpChannel = chan
+      // if the channel closes for any reason, attempt to reconnect
+      conn.on('close', async () => {
+        console.error('Connection to RMQ closed.  Reconnecting in 5 seconds...')
+        amqpChannel = null
+        await utils.sleep(5000)
+        await openRMQConnectionAsync(connectionString)
+      })
+      console.log('RabbitMQ connection established')
+      rmqConnected = true
+    } catch (error) {
+      // catch errors when attempting to establish connection
+      console.error('Cannot establish RabbitMQ connection. Attempting in 5 seconds...')
       await utils.sleep(5000)
     }
   }
@@ -552,7 +413,22 @@ function setPerformCreditTopoffInterval () {
   })
 }
 
-async function startIntervalsAsync () {
+async function startWatchesAndIntervalsAsync () {
+  // Continuous watch on the consul key holding the NIST object.
+  var lastAuditWatch = consul.watch({ method: consul.kv.get, options: { key: env.LAST_AUDIT_KEY } })
+
+  // Store the updated nist object on change
+  lastAuditWatch.on('change', async function (data, res) {
+    // process only if a value has been returned and it is different than what is already stored
+    if (data && data.Value && auditLatest !== data.Value) {
+      auditLatest = data.Value
+    }
+  })
+
+  lastAuditWatch.on('error', function (err) {
+    console.error('lastAuditWatch error: ', err)
+  })
+
   // attempt to generate a new audit chalenge on startup
   let randomFuzzyMS = await rnd(0, maxFuzzyMS)
   setTimeout(() => {
@@ -574,10 +450,12 @@ async function start () {
   try {
     // init DB
     await openStorageConnectionAsync()
+    // init RabbitMQ
+    await openRMQConnectionAsync(env.RABBITMQ_CONNECT_URI)
     // ensure at least 1 calendar block exist
     await checkForGenesisBlockAsync()
     // start main processing
-    await startIntervalsAsync()
+    await startWatchesAndIntervalsAsync()
     console.log('startup completed successfully')
   } catch (error) {
     console.error(`An error has occurred on startup: ${error.message}`)
