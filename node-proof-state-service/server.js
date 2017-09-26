@@ -259,6 +259,8 @@ function processMessage (msg) {
       default:
         // This is an unknown state type
         console.error(`Unknown state type: ${msg.properties.type}`)
+        // cannot handle unknown type messages, ack message and do nothing
+        amqpChannel.ack(msg)
     }
   }
 }

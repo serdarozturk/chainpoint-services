@@ -241,7 +241,7 @@ function processMessage (msg) {
         break
       case 'btctx':
         if (env.ANCHOR_BTC === 'enabled') {
-          // Consumes a tx  message from the btctx service
+          // Consumes a tx message from the btctx service
           consumeBtcTxMessageAsync(msg)
         } else {
           // BTC anchoring has been disabled, ack message and do nothing
@@ -261,8 +261,10 @@ function processMessage (msg) {
         consumeRewardMessage(msg)
         break
       default:
-        // This is an unknown state type
-        console.error('Unknown state type', msg.properties.type)
+        // This is an unknown message type
+        console.error('Unknown message type', msg.properties.type)
+        // cannot handle unknown type messages, ack message and do nothing
+        amqpChannel.ack(msg)
     }
   }
 }

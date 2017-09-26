@@ -181,10 +181,13 @@ async function consumeProofReadyMessageAsync (msg) {
       break
     case 'eth':
       console.log('building eth proof')
+      amqpChannel.ack(msg)
       break
     default:
       // This is an unknown proof ready type
       console.error('Unknown proof ready type', messageObj.type)
+      // cannot handle unknown type messages, ack message and do nothing
+      amqpChannel.ack(msg)
   }
 }
 
