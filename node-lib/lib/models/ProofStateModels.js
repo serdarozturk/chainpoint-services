@@ -14,14 +14,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// load all environment variables into env object
-const env = require('../lib/parse-env.js')('postgres-adapter')
-
 // PostgreSQL DB storage adapter
 let Sequelize = require('sequelize')
 
+const envalid = require('envalid')
+
+const env = envalid.cleanEnv(process.env, {
+  POSTGRES_CONNECT_PROTOCOL: envalid.str({ default: 'postgres:', desc: 'Postgres server connection protocol' }),
+  POSTGRES_CONNECT_USER: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection user name' }),
+  POSTGRES_CONNECT_PW: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection password' }),
+  POSTGRES_CONNECT_HOST: envalid.str({ default: 'postgres', desc: 'Postgres server connection host' }),
+  POSTGRES_CONNECT_PORT: envalid.num({ default: 5432, desc: 'Postgres server connection port' }),
+  POSTGRES_CONNECT_DB: envalid.str({ default: 'chainpoint', desc: 'Postgres server connection database name' })
+})
+
 // How many hours any piece of proof state data is retained until pruned
-const PROOF_STATE_EXPIRE_HOURS = 1
+const PROOF_STATE_EXPIRE_HOURS = 3
 
 // Connection URI for Postgres
 const POSTGRES_CONNECT_URI = `${env.POSTGRES_CONNECT_PROTOCOL}//${env.POSTGRES_CONNECT_USER}:${env.POSTGRES_CONNECT_PW}@${env.POSTGRES_CONNECT_HOST}:${env.POSTGRES_CONNECT_PORT}/${env.POSTGRES_CONNECT_DB}`

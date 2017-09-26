@@ -1,8 +1,8 @@
-# chainpoint-node-proof-state-service
+# chainpoint-lib
 
-## Storage Adapters
+## Proof State Models
 
-Storage adapters allow the service to write to persistent storage. All adapters conform to a common interface, allowing easy code-based or programmatic switching between different storage providers.
+Proof state models allow the service to write to persistent storage. All adapters conform to a common interface, allowing easy code-based or programmatic switching between different storage providers.
 
 The following is a description of methods that must be defined in a storage adapter: 
 
@@ -39,7 +39,7 @@ The following is a description of methods that must be defined in a storage adap
 | deleteBtcHeadStatesWithNoRemainingBtcTxStatesAsync()     | prune records from btchead\_states table | integer |
 
 
-## PostregSQL Adapter Configuration
+## Proof State Models Configuration
 Configuration parameters will be stored in environment variables. Environment variables can be overridden throught the use of a .env file. 
 
 The following are the descriptions of the configuration parameters:
@@ -53,7 +53,7 @@ The following are the descriptions of the configuration parameters:
 | POSTGRES\_CONNECT\_PORT       | the PostgreSQL connection port | 5432 |
 | POSTGRES\_CONNECT\_DB       | the PostgreSQL connection database name | 'chainpoint' |
 
-## PostregSQL Adapter Schema
+## Proof State Models Schema
 
 ### agg\_states
 | Column         | Type         | Description  | Indexed |
