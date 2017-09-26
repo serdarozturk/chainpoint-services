@@ -266,6 +266,7 @@ services:
     image: quay.io/chainpoint/node-audit-producer-service:${DOCKER_TAG}
     build:
       context: ./node-audit-producer-service
+    container_name: audit-producer
     depends_on:
       - roach1
       - rabbitmq
