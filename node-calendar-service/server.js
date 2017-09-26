@@ -141,7 +141,8 @@ let writeBlockAsync = async (height, type, dataId, dataVal, prevHash, friendlyNa
 }
 
 let createGenesisBlockAsync = async () => {
-  return await writeBlockAsync(0, 'gen', '0', zeroStr, zeroStr, 'GENESIS')
+  let writeResult = await writeBlockAsync(0, 'gen', '0', zeroStr, zeroStr, 'GENESIS')
+  return writeResult
 }
 
 let createCalendarBlockAsync = async (root) => {
