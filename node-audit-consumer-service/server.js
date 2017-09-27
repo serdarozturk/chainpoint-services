@@ -85,6 +85,13 @@ async function processIncomingAuditJobAsync (msg) {
       return
     }
 
+    if (!configResultsBody) {
+      console.log(`NodeAudit: GET failed with empty result for ${auditTaskObj.publicUri}`)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      amqpChannel.ack(msg)
+      return
+    }
+
     if (!configResultsBody.calendar) {
       console.log(`NodeAudit: GET failed with missing calendar data for ${auditTaskObj.publicUri}`)
       await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
