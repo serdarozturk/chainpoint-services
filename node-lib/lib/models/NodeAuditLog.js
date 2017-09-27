@@ -136,7 +136,7 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       },
       {
         unique: false,
-        fields: [{ attribute: 'audit_at', order: 'DESC' }]
+        fields: ['audit_at']
       }
     ]
   }
