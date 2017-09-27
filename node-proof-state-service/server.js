@@ -84,10 +84,10 @@ async function ConsumeCalendarMessageAsync (msg) {
         console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[cal] publish message nacked')
         throw new Error(error.message)
       }
-      // New messages have been published, ack consumption of original message
-      amqpChannel.ack(msg)
-      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
     }
+    // New messages have been published, ack consumption of original message
+    amqpChannel.ack(msg)
+    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
   } catch (error) {
     console.error(`Unable to process calendar message: ${error.message}`)
     // An error as occurred publishing a message, nack consumption of original message
@@ -179,10 +179,10 @@ async function ConsumeBtcMonMessageAsync (msg) {
         console.error(env.RMQ_WORK_OUT_GEN_QUEUE, '[btc] publish message nacked')
         throw new Error(error.message)
       }
-      // New messages have been published, ack consumption of original message
-      amqpChannel.ack(msg)
-      console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
     }
+    // New messages have been published, ack consumption of original message
+    amqpChannel.ack(msg)
+    console.log(msg.fields.routingKey, '[' + msg.properties.type + '] consume message acked')
   } catch (error) {
     console.error(`Unable to process btc mon message: ${error.message}`)
     // An error as occurred publishing a message, nack consumption of original message
@@ -298,7 +298,6 @@ async function openRMQConnectionAsync (connectionString) {
       let chan = await conn.createConfirmChannel()
       // the connection and channel have been established
       chan.assertQueue(env.RMQ_WORK_IN_STATE_QUEUE, { durable: true })
-      chan.assertQueue(env.RMQ_WORK_OUT_STATE_QUEUE, { durable: true })
       chan.assertQueue(env.RMQ_WORK_OUT_GEN_QUEUE, { durable: true })
       chan.prefetch(env.RMQ_PREFETCH_COUNT_STATE)
       amqpChannel = chan
