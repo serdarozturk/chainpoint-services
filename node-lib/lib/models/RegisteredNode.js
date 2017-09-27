@@ -84,15 +84,6 @@ var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
       allowNull: false,
       unique: true
     },
-    lastAuditAt: {
-      comment: 'The last time an audit was performed for this Node, in MS since EPOCH.',
-      type: Sequelize.INTEGER, // is 64 bit in CockroachDB
-      validate: {
-        isInt: true
-      },
-      field: 'last_audit_at',
-      allowNull: true
-    },
     tntCredit: {
       comment: 'The balance of token credit they have against their address.',
       type: Sequelize.DOUBLE,
