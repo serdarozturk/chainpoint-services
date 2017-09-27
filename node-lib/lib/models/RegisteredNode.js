@@ -109,7 +109,17 @@ var RegisteredNode = sequelize.define(env.COCKROACH_REG_NODE_TABLE_NAME,
     timestamps: true,
     // don't use camelcase for automatically added attributes but underscore style
     // so updatedAt will be updated_at
-    underscored: true
+    underscored: true,
+    indexes: [
+      {
+        unique: false,
+        fields: ['public_uri']
+      },
+      {
+        unique: false,
+        fields: ['tnt_credit']
+      }
+    ]
   }
 )
 
