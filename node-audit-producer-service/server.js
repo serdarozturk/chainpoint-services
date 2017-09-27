@@ -166,6 +166,9 @@ async function auditNodesAsync () {
         return
       }
 
+      // prune any old data from the table before adding new entries
+      await pruneAuditDataAsync()
+
       // get list of all Registered Nodes to audit
       let nodesReadyForAudit = []
       try {
@@ -425,20 +428,6 @@ function setPerformCreditTopoffInterval () {
   })
 }
 
-function setPruneAuditDataInterval () {
-  let currentHour = new Date().getUTCHours()
-
-  heart.createEvent(300, async function (count, last) {
-    let nowUTCHour = new Date().getUTCHours()
-
-    // if we are on a new hour
-    if (nowUTCHour !== currentHour) {
-      currentHour = nowUTCHour
-      await pruneAuditDataAsync()
-    }
-  })
-}
-
 async function startWatchesAndIntervalsAsync () {
   // Continuous watch on the consul key holding the NIST object.
   var lastAuditWatch = consul.watch({ method: consul.kv.get, options: { key: env.LAST_AUDIT_KEY } })
@@ -468,7 +457,6 @@ async function startWatchesAndIntervalsAsync () {
   setGenerateNewChallengeInterval()
   setPerformNodeAuditInterval()
   setPerformCreditTopoffInterval()
-  setPruneAuditDataInterval()
 }
 
 // process all steps need to start the application
