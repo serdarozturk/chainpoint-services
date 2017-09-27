@@ -127,11 +127,11 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
         unique: false,
         fields: [
           'tnt_addr',
-          { attribute: 'audit_at', order: 'DESC' },
           'public_ip_pass',
           'time_pass',
           'cal_state_pass',
-          'min_credits_pass'
+          'min_credits_pass',
+          { attribute: 'audit_at', order: 'DESC' }
         ]
       },
       {
