@@ -133,18 +133,18 @@ async function processIncomingAuditJobAsync (msg) {
         } catch (error) {
           console.error(`NodeAudit: Could not query for audit challenge: ${nodeAuditResponseTimestamp}`)
         }
-      }
 
-      // check if the Node challenge solution is correct
-      if (coreAuditChallenge) {
-        let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
-        nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
+        // check if the Node challenge solution is correct
+        if (coreAuditChallenge) {
+          let coreChallengeSolution = nacl.util.decodeUTF8(coreAuditChallenge.solution)
+          nodeAuditResponseSolution = nacl.util.decodeUTF8(nodeAuditResponseSolution)
 
-        if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
-          calStatePass = true
+          if (nacl.verify(nodeAuditResponseSolution, coreChallengeSolution)) {
+            calStatePass = true
+          }
+        } else {
+          console.error(`NodeAudit: No audit challenge record found: ${configResultsBody.calendar.audit_response} | ${configResultTime}, ${minTimestamp}`)
         }
-      } else {
-        console.error(`NodeAudit: No audit challenge record found: ${configResultsBody.calendar.audit_response} | ${configResultTime}, ${minTimestamp}`)
       }
     }
 
