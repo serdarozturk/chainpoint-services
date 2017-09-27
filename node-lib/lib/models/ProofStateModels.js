@@ -393,37 +393,37 @@ async function logEthEventForHashIdAsync (hashId) {
 
 async function pruneAggStatesAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await AggStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
+  let resultCount = await AggStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
 async function pruneHashTrackerLogsAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await HashTrackerLog.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  let resultCount = await HashTrackerLog.destroy({ where: { created_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
 async function pruneCalStatesAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await CalStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  let resultCount = await CalStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
 async function pruneAnchorBTCAggStatesAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await AnchorBTCAggStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  let resultCount = await AnchorBTCAggStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
 async function pruneBtcTxStatesAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await BtcTxStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  let resultCount = await BtcTxStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
 async function pruneBtcHeadStatesAsync () {
   let cutoffDate = new Date(Date.now() - PROOF_STATE_EXPIRE_HOURS * 60 * 60 * 1000)
-  let resultCount = await BtcHeadStates.destroy({ where: { updated_at: { $lt: cutoffDate } } })
+  let resultCount = await BtcHeadStates.destroy({ where: { created_at: { $lt: cutoffDate } } })
   return resultCount
 }
 
