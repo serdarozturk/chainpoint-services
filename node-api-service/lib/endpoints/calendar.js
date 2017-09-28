@@ -90,8 +90,9 @@ async function getCalBlockRangeV2Async (req, res, next) {
   let maxBlockRangeReady = Math.floor((parseInt(topBlock.id) + 1) / BLOCKRANGE_SIZE) - 1
   if (blockRangeIndex > maxBlockRangeReady) {
     res.status(404)
-    res.noCache()
-    res.send({code: 'NotFoundError', message: ''})
+    // cache the 404 for a short time to allow edge cache to remember that for a short while
+    res.cache('public', {maxAge: 30})
+    res.send({code: 'NotFoundError', message: 'block is not complete yet, check back soon'})
     return next()
   }
 
@@ -141,8 +142,9 @@ async function getCalBlockDataByHeightV1Async (req, res, next) {
 
   if (!block) {
     res.status(404)
-    res.noCache()
-    res.send({code: 'NotFoundError', message: ''})
+    // cache the 404 for a short time to allow edge cache to remember that for a short while
+    res.cache('public', {maxAge: 30})
+    res.send({code: 'NotFoundError', message: 'block not found'})
     return next()
   }
 
@@ -176,8 +178,9 @@ async function getCalBlockHashByHeightV1Async (req, res, next) {
 
   if (!block) {
     res.status(404)
-    res.noCache()
-    res.send({code: 'NotFoundError', message: ''})
+    // cache the 404 for a short time to allow edge cache to remember that for a short while
+    res.cache('public', {maxAge: 30})
+    res.send({code: 'NotFoundError', message: 'block not found'})
     return next()
   }
 
