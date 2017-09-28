@@ -156,10 +156,17 @@ var CalendarBlock = sequelize.define(env.COCKROACH_CAL_TABLE_NAME,
     // if you don't want that, set the following
     freezeTableName: true,
     indexes: [
-      // Create an index on type
+      {
+        unique: true,
+        fields: [{ attribute: 'id', order: 'DESC' }, 'hash']
+      },
       {
         unique: false,
-        fields: ['type']
+        fields: ['type', 'data_id']
+      },
+      {
+        unique: false,
+        fields: ['type', 'stack_id']
       }
     ]
   }
