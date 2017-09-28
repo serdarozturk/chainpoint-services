@@ -110,7 +110,13 @@ var AuditChallenge = sequelize.define(env.COCKROACH_AUDIT_CHALLENGE_TABLE_NAME,
     // Disable the modification of table names; By default, sequelize will automatically
     // transform all passed model names (first parameter of define) into plural.
     // if you don't want that, set the following
-    freezeTableName: true
+    freezeTableName: true,
+    indexes: [
+      {
+        unique: false,
+        fields: [{ attribute: 'time', order: 'DESC' }]
+      }
+    ]
   }
 )
 
