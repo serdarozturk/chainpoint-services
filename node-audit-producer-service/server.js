@@ -276,9 +276,17 @@ async function performCreditTopoffAsync (creditAmount) {
 
 async function pruneAuditDataAsync () {
   let cutoffTimestamp = Date.now() - 360 * 60 * 1000 // 6 hours ago
-  let resultCount = await NodeAuditLog.destroy({ where: { audit_at: { $lt: cutoffTimestamp } } })
-  if (resultCount > 0) {
-    console.log(`Pruned ${resultCount} records from the Audit log older than 6 hours`)
+  let totalPruned = 0
+  let pruneCount = 0
+
+  // continually delete old audit log entries in batches of 1000 until all are gone
+  do {
+    pruneCount = await NodeAuditLog.destroy({ where: { audit_at: { $lt: cutoffTimestamp } }, limit: 1000 })
+    totalPruned += pruneCount
+  } while (pruneCount > 0)
+
+  if (totalPruned > 0) {
+    console.log(`Pruned ${totalPruned} records from the Audit log older than 6 hours`)
   }
 }
 
