@@ -109,7 +109,13 @@ var EthTokenLog = sequelize.define(env.COCKROACH_ETH_TNT_TX_LOG_TABLE_NAME,
     timestamps: true,
     // don't use camelcase for automatically added attributes but underscore style
     // so updatedAt will be updated_at
-    underscored: true
+    underscored: true,
+    indexes: [
+      {
+        unique: false,
+        fields: ['to_address', { attribute: 'created_at', order: 'DESC' }]
+      }
+    ]
   }
 )
 
