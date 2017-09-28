@@ -204,6 +204,7 @@ async function performRewardAsync () {
  * }
  */
 async function calculateCurrentRewardShares () {
+  /*
   // get current reward period count
   let rewardBlockCount
   try {
@@ -211,8 +212,10 @@ async function calculateCurrentRewardShares () {
   } catch (error) {
     throw new Error(`Unable to query reward block count: ${error.message}`)
   }
-  let nodeTNTRewardShare = 0
+  */
+  let nodeTNTRewardShare = 500
   let coreTNTRewardShare = 0
+  /*
   switch (true) {
     case (rewardBlockCount < 9600):
       nodeTNTRewardShare = 6210.30
@@ -271,6 +274,7 @@ async function calculateCurrentRewardShares () {
       coreTNTRewardShare = 17.98
       break
   }
+  */
   let nodeTNTGrainsRewardShare = new BigNumber(nodeTNTRewardShare).times(10 ** 8).toNumber()
   let coreTNTGrainsRewardShare = new BigNumber(coreTNTRewardShare).times(10 ** 8).toNumber()
   return {
