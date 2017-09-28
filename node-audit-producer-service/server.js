@@ -29,6 +29,7 @@ const cnsl = require('consul')
 const _ = require('lodash')
 const heartbeats = require('heartbeats')
 const amqp = require('amqplib')
+const bluebird = require('bluebird')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -50,6 +51,7 @@ const creditTopoffAmount = 86400
 let heart = heartbeats.createHeart(200)
 
 let consul = cnsl({ host: env.CONSUL_HOST, port: env.CONSUL_PORT })
+bluebird.promisifyAll(consul.kv)
 console.log('Consul connection established')
 
 // The merkle tools object for building trees and generating proof paths
@@ -160,39 +162,43 @@ async function auditNodesAsync () {
   let readyForNextAuditRound = parseInt(auditLatest || 0) < maxPreviousAuditDate
   if (readyForNextAuditRound) {
     // update auditLatest
-    consul.kv.set(env.LAST_AUDIT_KEY, auditDate.toString(), async function (err, result) {
-      if (err) {
-        console.error(err)
-        return
-      }
+    try {
+      await consul.kv.setAsync(env.LAST_AUDIT_KEY, auditDate.toString())
+    } catch (error) {
+      console.error(`Unable to update consul LAST_AUDIT_KEY: ${error.message}`)
+      return
+    }
 
+    try {
       // prune any old data from the table before adding new entries
       await pruneAuditDataAsync()
+    } catch (error) {
+      console.error(`Unable to prune audit data: ${error.message}`)
+    }
 
-      // get list of all Registered Nodes to audit
-      let nodesReadyForAudit = []
+    // get list of all Registered Nodes to audit
+    let nodesReadyForAudit = []
+    try {
+      nodesReadyForAudit = await RegisteredNode.findAll({ attributes: ['tntAddr', 'publicUri', 'tntCredit'] })
+      console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
+    } catch (error) {
+      console.error(`Could not retrieve public Node list: ${error.message}`)
+    }
+
+    // iterate through each Registered Node, queue up an audit task for audit consumer
+    for (let x = 0; x < nodesReadyForAudit.length; x++) {
+      let auditTaskObj = {
+        tntAddr: nodesReadyForAudit[x].tntAddr,
+        publicUri: nodesReadyForAudit[x].publicUri,
+        tntCredit: nodesReadyForAudit[x].tntCredit
+      }
       try {
-        nodesReadyForAudit = await RegisteredNode.findAll({ attributes: ['tntAddr', 'publicUri', 'tntCredit'] })
-        console.log(`${nodesReadyForAudit.length} public Nodes ready for audit were found`)
+        await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AUDIT_QUEUE, Buffer.from(JSON.stringify(auditTaskObj)), { persistent: true })
       } catch (error) {
-        console.error(`Could not retrieve public Node list: ${error.message}`)
+        console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
       }
-
-      // iterate through each Registered Node, queue up an audit task for audit consumer
-      for (let x = 0; x < nodesReadyForAudit.length; x++) {
-        let auditTaskObj = {
-          tntAddr: nodesReadyForAudit[x].tntAddr,
-          publicUri: nodesReadyForAudit[x].publicUri,
-          tntCredit: nodesReadyForAudit[x].tntCredit
-        }
-        try {
-          await amqpChannel.sendToQueue(env.RMQ_WORK_OUT_AUDIT_QUEUE, Buffer.from(JSON.stringify(auditTaskObj)), { persistent: true })
-        } catch (error) {
-          console.error(env.RMQ_WORK_OUT_AGG_QUEUE, 'publish message nacked')
-        }
-      }
-      console.log(`Audit tasks queued for audit-consumer`)
-    })
+    }
+    console.log(`Audit tasks queued for audit-consumer`)
   } else {
     console.log(`Audit tasks have already been queued for this audit interval`)
   }
