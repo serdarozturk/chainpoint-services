@@ -113,6 +113,18 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
       type: Sequelize.BOOLEAN,
       field: 'min_credits_pass',
       allowNull: false
+    },
+    nodeVersion: {
+      comment: 'The reported version of the Node.',
+      type: Sequelize.STRING,
+      field: 'node_version',
+      allowNull: true
+    },
+    nodeVersionPass: {
+      comment: 'Boolean logging if the reported Node version was equal to or above the minimum required version.',
+      type: Sequelize.BOOLEAN,
+      field: 'node_version_pass',
+      allowNull: false
     }
   },
   {
@@ -131,12 +143,17 @@ var NodeAuditLog = sequelize.define(env.COCKROACH_AUDIT_TABLE_NAME,
           'time_pass',
           'cal_state_pass',
           'min_credits_pass',
+          'node_version_pass',
           { attribute: 'audit_at', order: 'DESC' }
         ]
       },
       {
         unique: false,
         fields: ['audit_at']
+      },
+      {
+        unique: false,
+        fields: ['node_version']
       }
     ]
   }

@@ -22,6 +22,7 @@ const nodeAuditLog = require('./lib/models/NodeAuditLog.js')
 const auditChallenge = require('./lib/models/AuditChallenge.js')
 const utils = require('./lib/utils.js')
 const amqp = require('amqplib')
+const semver = require('semver')
 
 // The channel used for all amqp communication
 // This value is set once the connection has been established
@@ -48,6 +49,9 @@ const MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN = 75
 // The minimum credit balance to receive awards and be publicly advertised
 const MIN_PASSING_CREDIT_BALANCE = 10800
 
+// The minimum Node version in use to qualify for rewards
+const MIN_NODE_VERSION_TO_PASS = '1.1.8'
+
 async function processIncomingAuditJobAsync (msg) {
   if (msg !== null) {
     let auditTaskObj = JSON.parse(msg.content.toString())
@@ -57,6 +61,8 @@ async function processIncomingAuditJobAsync (msg) {
     let timePass = false
     let calStatePass = false
     let minCreditsPass = false
+    let nodeVersion = null
+    let nodeVersionPass = false
 
     // perform the minimum credit check
     let currentCreditBalance = auditTaskObj.tntCredit
@@ -64,7 +70,7 @@ async function processIncomingAuditJobAsync (msg) {
 
     // if there is no public_uri set for this Node, fail all remaining audit tests and continue to the next
     if (!auditTaskObj.publicUri) {
-      await addAuditToLogAsync(auditTaskObj.tntAddr, null, Date.now(), false, null, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, null, Date.now(), publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
       amqpChannel.ack(msg)
       return
     }
@@ -80,27 +86,33 @@ async function processIncomingAuditJobAsync (msg) {
       } else {
         console.log(`NodeAudit: GET failed for ${auditTaskObj.publicUri}: ${error.message}`)
       }
-      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, Date.now(), true, 234, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, Date.now(), publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
       amqpChannel.ack(msg)
       return
     }
 
     if (!configResultsBody) {
       console.log(`NodeAudit: GET failed with empty result for ${auditTaskObj.publicUri}`)
-      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
       amqpChannel.ack(msg)
       return
     }
 
     if (!configResultsBody.calendar) {
       console.log(`NodeAudit: GET failed with missing calendar data for ${auditTaskObj.publicUri}`)
-      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
       amqpChannel.ack(msg)
       return
     }
     if (!configResultsBody.time) {
       console.log(`NodeAudit: GET failed with missing time for ${auditTaskObj.publicUri}`)
-      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, false, null, false, false, minCreditsPass)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
+      amqpChannel.ack(msg)
+      return
+    }
+    if (!configResultsBody.version) {
+      console.log(`NodeAudit: GET failed with missing version for ${auditTaskObj.publicUri}`)
+      await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
       amqpChannel.ack(msg)
       return
     }
@@ -148,7 +160,11 @@ async function processIncomingAuditJobAsync (msg) {
       }
     }
 
-    let success = await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass)
+    // check if the Node version is acceptable
+    nodeVersion = configResultsBody.version
+    nodeVersionPass = semver.satisfies(nodeVersion, `>=${MIN_NODE_VERSION_TO_PASS}`)
+
+    let success = await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
 
     if (success) {
       let results = {}
@@ -157,13 +173,14 @@ async function processIncomingAuditJobAsync (msg) {
       results.timePass = timePass
       results.calStatePass = calStatePass
       results.minCreditsPass = minCreditsPass
+      results.nodeVersionPass = nodeVersionPass
 
       console.log(`Audit complete for ${auditTaskObj.tntAddr} at ${auditTaskObj.publicUri}: ${JSON.stringify(results)}`)
     }
     amqpChannel.ack(msg)
   }
 
-  async function addAuditToLogAsync (tntAddr, publicUri, auditTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass) {
+  async function addAuditToLogAsync (tntAddr, publicUri, auditTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass) {
     try {
       await NodeAuditLog.create({
         tntAddr: tntAddr,
@@ -173,7 +190,9 @@ async function processIncomingAuditJobAsync (msg) {
         nodeMSDelta: nodeMSDelta,
         timePass: timePass,
         calStatePass: calStatePass,
-        minCreditsPass: minCreditsPass
+        minCreditsPass: minCreditsPass,
+        nodeVersion: nodeVersion,
+        nodeVersionPass: nodeVersionPass
       })
     } catch (error) {
       console.error(`Audit logging error: ${tntAddr}: ${error.message} `)
