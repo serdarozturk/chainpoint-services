@@ -135,7 +135,7 @@ async function getNodesRandomV1Async (req, res, next) {
   let sqlQuery = `SELECT rn.public_uri FROM ${regNodesTableName} rn 
                   WHERE rn.public_uri IS NOT NULL AND rn.tnt_addr IN (
                     SELECT DISTINCT al.tnt_addr FROM ${nodeAuditLogTableName} al 
-                    WHERE tnt_addr IS NOT NULL AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE and al.min_credits_pass = true AND al.audit_at >= ${thirtyMinutesAgo}
+                    WHERE tnt_addr IS NOT NULL AND al.public_ip_pass = TRUE AND al.time_pass = TRUE AND al.cal_state_pass = TRUE AND al.min_credits_pass = true AND al.node_version_pass = true AND al.audit_at >= ${thirtyMinutesAgo}
                   )
                   ORDER BY RANDOM() LIMIT ${RANDOM_NODES_RESULT_LIMIT}`
   let rndNodes = await registeredNodeSequelize.query(sqlQuery, { type: registeredNodeSequelize.QueryTypes.SELECT })
