@@ -169,13 +169,6 @@ async function auditNodesAsync () {
       return
     }
 
-    try {
-      // prune any old data from the table before adding new entries
-      await pruneAuditDataAsync()
-    } catch (error) {
-      console.error(`Unable to prune audit data: ${error.message}`)
-    }
-
     // get list of all Registered Nodes to audit
     let nodesReadyForAudit = []
     try {
@@ -199,6 +192,9 @@ async function auditNodesAsync () {
       }
     }
     console.log(`Audit tasks queued for audit-consumer`)
+
+    // wait 1 minute and then prune any old data from the table
+    setTimeout(() => { pruneAuditDataAsync() }, 60000)
   } else {
     console.log(`Audit tasks have already been queued for this audit interval`)
   }
@@ -278,13 +274,15 @@ async function pruneAuditDataAsync () {
   let cutoffTimestamp = Date.now() - 360 * 60 * 1000 // 6 hours ago
   let totalPruned = 0
   let pruneCount = 0
-
-  // continually delete old audit log entries in batches of 1000 until all are gone
-  do {
-    pruneCount = await NodeAuditLog.destroy({ where: { audit_at: { $lt: cutoffTimestamp } }, limit: 1000 })
-    totalPruned += pruneCount
-  } while (pruneCount > 0)
-
+  try {
+    // continually delete old audit log entries in batches of 1000 until all are gone
+    do {
+      pruneCount = await NodeAuditLog.destroy({ where: { audit_at: { $lt: cutoffTimestamp } }, limit: 500 })
+      totalPruned += pruneCount
+    } while (pruneCount > 0)
+  } catch (error) {
+    console.error(`Unable to prune audit data: ${error.message}`)
+  }
   if (totalPruned > 0) {
     console.log(`Pruned ${totalPruned} records from the Audit log older than 6 hours`)
   }
