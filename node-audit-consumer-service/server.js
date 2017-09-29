@@ -160,9 +160,13 @@ async function processIncomingAuditJobAsync (msg) {
       }
     }
 
-    // check if the Node version is acceptable
+    // check if the Node version is acceptable, catch error if version value is invalid
     nodeVersion = configResultsBody.version
-    nodeVersionPass = semver.satisfies(nodeVersion, `>=${MIN_NODE_VERSION_TO_PASS}`)
+    try {
+      nodeVersionPass = semver.satisfies(nodeVersion, `>=${MIN_NODE_VERSION_TO_PASS}`)
+    } catch (error) {
+      nodeVersionPass = false
+    }
 
     let success = await addAuditToLogAsync(auditTaskObj.tntAddr, auditTaskObj.publicUri, configResultTime, publicIPPass, nodeMSDelta, timePass, calStatePass, minCreditsPass, nodeVersion, nodeVersionPass)
 
