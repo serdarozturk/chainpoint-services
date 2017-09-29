@@ -267,8 +267,8 @@ async function openRMQConnectionAsync (connectionString) {
       chan.prefetch(env.RMQ_PREFETCH_COUNT_AUDIT)
       amqpChannel = chan
       // Receive and process audit task messages
-      chan.consume(env.RMQ_WORK_IN_AUDIT_QUEUE, (msg) => {
-        processIncomingAuditJobAsync(msg)
+      chan.consume(env.RMQ_WORK_IN_AUDIT_QUEUE, async (msg) => {
+        await processIncomingAuditJobAsync(msg)
       })
       // if the channel closes for any reason, attempt to reconnect
       conn.on('close', async () => {
