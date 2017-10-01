@@ -326,15 +326,12 @@ services:
 
   # Redis
   #
-  # LOCAL PORTS:
-  # redis : 6380 (+1 over default)
-  #
   redis:
     restart: always
     image: redis:4.0.1-alpine
     container_name: redis-core
     ports:
-      - "6380:6379"
+      - "6382:6379"
     volumes:
       - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - ./data/redis:/data
