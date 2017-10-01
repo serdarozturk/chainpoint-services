@@ -100,7 +100,7 @@ let envDefinitions = {
   RMQ_WORK_OUT_AUDIT_QUEUE: envalid.str({ default: 'work.audit', desc: 'The queue name for outgoing message to the audit consumer service' }),
 
   // Redis related variables
-  REDIS_CONNECT_URI: envalid.url({ default: 'redis://redis:6379', desc: 'The Redis server connection URI' }),
+  REDIS_CONNECT_URI: envalid.url({ devDefault: 'redis://redis:6380', desc: 'The Redis server connection URI' }),
 
   // Service Specific Variables
 
