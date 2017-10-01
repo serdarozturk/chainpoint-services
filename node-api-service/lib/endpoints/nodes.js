@@ -95,14 +95,14 @@ async function getNodeByTNTAddrV1Async (req, res, next) {
     }
   } catch (error) {
     console.error(`Could not retrieve RegisteredNode: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('could not retrieve RegisteredNode'))
   }
 
   try {
     recentAudits = await NodeAuditLog.findAll({ where: { tntAddr: lowerCasedTntAddrParam }, attributes: ['auditAt', 'publicIPPass', 'timePass', 'calStatePass', 'minCreditsPass'], order: [['auditAt', 'DESC']], limit: AUDIT_HISTORY_COUNT })
   } catch (error) {
     console.error(`Could not retrieve NodeAuditLog items: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('could not retrieve NodeAuditLog items'))
   }
 
   let result = {
@@ -201,21 +201,21 @@ async function postNodeV1Async (req, res, next) {
   try {
     let count = await RegisteredNode.count({ where: { tntAddr: lowerCasedTntAddrParam } })
     if (count >= 1) {
-      return next(new restify.ConflictError('tnt_addr'))
+      return next(new restify.ConflictError('the Ethereum address provided is already registered.'))
     }
   } catch (error) {
     console.error(`Unable to count registered Nodes: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('unable to count registered Nodes'))
   }
 
   try {
     let count = await RegisteredNode.count({ where: { publicUri: lowerCasedPublicUri } })
     if (count >= 1) {
-      return next(new restify.ConflictError('public_uri'))
+      return next(new restify.ConflictError('the public URI provided is already registered.'))
     }
   } catch (error) {
     console.error(`Unable to count registered Nodes: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('unable to count registered Nodes'))
   }
 
   let randHMACKey = crypto.randomBytes(32).toString('hex')
@@ -230,7 +230,7 @@ async function postNodeV1Async (req, res, next) {
     })
   } catch (error) {
     console.error(`Could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${lowerCasedPublicUri}: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('could not create RegisteredNode for ${lowerCasedTntAddrParam} at ${lowerCasedPublicUri}'))
   }
 
   res.send({
@@ -283,11 +283,11 @@ async function putNodeV1Async (req, res, next) {
     try {
       let count = await RegisteredNode.count({ where: { publicUri: lowerCasedPublicUri, tntAddr: { $ne: lowerCasedTntAddrParam } } })
       if (count >= 1) {
-        return next(new restify.ConflictError('public_uri'))
+        return next(new restify.ConflictError('public URI is already in use'))
       }
     } catch (error) {
       console.error(`Unable to count registered Nodes: ${error.message}`)
-      return next(new restify.InternalServerError('server error'))
+      return next(new restify.InternalServerError('unable to count registered Nodes'))
     }
   }
 
@@ -308,7 +308,7 @@ async function putNodeV1Async (req, res, next) {
     if (!regNode) {
       res.status(404)
       res.noCache()
-      res.send({ code: 'NotFoundError', message: '' })
+      res.send({ code: 'NotFoundError', message: 'could not find registered Node' })
       return next()
     }
 
@@ -324,7 +324,7 @@ async function putNodeV1Async (req, res, next) {
     let calculatedHMAC = hash.update(hmacTxt).digest('hex')
 
     if (!_.isEqual(calculatedHMAC, req.params.hmac)) {
-      return next(new restify.InvalidArgumentError('incorrect hmac'))
+      return next(new restify.InvalidArgumentError('invalid authentication HMAC provided'))
     }
 
     if (lowerCasedPublicUri == null || _.isEmpty(lowerCasedPublicUri)) {
@@ -336,7 +336,7 @@ async function putNodeV1Async (req, res, next) {
     await regNode.save()
   } catch (error) {
     console.error(`Could not update RegisteredNode: ${error.message}`)
-    return next(new restify.InternalServerError('server error'))
+    return next(new restify.InternalServerError('could not update RegisteredNode'))
   }
 
   res.send({
