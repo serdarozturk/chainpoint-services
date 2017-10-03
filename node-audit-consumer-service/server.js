@@ -50,7 +50,7 @@ const MAX_NODE_RESPONSE_CHALLENGE_AGE_MIN = 75
 const MIN_PASSING_CREDIT_BALANCE = 10800
 
 // The minimum Node version in use to qualify for rewards
-const MIN_NODE_VERSION_TO_PASS = '1.1.8'
+const MIN_NODE_VERSION_TO_PASS = '1.1.7'
 
 async function processIncomingAuditJobAsync (msg) {
   if (msg !== null) {
